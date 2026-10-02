@@ -4229,18 +4229,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             )}
                         </button>
 
-                        {/* Botão Sair do Sistema (Para modo Visualizador ou Foco Total) */}
+                        {/* Botão Sair / Voltar do Sistema (Para modo Visualizador ou Foco Total) */}
                         {onLogout && (
                             <button
                                 type="button"
                                 onClick={onLogout}
-                                className="font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap bg-rose-600/80 hover:bg-rose-600 text-white border border-rose-400/40 hover:shadow-[0_0_12px_rgba(225,29,72,0.3)] cursor-pointer"
-                                title="Sair do Sistema / Desconectar"
+                                className="font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap bg-rose-600/90 hover:bg-rose-600 text-white border border-rose-400/40 hover:shadow-[0_0_12px_rgba(225,29,72,0.3)] cursor-pointer"
+                                title="Voltar / Sair do Sistema"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                                </svg>
-                                <span>Sair</span>
+                                <ArrowLeftIcon className="w-4 h-4 text-white" />
+                                <span>{isViewer ? 'Voltar' : 'Sair'}</span>
                             </button>
                         )}
                     </div>
@@ -4339,17 +4337,26 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     >
                                         {/* Coluna da Máquina (Fundo Branco Limpo com Indicador Ita Aços) */}
                                         <div className={`p-2 sm:p-2.5 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
-                                            {/* Topo: Nome da Máquina (clicável para abrir turnos e paradas) + Botão Nova OP */}
+                                            {/* Topo: Nome da Máquina (clicável para abrir turnos e paradas se não for visualizador) + Botão Nova OP */}
                                             <div className="flex items-center justify-between gap-2 pb-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleOpenMachineShiftModal(mach.name)}
-                                                    className="text-blue-950 text-base sm:text-lg font-black tracking-wider block shrink-0 hover:text-orange-600 transition-all text-left flex items-center gap-1.5 group cursor-pointer"
-                                                    title={`Configuração da Máquina ${mach.name} (Comandos de OP, Ferramentas, Turnos e Paradas)`}
-                                                >
-                                                    <span className="group-hover:underline underline-offset-4 decoration-orange-500">{mach.name}</span>
-                                                    <span className="opacity-80 group-hover:opacity-100 group-hover:rotate-45 text-xs text-blue-600 font-mono transition-all transform duration-300">⚙️</span>
-                                                </button>
+                                                {isViewer ? (
+                                                    <div 
+                                                        className="text-blue-950 text-base sm:text-lg font-black tracking-wider block shrink-0 select-none"
+                                                        title={`Máquina ${mach.name}`}
+                                                    >
+                                                        <span>{mach.name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenMachineShiftModal(mach.name)}
+                                                        className="text-blue-950 text-base sm:text-lg font-black tracking-wider block shrink-0 hover:text-orange-600 transition-all text-left flex items-center gap-1.5 group cursor-pointer"
+                                                        title={`Configuração da Máquina ${mach.name} (Comandos de OP, Ferramentas, Turnos e Paradas)`}
+                                                    >
+                                                        <span className="group-hover:underline underline-offset-4 decoration-orange-500">{mach.name}</span>
+                                                        <span className="opacity-80 group-hover:opacity-100 group-hover:rotate-45 text-xs text-blue-600 font-mono transition-all transform duration-300">⚙️</span>
+                                                    </button>
+                                                )}
                                                 {!isViewer && (
                                                     <button
                                                         onClick={() => handleOpenCreateModal(mach.name)}
@@ -4422,20 +4429,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                     return (
                                                         <div 
-                                                            onClick={() => {
+                                                            onClick={isViewer ? undefined : () => {
                                                                 localStorage.setItem('msm_active_machine', mach.name);
                                                                 if (mach.name.startsWith('Trefila')) setPage('trefilaInProgress');
                                                                 else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
                                                                 else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
                                                             }}
-                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 cursor-pointer hover:shadow-md active:scale-[0.98] ${
+                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 ${
+                                                                isViewer 
+                                                                    ? 'cursor-default' 
+                                                                    : 'cursor-pointer hover:shadow-md active:scale-[0.98]'
+                                                            } ${
                                                                 isOperating 
                                                                     ? 'bg-emerald-50 border-emerald-300 shadow-sm' 
                                                                     : isOnline 
                                                                         ? 'bg-blue-50 border-blue-300 shadow-sm' 
                                                                         : 'bg-slate-50 border-slate-200 shadow-sm'
                                                             }`}
-                                                            title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel} ${isOnline ? '(Online no App)' : '(Offline no App)'}. Clique para abrir o painel da máquina.`}
+                                                            title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel} ${isOnline ? '(Online no App)' : '(Offline no App)'}.${isViewer ? '' : ' Clique para abrir o painel da máquina.'}`}
                                                         >
                                                             {/* Avatar com Foto do Operador */}
                                                             <div className="relative shrink-0">
@@ -4502,18 +4513,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     const isExceeded = Boolean((liveInfo as any).isOverLimit);
                                                     return (
                                                         <div 
-                                                            onClick={() => {
+                                                            onClick={isViewer ? undefined : () => {
                                                                 localStorage.setItem('msm_active_machine', mach.name);
                                                                 if (mach.name.startsWith('Trefila')) setPage('trefilaInProgress');
                                                                 else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
                                                                 else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
                                                             }}
-                                                            className={`mt-1.5 p-1 rounded-md cursor-pointer transition-all shadow-sm ${
+                                                            className={`mt-1.5 p-1 rounded-md transition-all shadow-sm ${
+                                                                isViewer 
+                                                                    ? 'cursor-default' 
+                                                                    : 'cursor-pointer hover:bg-rose-100'
+                                                            } ${
                                                                 isExceeded 
-                                                                    ? 'bg-rose-50 border-2 border-rose-500 text-rose-900 animate-pulse hover:bg-rose-100 shadow-rose-500/20' 
-                                                                    : 'bg-amber-50 border-2 border-amber-500 text-amber-950 animate-pulse hover:bg-amber-100 shadow-amber-500/20'
+                                                                    ? 'bg-rose-50 border-2 border-rose-500 text-rose-900 animate-pulse shadow-rose-500/20' 
+                                                                    : 'bg-amber-50 border-2 border-amber-500 text-amber-950 animate-pulse shadow-amber-500/20'
                                                             }`}
-                                                            title={isExceeded ? "Tempo Ultrapassado! Clique para ir ao painel da máquina" : "Alerta de Parada/Preparação. Clique para ir ao painel da máquina"}
+                                                            title={isExceeded ? "Tempo Ultrapassado!" : "Alerta de Parada/Preparação"}
                                                         >
                                                             <div className={`flex items-center gap-1 font-black text-[8px] uppercase tracking-wide ${isExceeded ? 'text-rose-600' : 'text-amber-700'}`}>
                                                                 <span className={`w-1.5 h-1.5 rounded-full ${isExceeded ? 'bg-rose-600 animate-ping' : 'bg-amber-500'}`} />
@@ -4530,8 +4545,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 }
 
                                                 return null;
-                                            })()}
-                                        </div>
+                                             })()}
+                                         </div>
 
                                         {/* Grade de fundo (5 Colunas de dias com visual claro e límpido) */}
                                         {Array.from({ length: 5 }).map((_, colIndex) => {
@@ -4831,8 +4846,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             return (
                                                 <div
                                                     key={op.id}
-                                                    onClick={() => setDrawerOP(op)}
-                                                    className={`pcp-op-bar absolute animate-fade ${barBg} ${barGlowRing}`}
+                                                    onClick={isViewer ? undefined : () => setDrawerOP(op)}
+                                                    className={`pcp-op-bar absolute animate-fade ${barBg} ${barGlowRing} ${isViewer ? '!cursor-default' : ''}`}
                                                     style={{
                                                         left: leftStyle,
                                                         width: widthStyle,
@@ -4843,16 +4858,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         <div className="flex items-center justify-between gap-2 shrink-0 pb-1 border-b border-slate-200/80 flex-wrap sm:flex-nowrap">
                                                             {/* Lado Esquerdo: #OP# + Descrição Completa + Status Badges */}
                                                             <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
-                                                                <span 
-                                                                    className="text-sm sm:text-base font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center flex-wrap gap-1 shrink-0"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setEditingInProgressOP(op);
-                                                                    }}
-                                                                    title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
-                                                                >
-                                                                    <span>#{title}#</span>
-                                                                </span>
+                                                                {isViewer ? (
+                                                                    <span className="text-sm sm:text-base font-black text-blue-900 tracking-wide select-none shrink-0">
+                                                                        <span>#{title}#</span>
+                                                                    </span>
+                                                                ) : (
+                                                                    <span 
+                                                                        className="text-sm sm:text-base font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center flex-wrap gap-1 shrink-0"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setEditingInProgressOP(op);
+                                                                        }}
+                                                                        title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
+                                                                    >
+                                                                        <span>#{title}#</span>
+                                                                    </span>
+                                                                )}
                                                                 {subtitle && (
                                                                     <span 
                                                                         className="text-xs sm:text-sm text-slate-800 font-bold tracking-normal"
@@ -4902,11 +4923,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                             {/* Lado Direito do Topo: Mover / Estender Duração + Barra de Progresso Real */}
                                                             <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none" onClick={(e) => e.stopPropagation()}>
-                                                                {!hasProductionStarted(op) && (
+                                                                {!isViewer && !hasProductionStarted(op) && (
                                                                     <div className="flex items-center gap-0.5 bg-white/95 px-1.5 py-0.5 rounded-lg border border-slate-200/90 shadow-xs">
                                                                         <button 
                                                                             onClick={() => handleShiftOP(op, -1)}
-                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5" 
+                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer" 
                                                                             title="Mover OP 1 dia antes"
                                                                         >
                                                                             ◀
@@ -4914,7 +4935,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Mover</span>
                                                                         <button 
                                                                             onClick={() => handleShiftOP(op, 1)}
-                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5"
+                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer"
                                                                             title="Mover OP 1 dia depois"
                                                                         >
                                                                             ▶
@@ -4924,40 +4945,47 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                                 {/* Pill de Duração / Extensão */}
                                                                 <div 
-                                                                    className="flex items-center gap-1 bg-white/95 px-2 py-0.5 rounded-lg border border-slate-200/90 shadow-xs text-slate-700"
-                                                                    title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Use [+] para estender a duração em dias.` : "Duração estimada em dias úteis"}
+                                                                    className="flex items-center gap-1 bg-white/95 px-2 py-0.5 rounded-lg border border-slate-200/90 shadow-xs text-slate-700 select-none"
+                                                                    title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}.` : "Duração estimada em dias úteis"}
                                                                 >
                                                                     <span className="text-[9.5px] text-slate-600 font-bold flex items-center gap-1">
                                                                         <span>⏱️</span>
                                                                         <span className="hidden sm:inline">{hasProductionStarted(op) ? 'Estender:' : 'Duração:'}</span>
                                                                     </span>
-                                                                    <div className="flex items-center gap-0.5 ml-0.5">
-                                                                        <button 
-                                                                            onClick={() => handleAdjustDuration(op, -1)}
-                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90"
-                                                                            title={hasProductionStarted(op) ? "Reduzir extensão" : "Diminuir duração"}
-                                                                        >
-                                                                            -
-                                                                        </button>
+                                                                    {isViewer ? (
                                                                         <span className="font-black text-xs text-slate-900 px-1 font-mono">{op.estimatedDurationDays || 1}d</span>
-                                                                        <button 
-                                                                            onClick={() => handleAdjustDuration(op, 1)}
-                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90"
-                                                                            title="Estender duração (+1 dia)"
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    </div>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-0.5 ml-0.5">
+                                                                            <button 
+                                                                                onClick={() => handleAdjustDuration(op, -1)}
+                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                                title={hasProductionStarted(op) ? "Reduzir extensão" : "Diminuir duração"}
+                                                                            >
+                                                                                -
+                                                                            </button>
+                                                                            <span className="font-black text-xs text-slate-900 px-1 font-mono">{op.estimatedDurationDays || 1}d</span>
+                                                                            <button 
+                                                                                onClick={() => handleAdjustDuration(op, 1)}
+                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                                title="Estender duração (+1 dia)"
+                                                                            >
+                                                                                +
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
 
                                                                 {/* Barra de Progresso Real Compacta e Precisa */}
                                                                 <div 
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
+                                                                        if (isViewer) return;
                                                                         handleOpenAdjustQuantity(op, { mode: 'total' });
                                                                     }}
-                                                                    className="flex items-center gap-1.5 bg-white/95 hover:bg-white px-2 py-0.5 rounded-lg transition-all border border-slate-200/90 hover:border-slate-300 shadow-xs cursor-pointer min-w-[145px] sm:min-w-[185px]"
-                                                                    title="Clique para ajustar quantidade total produzida da OP (Gestor)"
+                                                                    className={`flex items-center gap-1.5 bg-white/95 px-2 py-0.5 rounded-lg border border-slate-200/90 shadow-xs min-w-[145px] sm:min-w-[185px] select-none ${
+                                                                        isViewer ? 'cursor-default' : 'hover:bg-white transition-all hover:border-slate-300 cursor-pointer'
+                                                                    }`}
+                                                                    title={isViewer ? `Progresso: ${prog.produced.toLocaleString('pt-BR')} / ${prog.target.toLocaleString('pt-BR')} ${prog.unit} (${prog.pct}%)` : "Clique para ajustar quantidade total produzida da OP (Gestor)"}
                                                                 >
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-700 leading-none">
@@ -5046,18 +5074,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                         </span>
                                                                                     )}
                                                                                 </div>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
-                                                                                    }}
-                                                                                    className="px-2.5 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider shadow-xs transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
-                                                                                    title="Clique para lançar o peso deste lote"
-                                                                                >
-                                                                                    <span>Pesar</span>
-                                                                                    <span className="text-xs">⚖️</span>
-                                                                                </button>
+                                                                                {isViewer ? (
+                                                                                    <span className="px-2.5 py-0.5 rounded-md bg-amber-200 text-amber-900 font-black text-[10px] uppercase tracking-wider shrink-0">
+                                                                                        Aguardando Pesagem ⚖️
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
+                                                                                        }}
+                                                                                        className="px-2.5 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider shadow-xs transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+                                                                                        title="Clique para lançar o peso deste lote"
+                                                                                    >
+                                                                                        <span>Pesar</span>
+                                                                                        <span className="text-xs">⚖️</span>
+                                                                                    </button>
+                                                                                )}
                                                                             </div>
                                                                         );
                                                                     })()
@@ -5072,6 +5106,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
                                                                                 const lotName = lotStock?.internalLot || pLot.lotId || '---';
                                                                                 const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
+                                                                                if (isViewer) {
+                                                                                    return (
+                                                                                        <span
+                                                                                            key={pLot.lotId}
+                                                                                            className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-white text-amber-950 border border-amber-300 shadow-xs"
+                                                                                        >
+                                                                                            <span>Lote {lotName}</span>
+                                                                                            <span className="text-[9px] text-amber-600">⚖️</span>
+                                                                                        </span>
+                                                                                    );
+                                                                                }
                                                                                 return (
                                                                                     <button
                                                                                         key={pLot.lotId}
@@ -5112,7 +5157,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 return (
                                                                     <div 
                                                                         key={dayIdx} 
-                                                                        onClick={() => {
+                                                                        onClick={isViewer ? undefined : () => {
                                                                             setSelectedDailyReport({ 
                                                                                 op, 
                                                                                 date: currentDay, 
@@ -5122,7 +5167,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 unit: dayStats.unit 
                                                                             });
                                                                         }}
-                                                                        className={`flex flex-col justify-between p-1.5 sm:p-2 rounded-xl border text-left transition-all cursor-pointer hover:shadow-lg select-none h-full min-h-0 ${
+                                                                        className={`flex flex-col justify-between p-1.5 sm:p-2 rounded-xl border text-left transition-all select-none h-full min-h-0 ${
+                                                                            isViewer ? 'cursor-default' : 'cursor-pointer hover:shadow-lg'
+                                                                        } ${
                                                                             dayStats.isToday 
                                                                                 ? (prog.isLive && (prog.isStopped || prog.isPrep))
                                                                                     ? (isDowntimeOverLimit
@@ -5137,7 +5184,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                             ? 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
                                                                                             : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
                                                                         }`}
-                                                                        title={`Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
+                                                                        title={isViewer ? `Produção de ${dayColName} ${formatFriendlyDate(currentDay)}: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : `Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
                                                                     >
                                                                         <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-0.5 min-w-0">
                                                                             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
