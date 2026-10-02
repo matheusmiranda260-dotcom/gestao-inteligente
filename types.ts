@@ -718,11 +718,24 @@ export interface WorkInstruction {
     updatedAt?: string;
 }
 
+export interface UserActivityAction {
+    action: string;
+    page?: string;
+    details?: string;
+    timestamp: string;
+}
+
 export interface UserAccessLog {
     id: string;
     userId: string;
     username: string;
     loginAt: string;
+    logoutAt?: string | null;
+    lastActivityAt?: string | null;
+    durationSeconds?: number | null;
+    ipAddress?: string | null;
+    deviceInfo?: string | null;
+    actions?: (UserActivityAction | string)[] | null;
 }
 
 export const trelicaLabels = ['H08 (8m)', 'H12 (12m)', 'H6 (6m)', 'H10 (10m)'];

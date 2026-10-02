@@ -394,57 +394,326 @@ const UserModal: React.FC<{
 };
 
 
+const formatDuration = (seconds?: number | null): string => {
+    if (seconds === undefined || seconds === null || isNaN(seconds) || seconds <= 0) return '< 1 min';
+    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    if (hours > 0) {
+        return `${hours}h ${remMins}m (${mins} min)`;
+    }
+    return `${mins} min`;
+};
+
+const formatTimeOnly = (dateStr?: string | null): string => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDateFriendly = (dateStr?: string | null): string => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+};
+
+const getActionIcon = (actionText: string): string => {
+    const act = (actionText || '').toLowerCase();
+    if (act.includes('login') || act.includes('entrou')) return '🔑';
+    if (act.includes('logout') || act.includes('saiu') || act.includes('desconectou')) return '🚪';
+    if (act.includes('pcp') || act.includes('quadro')) return '📊';
+    if (act.includes('estoque') || act.includes('lote')) return '📦';
+    if (act.includes('trefila')) return '⚡';
+    if (act.includes('treliça') || act.includes('trelica')) return '🏗️';
+    if (act.includes('malha')) return '🕸️';
+    if (act.includes('pesagem') || act.includes('peso')) return '⚖️';
+    if (act.includes('usuário') || act.includes('usuario')) return '👥';
+    if (act.includes('qualidade') || act.includes('laboratório') || act.includes('laboratorio')) return '🔬';
+    if (act.includes('ordem') || act.includes('op')) return '📝';
+    if (act.includes('relatório') || act.includes('relatorio')) return '📈';
+    return '📌';
+};
+
 const AccessHistoryModal: React.FC<{
     user: User;
     accessLogs: UserAccessLog[];
     onClose: () => void;
 }> = ({ user, accessLogs, onClose }) => {
+    const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
     const userLogs = useMemo(() => {
         return accessLogs
             .filter(log => log.userId === user.id)
             .sort((a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime());
     }, [accessLogs, user.id]);
 
+    const totalDurationSeconds = useMemo(() => {
+        return userLogs.reduce((acc, log) => {
+            if (log.durationSeconds && log.durationSeconds > 0) {
+                return acc + log.durationSeconds;
+            }
+            if (log.loginAt && log.logoutAt) {
+                const diff = Math.round((new Date(log.logoutAt).getTime() - new Date(log.loginAt).getTime()) / 1000);
+                return acc + Math.max(0, diff);
+            }
+            return acc;
+        }, 0);
+    }, [userLogs]);
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col animate-fadeIn">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        📜 Histórico: {user.username}
-                    </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col overflow-hidden border border-slate-200">
+                {/* Cabeçalho do Modal */}
+                <div className="bg-gradient-to-r from-[#0F3F5C] via-[#0D354E] to-[#0A2A3D] p-5 text-white flex items-center justify-between shrink-0 shadow-md">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl shadow-inner">
+                            📜
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h2 className="text-lg font-black tracking-wide text-white">
+                                    Histórico de Sessões & Atividades
+                                </h2>
+                                <span className="bg-orange-500/20 text-orange-300 border border-orange-400/40 text-[11px] font-black px-2.5 py-0.5 rounded-full">
+                                    {user.username}
+                                </span>
+                            </div>
+                            <p className="text-xs text-blue-200/90 mt-0.5 font-medium">
+                                Rastreamento de tempo ativo e páginas/operações acessadas pelo usuário
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={onClose} 
+                        className="text-white/70 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-colors cursor-pointer"
+                        title="Fechar"
+                    >
+                        <span className="text-2xl font-bold leading-none">&times;</span>
+                    </button>
+                </div>
+
+                {/* Cards de Resumo Rápido */}
+                <div className="bg-slate-50 border-b border-slate-200 p-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status Atual</span>
+                        <div className="flex items-center gap-1.5 mt-1">
+                            {user.isOnline ? (
+                                <>
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                    <span className="text-xs font-black text-emerald-700">Online Agora</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
+                                    <span className="text-xs font-bold text-slate-500">Offline</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tempo Acumulado</span>
+                        <p className="text-xs font-black text-blue-950 mt-1">
+                            {formatDuration(totalDurationSeconds)}
+                        </p>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total de Sessões</span>
+                        <p className="text-xs font-black text-slate-800 mt-1">
+                            {userLogs.length} acesso(s)
+                        </p>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Perfil / Role</span>
+                        <p className="text-xs font-black text-slate-800 mt-1 capitalize">
+                            {user.role === 'viewer' ? '👁️ Somente PCP' : user.role === 'gestor' ? '👔 Gestor' : user.role === 'admin' ? '👑 Admin' : '👷 Operador'}
+                        </p>
+                    </div>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto pr-1 space-y-2 mb-6">
+                {/* Lista de Sessões com Linha do Tempo de Atividades */}
+                <div className="flex-grow overflow-y-auto p-4 space-y-3.5 bg-slate-100/70">
                     {userLogs.length > 0 ? (
-                        userLogs.map((log) => {
-                            const formattedDate = new Date(log.loginAt).toLocaleString('pt-BR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit'
+                        userLogs.map((log, index) => {
+                            const isCurrentlyActive = user.isOnline && index === 0 && !log.logoutAt;
+                            const loginDateFriendly = formatDateFriendly(log.loginAt);
+                            const startTime = formatTimeOnly(log.loginAt);
+                            
+                            let endTime = '';
+                            let durationSec = log.durationSeconds || 0;
+
+                            if (isCurrentlyActive) {
+                                endTime = 'Agora';
+                                durationSec = Math.max(0, Math.round((Date.now() - new Date(log.loginAt).getTime()) / 1000));
+                            } else if (log.logoutAt) {
+                                endTime = formatTimeOnly(log.logoutAt);
+                                if (!durationSec) {
+                                    durationSec = Math.max(0, Math.round((new Date(log.logoutAt).getTime() - new Date(log.loginAt).getTime()) / 1000));
+                                }
+                            } else if (log.lastActivityAt && new Date(log.lastActivityAt).getTime() > new Date(log.loginAt).getTime()) {
+                                endTime = formatTimeOnly(log.lastActivityAt);
+                                if (!durationSec) {
+                                    durationSec = Math.max(0, Math.round((new Date(log.lastActivityAt).getTime() - new Date(log.loginAt).getTime()) / 1000));
+                                }
+                            } else {
+                                endTime = startTime;
+                            }
+
+                            const durationFormatted = formatDuration(durationSec);
+                            
+                            // Normalizar lista de ações
+                            const rawActions = Array.isArray(log.actions) ? log.actions : [];
+                            const parsedActions = rawActions.map((item: any) => {
+                                if (typeof item === 'string') {
+                                    return { action: item, timestamp: log.loginAt };
+                                }
+                                return item;
                             });
+
+                            const isExpanded = expandedLogId === log.id || parsedActions.length <= 3;
+                            const hasMultipleActions = parsedActions.length > 3;
+
                             return (
-                                <div key={log.id} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-500"></div>
-                                        <span className="text-xs font-bold text-slate-700">Acesso ao sistema</span>
+                                <div 
+                                    key={log.id} 
+                                    className={`bg-white rounded-xl border transition-all shadow-xs ${
+                                        isCurrentlyActive 
+                                            ? 'border-emerald-400 ring-2 ring-emerald-200/70 shadow-sm' 
+                                            : 'border-slate-200 hover:border-slate-300'
+                                    }`}
+                                >
+                                    {/* Topo do Card de Sessão */}
+                                    <div className={`p-3.5 border-b rounded-t-xl flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap ${
+                                        isCurrentlyActive 
+                                            ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-emerald-200' 
+                                            : 'bg-slate-50 border-slate-200/80'
+                                    }`}>
+                                        <div className="flex items-center gap-2.5">
+                                            {isCurrentlyActive ? (
+                                                <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-sm animate-pulse">
+                                                    🟢
+                                                </div>
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-sm">
+                                                    📅
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs font-black text-slate-800">
+                                                        {loginDateFriendly}
+                                                    </span>
+                                                    {isCurrentlyActive && (
+                                                        <span className="text-[10px] bg-emerald-500 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-2xs">
+                                                            Sessão Ativa Agora
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-600 font-semibold">
+                                                    <span>🕒 <strong>{startTime}</strong> até <strong>{endTime}</strong></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Duração Destacada */}
+                                        <div className="flex items-center gap-2">
+                                            <div className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1.5 shadow-2xs ${
+                                                isCurrentlyActive 
+                                                    ? 'bg-emerald-600 text-white shadow-emerald-200' 
+                                                    : 'bg-blue-900 text-white'
+                                            }`}>
+                                                <span>⏱️</span>
+                                                <span>{durationFormatted}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <span className="text-xs font-semibold text-slate-500">{formattedDate}</span>
+
+                                    {/* Linha do Tempo de Atividades Realizadas na Sessão */}
+                                    <div className="p-3.5">
+                                        {parsedActions.length > 0 ? (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                                                    <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <span>🔍 Atividades Registradas ({parsedActions.length})</span>
+                                                    </span>
+                                                    {hasMultipleActions && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                                                            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                                                        >
+                                                            {expandedLogId === log.id ? 'Ocultar ▲' : `Ver todas as ${parsedActions.length} ações ▼`}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-1.5 pt-1">
+                                                    {(isExpanded ? parsedActions : parsedActions.slice(0, 3)).map((act: any, aIdx: number) => {
+                                                        const actionTime = formatTimeOnly(act.timestamp) || startTime;
+                                                        const icon = getActionIcon(act.action);
+                                                        return (
+                                                            <div 
+                                                                key={aIdx} 
+                                                                className="flex items-start gap-2.5 p-1.5 rounded-lg bg-slate-50/80 hover:bg-slate-100 border border-slate-100 transition-colors text-xs"
+                                                            >
+                                                                <span className="text-slate-400 font-mono font-bold text-[11px] shrink-0 pt-0.5">
+                                                                    {actionTime}
+                                                                </span>
+                                                                <span className="shrink-0">{icon}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <span className="font-bold text-slate-800 block truncate">
+                                                                        {act.action}
+                                                                    </span>
+                                                                    {act.details && (
+                                                                        <span className="text-[11px] text-slate-500 font-medium block truncate">
+                                                                            {act.details}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium p-2 bg-slate-50 rounded-lg">
+                                                <span>🔑</span>
+                                                <span>Sessão de acesso registrada no sistema às {startTime}.</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })
                     ) : (
-                        <div className="text-center py-10 text-slate-400">
-                            <p>Nenhum registro de acesso encontrado.</p>
+                        <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200">
+                            <span className="text-4xl block mb-2">📜</span>
+                            <p className="font-bold text-slate-600">Nenhum registro de acesso encontrado.</p>
+                            <p className="text-xs text-slate-400 mt-1">Os acessos futuros deste usuário serão registrados com tempo ativo e atividades.</p>
                         </div>
                     )}
                 </div>
                 
-                <div className="flex justify-end pt-4 border-t">
-                    <button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg transition">
+                {/* Rodapé */}
+                <div className="p-4 bg-white border-t border-slate-200 flex justify-between items-center shrink-0">
+                    <span className="text-xs text-slate-500 font-medium">
+                        Mostrando {userLogs.length} registro(s) de sessão
+                    </span>
+                    <button 
+                        onClick={onClose} 
+                        className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-6 rounded-xl transition shadow-sm cursor-pointer active:scale-95"
+                    >
                         Fechar
                     </button>
                 </div>
