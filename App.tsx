@@ -520,7 +520,7 @@ const App: React.FC = () => {
 
 
     // User Management
-    const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string }) => {
+    const addUser = async (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string; allowedMachines?: string[] }) => {
         const newUser: User = {
             id: generateId('user'),
             username: data.username,
@@ -528,6 +528,7 @@ const App: React.FC = () => {
             role: (data.role as any) || 'user',
             permissions: data.permissions,
             employeeId: data.employeeId || null,
+            allowedMachines: data.allowedMachines || [],
         };
 
         try {
@@ -547,6 +548,11 @@ const App: React.FC = () => {
             }
             await updateItem<User>('app_users', userId, sanitizedData);
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...sanitizedData } : u));
+            if (currentUser && currentUser.id === userId) {
+                const updatedCurrentUser = { ...currentUser, ...sanitizedData };
+                setCurrentUser(updatedCurrentUser);
+                localStorage.setItem('currentUser', JSON.stringify(updatedCurrentUser));
+            }
             showNotification('Usuário atualizado com sucesso!', 'success');
         } catch (error) {
             showNotification('Erro ao atualizar usuário.', 'error');

@@ -76,6 +76,7 @@ export interface User {
     loginCount?: number;
     lastLoginAt?: string;
     sessionVersion?: number;
+    allowedMachines?: string[];
 }
 
 export interface Employee {

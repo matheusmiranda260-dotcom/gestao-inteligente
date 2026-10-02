@@ -324,20 +324,43 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // Estado de data de referência (inicializado com a segunda-feira da semana ativa)
     const [currentDate, setCurrentDate] = useState<Date>(() => getMonday(new Date()));
 
-    // Filtro de máquinas visíveis (com persistência no localStorage)
+    // Máquinas disponíveis para o usuário atual (respeita parametrização de allowedMachines no cadastro de usuário)
+    const availableMachines = useMemo(() => {
+        const userAllowed = currentUser?.allowedMachines;
+        if (!userAllowed || !Array.isArray(userAllowed) || userAllowed.length === 0) {
+            return MACHINES;
+        }
+        const filtered = MACHINES.filter(m => userAllowed.includes(m.name));
+        return filtered.length > 0 ? filtered : MACHINES;
+    }, [currentUser?.allowedMachines]);
+
+    // Filtro de máquinas visíveis (com persistência no localStorage filtrado pelas permitidas)
     const [selectedMachinesFilter, setSelectedMachinesFilter] = useState<string[]>(() => {
+        const userAllowed = currentUser?.allowedMachines;
+        const allowedNames = (userAllowed && Array.isArray(userAllowed) && userAllowed.length > 0)
+            ? MACHINES.filter(m => userAllowed.includes(m.name)).map(m => m.name)
+            : MACHINES.map(m => m.name);
         try {
             const saved = localStorage.getItem('pcp_selected_machines_filter');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    const valid = parsed.filter((m: string) => MACHINES.some(mach => mach.name === m));
+                    const valid = parsed.filter((m: string) => allowedNames.includes(m));
                     if (valid.length > 0) return valid;
                 }
             }
         } catch {}
-        return MACHINES.map(m => m.name);
+        return allowedNames;
     });
+
+    // Sincronizar filtro quando availableMachines mudar
+    useEffect(() => {
+        const allowedNames = availableMachines.map(m => m.name);
+        setSelectedMachinesFilter(prev => {
+            const valid = prev.filter(m => allowedNames.includes(m));
+            return valid.length > 0 ? valid : allowedNames;
+        });
+    }, [availableMachines]);
 
     // Salvar filtro de máquinas sempre que alterado
     useEffect(() => {
@@ -1858,7 +1881,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Status e Paradas em tempo real de cada máquina da fábrica (atualiza com o relógio liveNow a cada 1s)
     const machineLiveStatus = useMemo(() => {
-        return MACHINES.filter(m => selectedMachinesFilter.includes(m.name)).map(mach => {
+        return availableMachines.filter(m => selectedMachinesFilter.includes(m.name)).map(mach => {
             // Encontra a OP em andamento nesta máquina
             const liveOp = productionOrders.find(o => 
                 (o.scheduledMachine === mach.name || o.machine === mach.name) && 
@@ -4160,21 +4183,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setSelectedMachinesFilter(MACHINES.map(m => m.name));
+                                    setSelectedMachinesFilter(availableMachines.map(m => m.name));
                                 }}
                                 className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${
-                                    selectedMachinesFilter.length === MACHINES.length
+                                    selectedMachinesFilter.length === availableMachines.length
                                         ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
                                         : 'text-blue-300 hover:text-white hover:bg-blue-800/50 border border-transparent'
                                 }`}
-                                title="Exibir todas as máquinas no quadro PCP"
+                                title="Exibir todas as máquinas permitidas no quadro PCP"
                             >
                                 Todas
                             </button>
 
-                            {MACHINES.map(mach => {
+                            {availableMachines.map(mach => {
                                 const isSelected = selectedMachinesFilter.includes(mach.name);
-                                const isAllSelected = selectedMachinesFilter.length === MACHINES.length;
+                                const isAllSelected = selectedMachinesFilter.length === availableMachines.length;
                                 
                                 return (
                                     <button
@@ -4187,7 +4210,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 if (selectedMachinesFilter.length > 1) {
                                                     setSelectedMachinesFilter(prev => prev.filter(m => m !== mach.name));
                                                 } else {
-                                                    setSelectedMachinesFilter(MACHINES.map(m => m.name));
+                                                    setSelectedMachinesFilter(availableMachines.map(m => m.name));
                                                 }
                                             } else {
                                                 setSelectedMachinesFilter(prev => [...prev, mach.name]);
@@ -4305,7 +4328,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         {/* Linhas das Máquinas */}
                         <div className="flex-1 flex flex-col relative min-h-0 bg-[#F8FAFC]">
-                            {MACHINES.filter(mach => selectedMachinesFilter.includes(mach.name)).map((mach) => {
+                            {availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name)).map((mach) => {
                                 const machOps = scheduledOrders.filter(op => op.scheduledMachine === mach.name);
 
                                 // Calcula trilhas verticais para OPs simultâneas ou sobrepostas na mesma máquina

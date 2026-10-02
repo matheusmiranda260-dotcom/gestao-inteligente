@@ -2,10 +2,18 @@ import React, { useState, useMemo } from 'react';
 import type { Page, User, Employee, UserAccessLog } from '../types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
 
+export const AVAILABLE_MACHINES = [
+    { id: 'Trefila 1', name: 'Trefila 1', short: 'TR 1', type: 'Trefila', icon: '⚡' },
+    { id: 'Trefila 2', name: 'Trefila 2', short: 'TR 2', type: 'Trefila', icon: '⚡' },
+    { id: 'Treliça 1', name: 'Treliça 1', short: 'TL 1', type: 'Treliça', icon: '🏗️' },
+    { id: 'Treliça 2', name: 'Treliça 2', short: 'TL 2', type: 'Treliça', icon: '🏗️' },
+    { id: 'Malha 1', name: 'Malha 1', short: 'ML 1', type: 'Malha', icon: '🕸️' },
+];
+
 interface UserManagementProps {
     users: User[];
     employees: Employee[];
-    addUser: (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string }) => void;
+    addUser: (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string; allowedMachines?: string[] }) => void;
     updateUser: (userId: string, data: Partial<User>) => void;
     deleteUser: (userId: string) => void;
     setPage: (page: Page) => void;
@@ -104,6 +112,12 @@ const UserModal: React.FC<{
     );
     const [role, setRole] = useState(user?.role || 'user');
     const [employeeId, setEmployeeId] = useState(user?.employeeId || '');
+    const [allowedMachines, setAllowedMachines] = useState<string[]>(() => {
+        if (user?.allowedMachines && Array.isArray(user.allowedMachines)) {
+            return user.allowedMachines;
+        }
+        return AVAILABLE_MACHINES.map(m => m.id);
+    });
     const isEditing = !!user;
 
     const handleRoleChange = (newRole: string) => {
@@ -124,14 +138,28 @@ const UserModal: React.FC<{
             return;
         }
         const effectivePerms = role === 'viewer' ? { pcpBoard: true, productionDashboard: true, ...permissions } : permissions;
+        const effectiveMachines = allowedMachines.length > 0 ? allowedMachines : AVAILABLE_MACHINES.map(m => m.id);
+        
         if (isEditing) {
-            const dataToSubmit: Partial<User> = { permissions: effectivePerms, role, employeeId };
+            const dataToSubmit: Partial<User> = { 
+                permissions: effectivePerms, 
+                role, 
+                employeeId, 
+                allowedMachines: effectiveMachines 
+            };
             if (password) {
                 dataToSubmit.password = password;
             }
             onSubmit(dataToSubmit);
         } else {
-            onSubmit({ username, password, permissions: effectivePerms, role, employeeId });
+            onSubmit({ 
+                username, 
+                password, 
+                permissions: effectivePerms, 
+                role, 
+                employeeId, 
+                allowedMachines: effectiveMachines 
+            });
         }
         onClose();
     };
@@ -188,6 +216,74 @@ const UserModal: React.FC<{
                                 ? '👑 Acesso total liberado para todas as telas e configurações.'
                                 : '👷 Permite marcar manualmente quais telas o operador pode acessar.'}
                         </p>
+                    </div>
+
+                    {/* Parametrização de Máquinas Permitidas para Visualização */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl shadow-xs">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                                <span>⚙️ Máquinas com Acesso de Visualização</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    allowedMachines.length === AVAILABLE_MACHINES.length
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                    {allowedMachines.length === AVAILABLE_MACHINES.length ? 'Todas (5/5)' : `${allowedMachines.length} de ${AVAILABLE_MACHINES.length}`}
+                                </span>
+                            </label>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setAllowedMachines(AVAILABLE_MACHINES.map(m => m.id))}
+                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 cursor-pointer"
+                                >
+                                    Marcar Todas
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAllowedMachines([])}
+                                    className="text-[10px] font-bold text-slate-500 hover:text-red-600 bg-white px-2 py-0.5 rounded border border-slate-200 cursor-pointer"
+                                >
+                                    Limpar
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-3">
+                            Selecione quais máquinas este usuário poderá visualizar no Quadro PCP e no Painel de Produção.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {AVAILABLE_MACHINES.map(mach => {
+                                const isChecked = allowedMachines.includes(mach.id);
+                                return (
+                                    <label
+                                        key={mach.id}
+                                        className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all select-none ${
+                                            isChecked 
+                                                ? 'bg-white border-blue-500 shadow-xs ring-1 ring-blue-400' 
+                                                : 'bg-white/60 border-slate-200 hover:bg-white text-slate-400'
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setAllowedMachines(prev => [...prev, mach.id]);
+                                                } else {
+                                                    setAllowedMachines(prev => prev.filter(m => m !== mach.id));
+                                                }
+                                            }}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        <span className="text-base">{mach.icon}</span>
+                                        <div className="flex flex-col">
+                                            <span className={`text-xs font-black ${isChecked ? 'text-slate-800' : 'text-slate-500'}`}>{mach.name}</span>
+                                            <span className="text-[10px] text-slate-400 font-medium">Setor {mach.type}</span>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     <div className="mb-6">
@@ -367,7 +463,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
     // Permite gerenciar todos os usuários, mas o admin principal (id: 'admin') pode ter proteção extra se quiser
     const manageableUsers = users.filter(u => u.username !== 'admin');
 
-    const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string }) => {
+    const handleAddUser = (data: { username: string; password: string; permissions: Partial<Record<Page, boolean>>; role: string; employeeId?: string; allowedMachines?: string[] }) => {
         addUser(data);
         setIsModalOpen(false);
     };
@@ -425,6 +521,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                             <tr>
                                 <th scope="col" className="px-6 py-3">Nome de Usuário</th>
                                 <th scope="col" className="px-6 py-3">Função</th>
+                                <th scope="col" className="px-6 py-3">Máquinas Visíveis</th>
                                 <th scope="col" className="px-6 py-3">Status</th>
                                 <th scope="col" className="px-6 py-3">Acessos</th>
                                 <th scope="col" className="px-6 py-3">Último Acesso</th>
@@ -444,6 +541,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     })
                                     : 'Sem registro';
 
+                                const userAllowed = user.allowedMachines;
+                                const isCustomMachines = Array.isArray(userAllowed) && userAllowed.length > 0 && userAllowed.length < AVAILABLE_MACHINES.length;
+
                                 return (
                                     <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
                                         <td className="px-6 py-4 font-medium text-slate-900">{user.username}</td>
@@ -456,6 +556,21 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">👁️ Somente PCP</span>
                                             ) : (
                                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">👷 Operador</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {isCustomMachines ? (
+                                                <div className="flex flex-wrap gap-1 max-w-[220px]">
+                                                    {userAllowed!.map(m => (
+                                                        <span key={m} className="text-[10px] bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 shadow-2xs">
+                                                            {m.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                    🌐 Todas (5/5)
+                                                </span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
