@@ -4029,6 +4029,222 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return [...new Set([...FioMaquinaBitolaOptions, ...customGauges])];
     }, [gauges]);
 
+    // Helper para converter unidades de produção de uma OP para kg com base na Ficha Técnica Oficial
+    const getOpWeightPerUnit = (op: ProductionOrderData): number => {
+        const mach = String(op.scheduledMachine || op.machine || '');
+        if (mach.startsWith('Trefila')) return 1;
+
+        const opText = `${op.productCode || ''} ${op.productDescription || ''} ${op.trelicaModel || ''} ${op.malhaModel || ''} ${op.tamanho || ''}`.toUpperCase();
+
+        // 1. Treliça (TL 1 e TL 2)
+        if (mach.startsWith('Treliça')) {
+            // Se for ET8 (6m ou 12m)
+            if (opText.includes('ET8') || opText.includes('ET-8') || opText.includes('H8') || opText.includes('H-8') || opText.includes('3884')) {
+                const is12m = opText.includes('12M') || opText.includes('12 METROS') || op.tamanho === '12';
+                return is12m ? 8.174 : 4.087;
+            }
+            // Se for ET10 (6m ou 12m)
+            if (opText.includes('ET10') || opText.includes('ET-10') || opText.includes('H10') || opText.includes('H-10') || opText.includes('8702')) {
+                const is6m = opText.includes('6M') || opText.includes('6 METROS') || op.tamanho === '6';
+                return is6m ? 3.843 : 9.057;
+            }
+            // Se for ET6
+            if (opText.includes('ET6') || opText.includes('H6')) {
+                return 5.502;
+            }
+            // Se for ET12
+            if (opText.includes('ET12') || opText.includes('H12')) {
+                const is6m = opText.includes('6M') || op.tamanho === '6';
+                return is6m ? 5.270 : 10.540;
+            }
+
+            const allTrelicaList = [...(trelicaModels || []), ...DEFAULT_TRELICA_MODELS];
+            const found = allTrelicaList.find(m => 
+                (m.cod && (m.cod === op.trelicaModel || opText.includes(m.cod.toUpperCase()))) ||
+                (m.modelo && (m.modelo === op.trelicaModel || opText.includes(m.modelo.toUpperCase())))
+            );
+            if (found) {
+                const p = found.pesoFinal || (found as any).peso_final;
+                if (p) {
+                    const parsed = parseFloat(String(p).replace(',', '.'));
+                    if (!isNaN(parsed) && parsed > 0) return parsed;
+                }
+            }
+
+            if (op.pieceWeight && op.pieceWeight > 0) return op.pieceWeight;
+            return 4.087;
+        }
+
+        // 2. Malha (ML 1)
+        if (mach.startsWith('Malha')) {
+            // Fichas técnicas nominais oficiais de Malha
+            // Cód. 6626 (Q138 4,20mm): 32,283 kg por painel
+            if (opText.includes('6626') || opText.includes('Q138') || opText.includes('4,20') || opText.includes('4.20')) {
+                return 32.283;
+            }
+            // Cód. 6621 (4,60mm): 38,725 kg
+            if (opText.includes('6621') || opText.includes('4,60') || opText.includes('4.60')) {
+                return 38.725;
+            }
+            // Cód. 3885 (Q116 5,00mm): 45,753 kg
+            if (opText.includes('3885') || opText.includes('Q116') || opText.includes('5,00') || opText.includes('5.00')) {
+                return 45.753;
+            }
+            // Cód. 3968 (Q113 3,80mm): 26,448 kg
+            if (opText.includes('3968') || opText.includes('Q113') || opText.includes('3,80') || opText.includes('3.80')) {
+                return 26.448;
+            }
+
+            const allMalhaList = [...(availableMalhaModels || []), ...(DefaultMalhaGauges || [])];
+            const found = allMalhaList.find(m => {
+                const mCode = String(m.productCode || '').toUpperCase();
+                const mDesc = String(m.description || '').toUpperCase();
+                const mId = String(m.id || '').toUpperCase();
+                return (
+                    (mCode && (opText.includes(mCode) || mCode === op.productCode || mCode === op.malhaModel)) ||
+                    (mDesc && (opText.includes(mDesc) || mDesc.includes(String(op.productDescription || '').toUpperCase()))) ||
+                    (mId && (mId === op.malhaModel || mId === op.productCode))
+                );
+            });
+
+            if (found) {
+                const rawPeso = (found as any).peso_peca || (found as any).peso_final || (found as any).peso;
+                if (rawPeso) {
+                    const parsed = parseFloat(String(rawPeso).replace(',', '.'));
+                    if (!isNaN(parsed) && parsed > 0) return parsed;
+                }
+            }
+
+            if (op.pieceWeight && op.pieceWeight > 0) return op.pieceWeight;
+            return 32.283;
+        }
+
+        return 1;
+    };
+
+    // Totais consolidados por dia para a linha de rodapé (soma de todas as máquinas selecionadas)
+    const weekDailyTotals = useMemo(() => {
+        const visibleMachines = availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name));
+        const todayStr = formatDateString(liveNow);
+
+        const days = weekDays.map((day) => {
+            const dayDateStr = formatDateString(day);
+            const isToday = dayDateStr === todayStr;
+            const isPast = dayDateStr < todayStr;
+            const isFuture = dayDateStr > todayStr;
+            const isHoliday = holidaysMap.has(dayDateStr);
+            const holidayName = holidaysMap.get(dayDateStr) || '';
+
+            let dayPlannedKg = 0;
+            let dayProducedKg = 0;
+            let dayPlannedPcs = 0;
+            let dayProducedPcs = 0;
+
+            visibleMachines.forEach(mach => {
+                const isTrefila = mach.name.startsWith('Trefila');
+                const isTrelica = mach.name.startsWith('Treliça');
+
+                const machOps = scheduledOrders.filter(op => {
+                    if (op.scheduledMachine !== mach.name && op.machine !== mach.name) return false;
+                    const start = op.plannedStartDate || '';
+                    const end = op.plannedEndDate || start;
+                    return start <= dayDateStr && end >= dayDateStr;
+                });
+
+                machOps.forEach(op => {
+                    const stats = getOpDayStats(op, day, mach.name);
+                    const unitWeight = getOpWeightPerUnit(op);
+
+                    // 1. Meta / Planejado (kg)
+                    if (!isHoliday) {
+                        const totalTarget = isTrefila 
+                            ? (Number(op.totalWeight) || Number(op.quantityToProduce) || 18000)
+                            : (Number(op.quantityToProduce) || Number(op.malhaPieces) || (isTrelica ? 3500 : 5000));
+                        const durationDays = Math.max(1, op.estimatedDurationDays || 1);
+                        const dailyPlannedQty = stats.isFuture && stats.produced > 0 
+                            ? stats.produced 
+                            : Math.round(totalTarget / durationDays);
+
+                        if (isTrefila) {
+                            dayPlannedKg += dailyPlannedQty;
+                        } else {
+                            dayPlannedPcs += dailyPlannedQty;
+                            dayPlannedKg += Math.round(dailyPlannedQty * unitWeight);
+                        }
+                    }
+
+                    // 2. Realizado / Produzido (kg)
+                    if (isToday || isPast) {
+                        if (isTrefila) {
+                            dayProducedKg += stats.produced;
+                        } else {
+                            dayProducedPcs += stats.produced;
+                            const matchingReports = (shiftReports || []).filter(r => {
+                                const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
+                                if (!isThisOp) return false;
+                                const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+                                return repDate === dayDateStr;
+                            });
+                            const repWeight = matchingReports.reduce((acc, r) => acc + (Number(r.totalProducedWeight) || 0), 0);
+                            if (repWeight > 0) {
+                                dayProducedKg += repWeight;
+                            } else if (stats.produced > 0) {
+                                dayProducedKg += Math.round(stats.produced * unitWeight);
+                            }
+                        }
+                    }
+                });
+
+                // Inclui também relatórios avulsos do dia não atrelados às OPs programadas
+                if (isToday || isPast) {
+                    const unlinkedReports = (shiftReports || []).filter(r => {
+                        if (r.machine !== mach.name) return false;
+                        const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+                        if (repDate !== dayDateStr) return false;
+                        return !machOps.some(o => o.id === r.productionOrderId || o.orderNumber === r.orderNumber);
+                    });
+                    unlinkedReports.forEach(r => {
+                        if (isTrefila) {
+                            dayProducedKg += Number(r.totalProducedWeight) || 0;
+                        } else {
+                            const repWeight = Number(r.totalProducedWeight) || (Number(r.totalProducedQuantity || 0) * (isTrelica ? 3.5 : 5.0));
+                            dayProducedKg += repWeight;
+                            dayProducedPcs += Number(r.totalProducedQuantity) || 0;
+                        }
+                    });
+                }
+            });
+
+            const percentReached = dayPlannedKg > 0 ? Math.round((dayProducedKg / dayPlannedKg) * 100) : 0;
+
+            return {
+                day,
+                dayDateStr,
+                isToday,
+                isPast,
+                isFuture,
+                isHoliday,
+                holidayName,
+                dayPlannedKg,
+                dayProducedKg,
+                dayPlannedPcs,
+                dayProducedPcs,
+                percentReached
+            };
+        });
+
+        const weekTotalPlannedKg = days.reduce((acc, d) => acc + d.dayPlannedKg, 0);
+        const weekTotalProducedKg = days.reduce((acc, d) => acc + d.dayProducedKg, 0);
+        const weekPercent = weekTotalPlannedKg > 0 ? Math.round((weekTotalProducedKg / weekTotalPlannedKg) * 100) : 0;
+
+        return {
+            days,
+            weekTotalPlannedKg,
+            weekTotalProducedKg,
+            weekPercent
+        };
+    }, [availableMachines, selectedMachinesFilter, weekDays, liveNow, holidaysMap, scheduledOrders, shiftReports, trelicaModels, availableMalhaModels]);
+
     return (
         <div className={`pcp-board-container bg-[#F1F5F9] text-slate-800 flex flex-col select-none ${
             isPcpFullscreen ? 'h-screen max-h-screen overflow-hidden p-1.5 gap-1.5' : 'min-h-screen p-2 sm:p-4 gap-3'
@@ -5532,6 +5748,173 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* RODAPÉ DE TOTAIS DIÁRIOS (SOMA DE TODAS AS MÁQUINAS: PLANEJADO vs PRODUZIDO EM KG) */}
+                        <div className="pcp-timeline-grid sticky bottom-0 z-30 shrink-0 bg-white/95 backdrop-blur-md border-t-2 border-orange-500 shadow-[0_-4px_20px_rgba(11,43,104,0.12)]">
+                            {/* Coluna 1: Indicador Geral e Resumo da Semana */}
+                            <div className="p-2 sm:p-2.5 flex flex-col justify-between border-r border-slate-200 border-l-4 border-l-orange-500 sticky left-0 z-40 bg-gradient-to-br from-[#092354] via-[#0C2B68] to-[#0A1F48] text-white shadow-md select-none">
+                                <div>
+                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                        <span className="text-xs font-black tracking-wider uppercase text-white flex items-center gap-1.5">
+                                            <span>📊 TOTAIS (KG)</span>
+                                        </span>
+                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-500/30 text-orange-300 border border-orange-400/40">
+                                            Geral
+                                        </span>
+                                    </div>
+                                    <p className="text-[9px] text-blue-200/80 leading-tight">
+                                        Soma de todas as máquinas
+                                    </p>
+                                </div>
+
+                                {/* Resumo Semanal Acumulado */}
+                                <div className="bg-blue-950/80 rounded-lg p-1.5 border border-blue-400/20 my-1 flex flex-col gap-1">
+                                    <div className="flex items-center justify-between text-[9px]">
+                                        <span className="text-blue-300 font-bold uppercase">Plan. Semana:</span>
+                                        <span className="font-mono font-black text-white text-xs">
+                                            ~{weekDailyTotals.weekTotalPlannedKg.toLocaleString('pt-BR')} kg
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[9px]">
+                                        <span className="text-emerald-400 font-bold uppercase">Prod. Semana:</span>
+                                        <span className="font-mono font-black text-emerald-300 text-xs">
+                                            {weekDailyTotals.weekTotalProducedKg.toLocaleString('pt-BR')} kg
+                                        </span>
+                                    </div>
+                                    {weekDailyTotals.weekTotalPlannedKg > 0 && (
+                                        <div className="pt-1 border-t border-blue-800/60 flex items-center justify-between text-[8.5px]">
+                                            <span className="text-blue-200">Evolução:</span>
+                                            <span className="font-mono font-bold text-orange-300">
+                                                {weekDailyTotals.weekPercent}% da meta
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="text-[8px] text-blue-300/70 text-center font-mono">
+                                    {selectedMachinesFilter.length === availableMachines.length 
+                                        ? 'Todas as 4 máquinas' 
+                                        : `${selectedMachinesFilter.length} máquinas filtradas`}
+                                </div>
+                            </div>
+
+                            {/* Colunas 2 a 6: Cada dia da semana (Segunda a Sexta) */}
+                            {weekDailyTotals.days.map((d, index) => {
+                                const daysNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+                                return (
+                                    <div 
+                                        key={index} 
+                                        className={`p-2 sm:p-2.5 flex flex-col justify-between border-l text-left transition-all select-none ${
+                                            d.isToday 
+                                                ? 'bg-blue-50/90 border-l-blue-500 shadow-inner' 
+                                                : d.isHoliday 
+                                                    ? 'bg-rose-50/70 border-l-rose-300' 
+                                                    : 'bg-white border-l-slate-200'
+                                        }`}
+                                    >
+                                        {/* Topo do Card: Nome do Dia + Tag de Status */}
+                                        <div className="flex items-center justify-between gap-1 mb-1">
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">
+                                                {daysNames[index]} {formatFriendlyDate(d.day)}
+                                            </span>
+                                            {d.isToday ? (
+                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-blue-600 text-white tracking-wider flex items-center gap-1 shadow-xs">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                                    Hoje
+                                                </span>
+                                            ) : d.isHoliday ? (
+                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 tracking-wider">
+                                                    🌴 Feriado
+                                                </span>
+                                            ) : d.isPast ? (
+                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 tracking-wider">
+                                                    Realizado
+                                                </span>
+                                            ) : (
+                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 tracking-wider">
+                                                    Previsto
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Valores: Produzido e Planejado */}
+                                        <div className="flex flex-col gap-1 my-0.5">
+                                            {/* Produzido */}
+                                            <div className="flex items-center justify-between gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200/80">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                                                    Produzido:
+                                                </span>
+                                                <div className="text-right">
+                                                    <span className={`text-xs sm:text-sm font-black font-mono tracking-tight ${
+                                                        d.dayProducedKg > 0 ? 'text-emerald-700' : 'text-slate-400'
+                                                    }`}>
+                                                        {d.dayProducedKg > 0 ? `${d.dayProducedKg.toLocaleString('pt-BR')} kg` : d.isFuture ? '-' : '0 kg'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Planejado */}
+                                            <div className="flex items-center justify-between gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200/80">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
+                                                    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                                                    Planejado:
+                                                </span>
+                                                <div className="text-right">
+                                                    <span className="text-xs sm:text-sm font-black font-mono text-blue-900 tracking-tight">
+                                                        {d.dayPlannedKg > 0 ? `~${d.dayPlannedKg.toLocaleString('pt-BR')} kg` : '-'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Rodapé: Atingimento / Progresso */}
+                                        <div className="pt-1 border-t border-slate-200/80 mt-1">
+                                            {d.dayPlannedKg > 0 ? (
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center justify-between text-[9px] font-bold">
+                                                        <span className="text-slate-500">Atingimento:</span>
+                                                        <span className={`font-mono font-black ${
+                                                            d.percentReached >= 100 
+                                                                ? 'text-emerald-600' 
+                                                                : d.percentReached >= 70 
+                                                                    ? 'text-blue-600' 
+                                                                    : d.isFuture 
+                                                                        ? 'text-slate-400' 
+                                                                        : 'text-amber-600'
+                                                        }`}>
+                                                            {d.isFuture && d.dayProducedKg === 0 ? 'Aguardando' : `${d.percentReached}%`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                                        <div 
+                                                            className={`h-full transition-all duration-500 rounded-full ${
+                                                                d.percentReached >= 100 
+                                                                    ? 'bg-emerald-500' 
+                                                                    : d.percentReached >= 70 
+                                                                        ? 'bg-blue-500' 
+                                                                        : 'bg-amber-500'
+                                                            }`}
+                                                            style={{ width: `${Math.min(100, Math.max(0, d.percentReached))}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-[9px] text-slate-400 italic text-center">
+                                                    {d.isHoliday ? 'Folga / Feriado' : 'Sem programação'}
+                                                </div>
+                                            )}
+
+                                            {(d.dayPlannedPcs > 0 || d.dayProducedPcs > 0) && (
+                                                <div className="text-[8px] text-slate-400 font-mono text-center pt-0.5 truncate">
+                                                    Treliça/Malha: {d.dayProducedPcs.toLocaleString('pt-BR')}/{d.dayPlannedPcs.toLocaleString('pt-BR')} pçs
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
