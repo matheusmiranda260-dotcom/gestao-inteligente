@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, User, Employee, UserAccessLog } from '../types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
 
@@ -455,18 +455,33 @@ const AccessHistoryModal: React.FC<{
 
     const activeSessions = useMemo(() => {
         const now = Date.now();
-        return userLogs.filter(log => 
+        const PRESENCE_TIMEOUT_MS = 180000; // 3 minutos
+        const rawActive = userLogs.filter(log => 
             log.isActive !== false &&
             !log.logoutAt &&
             log.lastActivityAt &&
-            (now - new Date(log.lastActivityAt).getTime() < 120000)
+            (now - new Date(log.lastActivityAt).getTime() >= -60000) &&
+            (now - new Date(log.lastActivityAt).getTime() < PRESENCE_TIMEOUT_MS)
         );
+
+        // Deduplica estritamente por dispositivo para que abas do mesmo PC contem como 1 dispositivo
+        const deviceMap = new Map<string, UserAccessLog>();
+        rawActive.forEach(log => {
+            const key = log.deviceId || log.deviceInfo || 'single_device';
+            const existing = deviceMap.get(key);
+            if (!existing || new Date(log.lastActivityAt).getTime() > new Date(existing.lastActivityAt).getTime()) {
+                deviceMap.set(key, log);
+            }
+        });
+
+        return Array.from(deviceMap.values());
     }, [userLogs]);
 
     const isUserOnline = activeSessions.length > 0 || Boolean(
         user.isOnline && 
         user.lastSeenAt && 
-        (Date.now() - new Date(user.lastSeenAt).getTime() < 120000)
+        (Date.now() - new Date(user.lastSeenAt).getTime() >= -60000) &&
+        (Date.now() - new Date(user.lastSeenAt).getTime() < 180000)
     );
 
     const totalDurationSeconds = useMemo(() => {
@@ -802,6 +817,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
     const [viewingHistoryUser, setViewingHistoryUser] = useState<User | null>(null);
+    const [tick, setTick] = useState<number>(() => Date.now());
+
+    // Ticker contínuo a cada 10 segundos para reavaliar status Online/Offline de todos os usuários em tempo real
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTick(Date.now());
+        }, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Permite gerenciar todos os usuários, mas o admin principal (id: 'admin') pode ter proteção extra se quiser
     const manageableUsers = users.filter(u => u.username !== 'admin');
@@ -884,28 +908,41 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     })
                                     : 'Sem registro';
 
-                                const now = Date.now();
-                                const userActiveLogs = accessLogs.filter(log => 
-                                    (log.userId === user.id || log.username?.toLowerCase() === user.username.toLowerCase()) &&
-                                    log.isActive !== false &&
-                                    !log.logoutAt &&
-                                    log.lastActivityAt &&
-                                    (now - new Date(log.lastActivityAt).getTime() < 120000)
-                                );
+                                const PRESENCE_TIMEOUT_MS = 180000; // 3 minutos de tolerância para sincronização entre computadores
 
-                                const isRealtimeOnline = userActiveLogs.length > 0 || Boolean(
+                                const userActiveLogs = accessLogs.filter(log => {
+                                    const isMatch = log.userId === user.id || (log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase());
+                                    if (!isMatch) return false;
+                                    if (log.isActive === false || log.logoutAt || !log.lastActivityAt) return false;
+                                    const diff = tick - new Date(log.lastActivityAt).getTime();
+                                    return diff >= -60000 && diff < PRESENCE_TIMEOUT_MS;
+                                });
+
+                                // Deduplica estritamente por dispositivo físico para que várias abas no mesmo computador NÃO sejam contadas como múltiplos PCs
+                                const deviceMap = new Map<string, UserAccessLog>();
+                                userActiveLogs.forEach(log => {
+                                    const key = log.deviceId || log.deviceInfo || 'single_device';
+                                    const existing = deviceMap.get(key);
+                                    if (!existing || new Date(log.lastActivityAt).getTime() > new Date(existing.lastActivityAt).getTime()) {
+                                        deviceMap.set(key, log);
+                                    }
+                                });
+                                const distinctActiveLogs = Array.from(deviceMap.values());
+
+                                const isRealtimeOnline = distinctActiveLogs.length > 0 || Boolean(
                                     user.isOnline && 
                                     user.lastSeenAt && 
-                                    (now - new Date(user.lastSeenAt).getTime() < 120000)
+                                    (tick - new Date(user.lastSeenAt).getTime() >= -60000) &&
+                                    (tick - new Date(user.lastSeenAt).getTime() < PRESENCE_TIMEOUT_MS)
                                 );
 
-                                const distinctDevicesCount = userActiveLogs.length > 0 
-                                    ? new Set(userActiveLogs.map(l => l.deviceId || l.deviceInfo || l.id)).size 
+                                const distinctDevicesCount = distinctActiveLogs.length > 0 
+                                    ? distinctActiveLogs.length 
                                     : (isRealtimeOnline ? 1 : 0);
 
                                 const userAllowed = user.allowedMachines;
                                 const isCustomMachines = Array.isArray(userAllowed) && userAllowed.length > 0 && userAllowed.length < AVAILABLE_MACHINES.length;
-                                const primaryActiveLog = userActiveLogs[0];
+                                const primaryActiveLog = distinctActiveLogs[0] || userActiveLogs[0];
                                 const currentFocus = primaryActiveLog?.focusStatus || user.focusStatus || 'active';
                                 const currentPageName = primaryActiveLog?.currentPage || user.currentPage || '';
 
