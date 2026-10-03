@@ -3504,7 +3504,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         // Produção isolada de HOJE / Dia Ativo
         let todayProduced = 0;
         if (isTrefila) {
-            todayProduced = dayLotsWeight > 0 ? dayLotsWeight : (reportsDayQty > 0 ? reportsDayQty : (op.actualProducedWeight || 0));
+            todayProduced = dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty;
         } else {
             const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
             let liveShiftPcs = 0;
@@ -3512,9 +3512,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 liveShiftPcs = Math.max(0, totalOverall - Number(openLog.startQuantity));
             }
             todayProduced = Math.max(dayPackagesQty + reportsDayQty, dayLogsPcs, liveShiftPcs);
-            if (todayProduced === 0 && (op.status === 'in_progress' || op.status === 'Em Produção') && totalOverall > 0) {
-                todayProduced = totalOverall;
-            }
         }
 
         // Produção realizada nos dias anteriores a hoje
@@ -3532,11 +3529,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (isLive) {
                 status = 'live';
                 operatorName = liveOperator?.displayName || (liveOperator?.name ? formatShortName(liveOperator.name) : '') || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Operando';
-                produced = todayProduced > 0 ? todayProduced : totalOverall;
-            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0 || totalOverall > 0) {
+                produced = todayProduced;
+            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
                 // Houve produção hoje, mas turno atual não está em andamento agora
                 status = 'closed';
-                produced = todayProduced > 0 ? todayProduced : (isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : (dayPackagesQty > 0 ? dayPackagesQty : totalOverall)));
+                produced = todayProduced;
                 operatorName = reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
             } else {
                 status = 'idle';
