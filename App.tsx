@@ -44,6 +44,7 @@ import type { StockGauge, StickyNote } from './types';
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption, fetchPcpShiftConfig } from './services/supabaseService';
 import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS, checkMachineShiftStatus } from './services/shiftConfigService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
+import { getDeviceId, getDeviceInfo, getFocusStatus, getPageFriendlyName } from './utils/deviceTracker';
 
 const SESSION_VERSION = 1;
 
@@ -360,15 +361,94 @@ const App: React.FC = () => {
         return () => subscription.unsubscribe();
     }, []);
 
+    // Garantir inicialização da sessão única por aba/dispositivo
+    const ensureActiveSessionLog = useCallback(async (user: User) => {
+        if (!user || !user.id || user.id === 'local-admin-gestor') return;
+
+        let sessionLogId = sessionStorage.getItem('msm_tab_session_log_id');
+        if (!sessionLogId) {
+            sessionLogId = generateId('log');
+            sessionStorage.setItem('msm_tab_session_log_id', sessionLogId);
+            localStorage.setItem('msm_session_log_id', sessionLogId);
+        }
+
+        const nowIso = new Date().toISOString();
+        const pageFriendly = getPageFriendlyName(page);
+        const deviceId = getDeviceId();
+        const deviceInfo = getDeviceInfo();
+        const focus = getFocusStatus();
+
+        try {
+            const { data: existing } = await supabase
+                .from('user_access_logs')
+                .select('id')
+                .eq('id', sessionLogId)
+                .maybeSingle();
+
+            if (!existing) {
+                const initialAction = {
+                    action: `Acessou o sistema (${pageFriendly})`,
+                    page: page,
+                    timestamp: nowIso
+                };
+                const newLog = {
+                    id: sessionLogId,
+                    user_id: user.id,
+                    username: user.username,
+                    login_at: nowIso,
+                    last_activity_at: nowIso,
+                    duration_seconds: 0,
+                    is_active: true,
+                    device_id: deviceId,
+                    device_info: deviceInfo,
+                    current_page: pageFriendly,
+                    focus_status: focus,
+                    actions: [initialAction]
+                };
+                await supabase.from('user_access_logs').insert(newLog);
+                setAccessLogs(prev => [mapToCamelCase(newLog) as UserAccessLog, ...prev.filter(l => l.id !== sessionLogId)]);
+            } else {
+                await supabase
+                    .from('user_access_logs')
+                    .update({
+                        last_activity_at: nowIso,
+                        is_active: true,
+                        current_page: pageFriendly,
+                        focus_status: focus,
+                        device_info: deviceInfo
+                    })
+                    .eq('id', sessionLogId);
+            }
+
+            // Atualiza pulso na tabela app_users
+            await supabase
+                .from('app_users')
+                .update({
+                    is_online: true,
+                    last_seen_at: nowIso,
+                    current_page: pageFriendly,
+                    focus_status: focus
+                })
+                .eq('id', user.id);
+        } catch (e) {
+            console.error('Erro ao inicializar sessão de acesso:', e);
+        }
+    }, [page]);
+
     // Atualizar log da sessão no Supabase e estado local
-    const updateSessionLogDb = async (sessionLogId: string, newAction?: any) => {
+    const updateSessionLogDb = async (sessionLogId: string, newAction?: any, customFocus?: 'active' | 'background' | 'idle') => {
+        if (!currentUser || !currentUser.id || currentUser.id === 'local-admin-gestor') return;
         try {
             const nowIso = new Date().toISOString();
+            const focus = customFocus || getFocusStatus();
+            const pageFriendly = getPageFriendlyName(page);
+            const deviceInfo = getDeviceInfo();
+
             const { data: existing } = await supabase
                 .from('user_access_logs')
                 .select('*')
                 .eq('id', sessionLogId)
-                .single();
+                .maybeSingle();
 
             if (existing) {
                 const currentActions = Array.isArray(existing.actions) ? existing.actions : [];
@@ -388,10 +468,25 @@ const App: React.FC = () => {
                     .update({
                         last_activity_at: nowIso,
                         duration_seconds: durationSec,
+                        is_active: true,
+                        current_page: pageFriendly,
+                        focus_status: focus,
+                        device_info: deviceInfo,
                         actions: updatedActions
                     })
                     .eq('id', sessionLogId);
             }
+
+            // Atualizar pulso do usuário na tabela app_users
+            await supabase
+                .from('app_users')
+                .update({
+                    is_online: true,
+                    last_seen_at: nowIso,
+                    current_page: pageFriendly,
+                    focus_status: focus
+                })
+                .eq('id', currentUser.id);
         } catch (e) {
             // Silently handle
         }
@@ -400,7 +495,7 @@ const App: React.FC = () => {
     const logUserAction = (actionText: string, pageKey?: string, details?: string) => {
         if (!currentUser || !currentUser.id || currentUser.id === 'local-admin-gestor') return;
 
-        const sessionLogId = localStorage.getItem('msm_session_log_id');
+        const sessionLogId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
         if (!sessionLogId) return;
 
         const nowIso = new Date().toISOString();
@@ -420,7 +515,8 @@ const App: React.FC = () => {
                     if (lastText === actionText) {
                         return {
                             ...log,
-                            lastActivityAt: nowIso
+                            lastActivityAt: nowIso,
+                            currentPage: getPageFriendlyName(pageKey || page)
                         };
                     }
                     const updatedActions = [...existingActions, actionItem];
@@ -430,6 +526,7 @@ const App: React.FC = () => {
                         ...log,
                         lastActivityAt: nowIso,
                         durationSeconds: durationSec,
+                        currentPage: getPageFriendlyName(pageKey || page),
                         actions: updatedActions
                     };
                 }
@@ -440,104 +537,65 @@ const App: React.FC = () => {
         updateSessionLogDb(sessionLogId, actionItem);
     };
 
+    // Inicialização da sessão quando usuário estiver carregado
+    useEffect(() => {
+        if (currentUser && currentUser.id && currentUser.id !== 'local-admin-gestor') {
+            ensureActiveSessionLog(currentUser);
+        }
+    }, [currentUser?.id]);
+
     // Log de navegação de páginas do usuário
     useEffect(() => {
         if (!currentUser || !currentUser.id || page === 'login') return;
-        const pageNames: Record<string, string> = {
-            menu: 'Menu Principal',
-            pcpBoard: 'Quadro PCP',
-            productionDashboard: 'Dashboard Geral de Produção',
-            stock: 'Estoque / Gestão de Lotes',
-            stockAdd: 'Conferência de Matéria-Prima',
-            stockTransfer: 'Transferência de Lotes',
-            trefila: 'Dashboard Trefila',
-            trefilaInProgress: 'Painel Trefila em Operação',
-            trefilaWeighing: 'Pesagem de Rolos Trefila',
-            trefilaBitolaCheck: 'Aferição de Bitola',
-            trefilaPending: 'Fila de Produção Trefila',
-            trefilaCompleted: 'Histórico de Produção Trefila',
-            trefilaReports: 'Relatórios Trefila',
-            trefilaParts: 'Peças Trefila',
-            trefilaRings: 'Setup de Anéis Trefila',
-            productionOrder: 'Criar OP Trefila',
-            trelica: 'Dashboard Treliça',
-            trelicaInProgress: 'Painel Treliça em Operação',
-            trelicaPending: 'Fila de Produção Treliça',
-            trelicaCompleted: 'Histórico de Produção Treliça',
-            trelicaReports: 'Relatórios Treliça',
-            trelicaParts: 'Peças Treliça',
-            productionOrderTrelica: 'Criar OP Treliça',
-            finishedGoods: 'Estoque Produto Acabado Treliça',
-            malha: 'Dashboard Malha',
-            malhaInProgress: 'Painel Malha em Operação',
-            malhaPending: 'Fila de Produção Malha',
-            malhaCompleted: 'Histórico de Produção Malha',
-            malhaReports: 'Relatórios Malha',
-            productionOrderMalha: 'Criar OP Malha',
-            desbobinadeira: 'Desbobinadeira',
-            desbobinadeiraDashboard: 'Dashboard Desbobinadeira',
-            laboratory: 'Laboratório de Qualidade',
-            reports: 'Relatórios e KPIs Estratégicos',
-            peopleManagement: 'Gestão de Pessoas',
-            meetingsTasks: 'Reuniões e Tarefas',
-            continuousImprovement: 'Melhoria Contínua (Kaizen)',
-            userManagement: 'Gerenciar Usuários',
-            workInstructions: 'Instruções de Trabalho (POP)',
-            gaugesManager: 'Configurações de Bitolas',
-            partsManager: 'Catálogo de Peças'
-        };
-        const pageLabel = pageNames[page] || page;
+        const pageLabel = getPageFriendlyName(page);
         logUserAction(`Acessou ${pageLabel}`, page);
     }, [page]);
 
-    // Heartbeat de tempo ativo na sessão (atualiza a cada 45s)
+    // Heartbeat contínuo de presença e engajamento em tempo real (a cada 25s)
     useEffect(() => {
         if (!currentUser || !currentUser.id || currentUser.id === 'local-admin-gestor') return;
 
-        const interval = setInterval(() => {
-            const sessionLogId = localStorage.getItem('msm_session_log_id');
-            if (sessionLogId) {
-                updateSessionLogDb(sessionLogId);
+        const sendHeartbeat = () => {
+            const curSessionId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
+            if (curSessionId) {
+                updateSessionLogDb(curSessionId);
             }
-        }, 45000);
+        };
 
-        return () => clearInterval(interval);
-    }, [currentUser?.id]);
+        // Envia imediatamente
+        sendHeartbeat();
 
-    // Manage user online/offline status and unload behavior
+        const interval = setInterval(sendHeartbeat, 25000);
+
+        // Detectar alteração de visibilidade (quando minimiza ou troca de aba)
+        const handleVisibility = () => {
+            const curSessionId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
+            if (curSessionId) {
+                const focus = document.visibilityState === 'hidden' ? 'background' : 'active';
+                updateSessionLogDb(curSessionId, undefined, focus);
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [currentUser?.id, page]);
+
+    // Encerramento de sessão ao fechar aba/navegador
     useEffect(() => {
         if (currentUser && currentUser.id && currentUser.id !== 'local-admin-gestor') {
-            // Set online in DB
-            supabase
-                .from('app_users')
-                .update({ is_online: true })
-                .eq('id', currentUser.id)
-                .then();
-
             const handleBeforeUnload = () => {
                 const supabaseUrl = (supabase as any).supabaseUrl;
                 const supabaseKey = (supabase as any).supabaseKey;
                 if (!supabaseUrl || !supabaseKey) return;
 
-                const sessionLogId = localStorage.getItem('msm_session_log_id');
+                const sessionLogId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
                 const nowIso = new Date().toISOString();
 
-                // 1. Atualizar app_users como offline
-                const urlUser = `${supabaseUrl}/rest/v1/app_users?id=eq.${currentUser.id}`;
-                try {
-                    fetch(urlUser, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': supabaseKey,
-                            'Authorization': `Bearer ${supabaseKey}`
-                        },
-                        body: JSON.stringify({ is_online: false }),
-                        keepalive: true
-                    });
-                } catch (e) {}
-
-                // 2. Atualizar user_access_logs com encerramento de sessão
+                // 1. Atualizar user_access_logs com encerramento de sessão
                 if (sessionLogId) {
                     const urlLog = `${supabaseUrl}/rest/v1/user_access_logs?id=eq.${sessionLogId}`;
                     try {
@@ -550,24 +608,47 @@ const App: React.FC = () => {
                             },
                             body: JSON.stringify({
                                 logout_at: nowIso,
-                                last_activity_at: nowIso
+                                last_activity_at: nowIso,
+                                is_active: false,
+                                focus_status: 'background'
                             }),
                             keepalive: true
                         });
                     } catch (e) {}
                 }
+
+                // 2. Atualizar app_users como offline
+                const urlUser = `${supabaseUrl}/rest/v1/app_users?id=eq.${currentUser.id}`;
+                try {
+                    fetch(urlUser, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': supabaseKey,
+                            'Authorization': `Bearer ${supabaseKey}`
+                        },
+                        body: JSON.stringify({
+                            is_online: false,
+                            last_seen_at: nowIso,
+                            focus_status: 'background'
+                        }),
+                        keepalive: true
+                    });
+                } catch (e) {}
             };
 
             window.addEventListener('beforeunload', handleBeforeUnload);
 
             return () => {
                 window.removeEventListener('beforeunload', handleBeforeUnload);
-                // Set offline in DB
-                supabase
-                    .from('app_users')
-                    .update({ is_online: false })
-                    .eq('id', currentUser.id)
-                    .then();
+                const sessionLogId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
+                if (sessionLogId) {
+                    supabase
+                        .from('user_access_logs')
+                        .update({ is_active: false, last_activity_at: new Date().toISOString() })
+                        .eq('id', sessionLogId)
+                        .then();
+                }
             };
         }
     }, [currentUser?.id]);
@@ -614,14 +695,22 @@ const App: React.FC = () => {
                 }
 
                 const sessionLogId = generateId('log');
+                sessionStorage.setItem('msm_tab_session_log_id', sessionLogId);
                 localStorage.setItem('msm_session_log_id', sessionLogId);
+
+                const targetPage = usersFound.role === 'gestor' || usersFound.role === 'admin' || usersFound.role === 'viewer' || usersFound.permissions?.pcpBoard ? 'pcpBoard' : 'menu';
+                const pageFriendly = getPageFriendlyName(targetPage);
+                const deviceId = getDeviceId();
+                const deviceInfo = getDeviceInfo();
+                const focus = getFocusStatus();
+
                 const initialAction = {
-                    action: 'Login no sistema',
-                    page: 'login',
+                    action: `Login no sistema (${pageFriendly})`,
+                    page: targetPage,
                     timestamp: new Date().toISOString()
                 };
 
-                // Gravar log de acesso com tempo ativo e ações na tabela user_access_logs
+                // Gravar log de acesso com identificação de dispositivo e ações
                 const newAccessLog = {
                     id: sessionLogId,
                     user_id: usersFound.id,
@@ -629,24 +718,32 @@ const App: React.FC = () => {
                     login_at: new Date().toISOString(),
                     last_activity_at: new Date().toISOString(),
                     duration_seconds: 0,
+                    is_active: true,
+                    device_id: deviceId,
+                    device_info: deviceInfo,
+                    current_page: pageFriendly,
+                    focus_status: focus,
                     actions: [initialAction]
                 };
                 try {
                     await supabase.from('user_access_logs').insert(newAccessLog);
-                    setAccessLogs(prev => [mapToCamelCase(newAccessLog) as UserAccessLog, ...prev]);
+                    setAccessLogs(prev => [mapToCamelCase(newAccessLog) as UserAccessLog, ...prev.filter(l => l.id !== sessionLogId)]);
                 } catch (logErr) {
                     console.error('Failed to create user access log:', logErr);
                 }
 
                 const appUser = mapToCamelCase({
                     ...usersFound,
-                    ...updatedFields
+                    ...updatedFields,
+                    lastSeenAt: new Date().toISOString(),
+                    currentPage: pageFriendly,
+                    focusStatus: focus
                 }) as User;
                 appUser.sessionVersion = SESSION_VERSION;
 
                 setCurrentUser(appUser);
                 localStorage.setItem('msm_user', JSON.stringify(appUser));
-                setPage(appUser.role === 'gestor' || appUser.role === 'admin' || appUser.role === 'viewer' || appUser.permissions?.pcpBoard ? 'pcpBoard' : 'menu');
+                setPage(targetPage as Page);
                 showNotification(`Bem-vindo, ${appUser.username}!`, 'success');
                 return;
             }
@@ -677,7 +774,7 @@ const App: React.FC = () => {
     };
 
     const handleLogout = async (): Promise<void> => {
-        const sessionLogId = localStorage.getItem('msm_session_log_id');
+        const sessionLogId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
         if (sessionLogId) {
             try {
                 const nowIso = new Date().toISOString();
@@ -696,6 +793,8 @@ const App: React.FC = () => {
                             logout_at: nowIso,
                             last_activity_at: nowIso,
                             duration_seconds: durationSec,
+                            is_active: false,
+                            focus_status: 'background',
                             actions: [...currentActions, { action: 'Desconectou (Logout)', page: 'logout', timestamp: nowIso }]
                         })
                         .eq('id', sessionLogId);
@@ -703,6 +802,7 @@ const App: React.FC = () => {
             } catch (err) {
                 console.error('Failed to update session logout:', err);
             }
+            sessionStorage.removeItem('msm_tab_session_log_id');
             localStorage.removeItem('msm_session_log_id');
         }
 
@@ -710,7 +810,11 @@ const App: React.FC = () => {
             try {
                 await supabase
                     .from('app_users')
-                    .update({ is_online: false })
+                    .update({ 
+                        is_online: false, 
+                        last_seen_at: new Date().toISOString(),
+                        focus_status: 'background' 
+                    })
                     .eq('id', currentUser.id);
             } catch (err) {
                 console.error('Failed to set user offline during logout:', err);

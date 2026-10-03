@@ -552,13 +552,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             (emp && (u.employeeId === emp.id || u.id === emp.appUserId))
         );
 
-        const isOnlineInApp = Boolean(
-            appUser?.isOnline ||
-            (currentUser && (
+        const isAppUserFresh = Boolean(
+            appUser?.isOnline && 
+            (!appUser.lastSeenAt || (Date.now() - new Date(appUser.lastSeenAt).getTime() < 120000))
+        );
+        const isCurrentUserFresh = Boolean(
+            currentUser && (
                 currentUser.username.toLowerCase() === activeOpName.toLowerCase() ||
                 (emp && (currentUser.employeeId === emp.id || currentUser.id === emp.appUserId))
-            ))
+            )
         );
+
+        const isOnlineInApp = isAppUserFresh || isCurrentUserFresh;
 
         // 5. Determinar estado e rótulo de produção vs online
         let isStopped = false;

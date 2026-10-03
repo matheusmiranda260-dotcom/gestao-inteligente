@@ -75,6 +75,10 @@ export interface User {
     isOnline?: boolean;
     loginCount?: number;
     lastLoginAt?: string;
+    lastSeenAt?: string;
+    currentPage?: string;
+    focusStatus?: 'active' | 'background' | 'idle';
+    activeSessionsCount?: number;
     sessionVersion?: number;
     allowedMachines?: string[];
 }
@@ -734,7 +738,11 @@ export interface UserAccessLog {
     lastActivityAt?: string | null;
     durationSeconds?: number | null;
     ipAddress?: string | null;
+    deviceId?: string | null;
     deviceInfo?: string | null;
+    currentPage?: string | null;
+    focusStatus?: 'active' | 'background' | 'idle' | null;
+    isActive?: boolean | null;
     actions?: (UserActivityAction | string)[] | null;
 }
 

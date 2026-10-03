@@ -449,9 +449,25 @@ const AccessHistoryModal: React.FC<{
 
     const userLogs = useMemo(() => {
         return accessLogs
-            .filter(log => log.userId === user.id)
+            .filter(log => log.userId === user.id || log.username?.toLowerCase() === user.username.toLowerCase())
             .sort((a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime());
-    }, [accessLogs, user.id]);
+    }, [accessLogs, user.id, user.username]);
+
+    const activeSessions = useMemo(() => {
+        const now = Date.now();
+        return userLogs.filter(log => 
+            log.isActive !== false &&
+            !log.logoutAt &&
+            log.lastActivityAt &&
+            (now - new Date(log.lastActivityAt).getTime() < 120000)
+        );
+    }, [userLogs]);
+
+    const isUserOnline = activeSessions.length > 0 || Boolean(
+        user.isOnline && 
+        user.lastSeenAt && 
+        (Date.now() - new Date(user.lastSeenAt).getTime() < 120000)
+    );
 
     const totalDurationSeconds = useMemo(() => {
         return userLogs.reduce((acc, log) => {
@@ -485,7 +501,7 @@ const AccessHistoryModal: React.FC<{
                                 </span>
                             </div>
                             <p className="text-xs text-blue-200/90 mt-0.5 font-medium">
-                                Rastreamento de tempo ativo e páginas/operações acessadas pelo usuário
+                                Rastreamento de tempo ativo, dispositivos e páginas/operações acessadas
                             </p>
                         </div>
                     </div>
@@ -503,13 +519,18 @@ const AccessHistoryModal: React.FC<{
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status Atual</span>
                         <div className="flex items-center gap-1.5 mt-1">
-                            {user.isOnline ? (
+                            {isUserOnline ? (
                                 <>
                                     <span className="relative flex h-2.5 w-2.5">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                                     </span>
                                     <span className="text-xs font-black text-emerald-700">Online Agora</span>
+                                    {activeSessions.length > 1 && (
+                                        <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded border border-amber-300">
+                                            {activeSessions.length} PCs
+                                        </span>
+                                    )}
                                 </>
                             ) : (
                                 <>
@@ -541,6 +562,59 @@ const AccessHistoryModal: React.FC<{
                         </p>
                     </div>
                 </div>
+
+                {/* Seção de Dispositivos Conectados em Tempo Real (se houver sessões ativas) */}
+                {activeSessions.length > 0 && (
+                    <div className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-4 border-b border-blue-800 shadow-inner">
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                                </span>
+                                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                                    <span>⚡ Dispositivos / Computadores Ativos Agora ({activeSessions.length})</span>
+                                </h3>
+                            </div>
+                            {activeSessions.length > 1 && (
+                                <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-bold">
+                                    ⚠️ Compartilhamento Simultâneo
+                                </span>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {activeSessions.map((session, sIdx) => {
+                                const focus = session.focusStatus || 'active';
+                                const focusLabel = focus === 'active' ? '🟢 Ativo na Tela' : focus === 'background' ? '🟡 Em 2º Plano' : '⚪ Ausente';
+                                const focusColor = focus === 'active' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' : focus === 'background' ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' : 'bg-slate-500/20 text-slate-300 border-slate-400/30';
+                                const connectedMins = Math.max(1, Math.round((Date.now() - new Date(session.loginAt).getTime()) / 60000));
+
+                                return (
+                                    <div key={session.id || sIdx} className="bg-white/10 rounded-lg p-2.5 border border-white/15 text-xs">
+                                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                                            <span className="font-bold text-white flex items-center gap-1 truncate text-[11px]">
+                                                <span>💻</span>
+                                                <span className="truncate">{session.deviceInfo || `Dispositivo ${sIdx + 1}`}</span>
+                                            </span>
+                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${focusColor} shrink-0`}>
+                                                {focusLabel}
+                                            </span>
+                                        </div>
+                                        <div className="text-[11px] text-blue-100 flex items-center justify-between gap-2">
+                                            <div className="truncate">
+                                                <span className="text-blue-200">Tela: </span>
+                                                <span className="text-amber-300 font-bold">{session.currentPage || user.currentPage || 'Quadro PCP'}</span>
+                                            </div>
+                                            <span className="text-[10px] text-blue-300 shrink-0 font-medium">
+                                                há {connectedMins}m
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
                 
                 {/* Lista de Sessões com Linha do Tempo de Atividades */}
                 <div className="flex-grow overflow-y-auto p-4 space-y-3.5 bg-slate-100/70">
@@ -810,8 +884,30 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     })
                                     : 'Sem registro';
 
+                                const now = Date.now();
+                                const userActiveLogs = accessLogs.filter(log => 
+                                    (log.userId === user.id || log.username?.toLowerCase() === user.username.toLowerCase()) &&
+                                    log.isActive !== false &&
+                                    !log.logoutAt &&
+                                    log.lastActivityAt &&
+                                    (now - new Date(log.lastActivityAt).getTime() < 120000)
+                                );
+
+                                const isRealtimeOnline = userActiveLogs.length > 0 || Boolean(
+                                    user.isOnline && 
+                                    user.lastSeenAt && 
+                                    (now - new Date(user.lastSeenAt).getTime() < 120000)
+                                );
+
+                                const distinctDevicesCount = userActiveLogs.length > 0 
+                                    ? new Set(userActiveLogs.map(l => l.deviceId || l.deviceInfo || l.id)).size 
+                                    : (isRealtimeOnline ? 1 : 0);
+
                                 const userAllowed = user.allowedMachines;
                                 const isCustomMachines = Array.isArray(userAllowed) && userAllowed.length > 0 && userAllowed.length < AVAILABLE_MACHINES.length;
+                                const primaryActiveLog = userActiveLogs[0];
+                                const currentFocus = primaryActiveLog?.focusStatus || user.focusStatus || 'active';
+                                const currentPageName = primaryActiveLog?.currentPage || user.currentPage || '';
 
                                 return (
                                     <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
@@ -843,16 +939,39 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {user.isOnline ? (
-                                                <span className="flex items-center gap-1.5 text-emerald-600 font-bold">
-                                                    <span className="relative flex h-2.5 w-2.5">
-                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                                    </span>
-                                                    Online
-                                                </span>
+                                            {isRealtimeOnline ? (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="relative flex h-2.5 w-2.5">
+                                                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                                                                currentFocus === 'active' ? 'bg-emerald-400' : currentFocus === 'background' ? 'bg-amber-400' : 'bg-slate-400'
+                                                            }`}></span>
+                                                            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                                                                currentFocus === 'active' ? 'bg-emerald-500' : currentFocus === 'background' ? 'bg-amber-500' : 'bg-slate-400'
+                                                            }`}></span>
+                                                        </span>
+                                                        <span className={`font-bold text-xs ${
+                                                            currentFocus === 'active' ? 'text-emerald-700' : currentFocus === 'background' ? 'text-amber-700' : 'text-slate-600'
+                                                        }`}>
+                                                            {currentFocus === 'active' ? 'Online (Ativo)' : currentFocus === 'background' ? 'Em 2º Plano' : 'Ausente'}
+                                                        </span>
+                                                    </div>
+                                                    {currentPageName && (
+                                                        <div className="text-[10px] text-slate-500 font-semibold mt-0.5 flex items-center gap-1 truncate max-w-[170px]" title={`Visualizando: ${currentPageName}`}>
+                                                            <span>📍</span>
+                                                            <span className="truncate">{currentPageName}</span>
+                                                        </div>
+                                                    )}
+                                                    {distinctDevicesCount > 1 && (
+                                                        <div className="mt-1">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded shadow-2xs animate-pulse" title={`${distinctDevicesCount} computadores/dispositivos estão conectados simultaneamente nesta conta.`}>
+                                                                ⚡ {distinctDevicesCount} PCs Conectados
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ) : (
-                                                <span className="flex items-center gap-1.5 text-slate-400 font-semibold">
+                                                <span className="flex items-center gap-1.5 text-slate-400 font-semibold text-xs">
                                                     <span className="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
                                                     Offline
                                                 </span>
