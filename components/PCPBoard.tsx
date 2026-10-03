@@ -3419,23 +3419,38 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const getOpDayStats = (op: ProductionOrderData, date: Date, machName: string) => {
         const dateStr = formatDateString(date);
         const todayStr = formatDateString(liveNow);
-        const isToday = dateStr === todayStr;
-        const isPast = dateStr < todayStr;
-        const isFuture = dateStr > todayStr;
+        const isWeekend = liveNow.getDay() === 0 || liveNow.getDay() === 6;
+        const mondayOfThisWeekStr = formatDateString(getMonday(liveNow));
+
+        // Se hoje for fim de semana (Sábado/Domingo) e estivermos na visualização da semana corrente (Segunda-feira),
+        // tratamos a Segunda como o dia de monitoramento ativo ao vivo
+        const isToday = dateStr === todayStr || (isWeekend && dateStr === mondayOfThisWeekStr);
+        const isPast = dateStr < todayStr && !isToday;
+        const isFuture = dateStr > todayStr && !isToday;
         const isHoliday = holidaysMap.has(dateStr);
         const holidayName = holidaysMap.get(dateStr) || '';
+
+        const saturdayDate = new Date(getMonday(liveNow));
+        saturdayDate.setDate(saturdayDate.getDate() - 2);
+        const saturdayStr = formatDateString(saturdayDate);
+
+        const sundayDate = new Date(getMonday(liveNow));
+        sundayDate.setDate(sundayDate.getDate() - 1);
+        const sundayStr = formatDateString(sundayDate);
+
+        const isEvaluatingActiveMonday = isWeekend && dateStr === mondayOfThisWeekStr;
 
         const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
         const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
         const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
         const unit = isTrelica || isMalha ? 'pçs' : 'kg';
 
-        // 1. Relatórios de Turno desta OP nesta data específica
+        // 1. Relatórios de Turno desta OP nesta data específica (ou hoje/fim de semana)
         const matchingReports = (shiftReports || []).filter(r => {
             const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
             if (!isThisOp) return false;
             const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
-            return repDate === dateStr;
+            return repDate === dateStr || (isEvaluatingActiveMonday && (repDate === saturdayStr || repDate === sundayStr || repDate === todayStr));
         });
         const reportsDayQty = matchingReports.reduce((acc, r) => acc + (isTrefila ? (Number(r.totalProducedWeight) || 0) : (Number(r.totalProducedQuantity) || 0)), 0);
         const reportOperators = [...new Set(matchingReports.map(r => r.operator).filter(Boolean))].map(formatShortName).join(', ');
@@ -3444,7 +3459,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const dayLotsWeight = (op.processedLots || []).reduce((acc: number, l: any) => {
             if (l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight))) return acc;
             const lotDate = getIsoDateStr(l.endTime || l.startTime);
-            if (lotDate === dateStr) {
+            if (lotDate === dateStr || (isEvaluatingActiveMonday && (lotDate === saturdayStr || lotDate === sundayStr || lotDate === todayStr))) {
                 return acc + Number(l.finalWeight);
             }
             return acc;
@@ -3454,7 +3469,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const dayPackagesQty = (op.weighedPackages || []).reduce((acc: number, p: any) => {
             if (!p.timestamp) return acc;
             const pkgDate = getIsoDateStr(p.timestamp);
-            if (pkgDate === dateStr) {
+            if (pkgDate === dateStr || (isEvaluatingActiveMonday && (pkgDate === saturdayStr || pkgDate === sundayStr || pkgDate === todayStr))) {
                 return acc + (Number(p.quantity) || 200);
             }
             return acc;
@@ -3464,7 +3479,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const dayLogs = (op.operatorLogs || []).filter(l => {
             const s = getIsoDateStr(l.startTime);
             const e = getIsoDateStr(l.endTime);
-            return s === dateStr || e === dateStr;
+            return s === dateStr || e === dateStr || (isEvaluatingActiveMonday && (s === saturdayStr || s === sundayStr || s === todayStr || e === saturdayStr || e === sundayStr || e === todayStr));
         });
         const logOperators = dayLogs.map(l => formatShortName(l.operator)).filter(Boolean)[0] || '';
 
@@ -3486,10 +3501,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return acc;
         }, 0);
 
-        // Produção isolada de HOJE
+        // Produção isolada de HOJE / Dia Ativo
         let todayProduced = 0;
         if (isTrefila) {
-            todayProduced = dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty;
+            todayProduced = dayLotsWeight > 0 ? dayLotsWeight : (reportsDayQty > 0 ? reportsDayQty : (op.actualProducedWeight || 0));
         } else {
             const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
             let liveShiftPcs = 0;
@@ -3497,6 +3512,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 liveShiftPcs = Math.max(0, totalOverall - Number(openLog.startQuantity));
             }
             todayProduced = Math.max(dayPackagesQty + reportsDayQty, dayLogsPcs, liveShiftPcs);
+            if (todayProduced === 0 && (op.status === 'in_progress' || op.status === 'Em Produção') && totalOverall > 0) {
+                todayProduced = totalOverall;
+            }
         }
 
         // Produção realizada nos dias anteriores a hoje
@@ -3514,11 +3532,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (isLive) {
                 status = 'live';
                 operatorName = liveOperator?.displayName || (liveOperator?.name ? formatShortName(liveOperator.name) : '') || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Operando';
-                produced = todayProduced;
-            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
+                produced = todayProduced > 0 ? todayProduced : totalOverall;
+            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0 || totalOverall > 0) {
                 // Houve produção hoje, mas turno atual não está em andamento agora
                 status = 'closed';
-                produced = todayProduced > 0 ? todayProduced : (isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : dayPackagesQty));
+                produced = todayProduced > 0 ? todayProduced : (isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : (dayPackagesQty > 0 ? dayPackagesQty : totalOverall)));
                 operatorName = reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
             } else {
                 status = 'idle';
@@ -3550,7 +3568,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         } else {
             // isFuture
-            if (isHoliday) {
+            if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || dayLogsPcs > 0) {
+                status = 'closed';
+                produced = isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : (dayPackagesQty > 0 ? dayPackagesQty : dayLogsPcs));
+                operatorName = reportOperators || logOperators || 'Encerrado';
+            } else if (isHoliday) {
                 status = 'idle';
                 produced = 0;
                 operatorName = holidayName;
@@ -4126,14 +4148,25 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const weekDailyTotals = useMemo(() => {
         const visibleMachines = availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name));
         const todayStr = formatDateString(liveNow);
+        const isWeekend = liveNow.getDay() === 0 || liveNow.getDay() === 6;
+        const mondayOfThisWeekStr = formatDateString(getMonday(liveNow));
+
+        const saturdayDate = new Date(getMonday(liveNow));
+        saturdayDate.setDate(saturdayDate.getDate() - 2);
+        const saturdayStr = formatDateString(saturdayDate);
+
+        const sundayDate = new Date(getMonday(liveNow));
+        sundayDate.setDate(sundayDate.getDate() - 1);
+        const sundayStr = formatDateString(sundayDate);
 
         const days = weekDays.map((day) => {
             const dayDateStr = formatDateString(day);
-            const isToday = dayDateStr === todayStr;
-            const isPast = dayDateStr < todayStr;
-            const isFuture = dayDateStr > todayStr;
+            const isToday = dayDateStr === todayStr || (isWeekend && dayDateStr === mondayOfThisWeekStr);
+            const isPast = dayDateStr < todayStr && !isToday;
+            const isFuture = dayDateStr > todayStr && !isToday;
             const isHoliday = holidaysMap.has(dayDateStr);
             const holidayName = holidaysMap.get(dayDateStr) || '';
+            const isEvaluatingActiveMonday = isWeekend && dayDateStr === mondayOfThisWeekStr;
 
             let dayPlannedKg = 0;
             let dayProducedKg = 0;
@@ -4174,21 +4207,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     }
 
                     // 2. Realizado / Produzido (kg)
-                    if (isToday || isPast) {
+                    if (isToday || isPast || stats.status === 'live' || stats.status === 'closed' || stats.produced > 0) {
                         if (isTrefila) {
-                            dayProducedKg += stats.produced;
+                            if (stats.produced > 0 && (stats.status === 'live' || stats.status === 'closed' || isToday || isPast)) {
+                                dayProducedKg += stats.produced;
+                            }
                         } else {
-                            dayProducedPcs += stats.produced;
                             const matchingReports = (shiftReports || []).filter(r => {
                                 const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
                                 if (!isThisOp) return false;
                                 const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
-                                return repDate === dayDateStr;
+                                return repDate === dayDateStr || (isEvaluatingActiveMonday && (repDate === saturdayStr || repDate === sundayStr || repDate === todayStr));
                             });
                             const repWeight = matchingReports.reduce((acc, r) => acc + (Number(r.totalProducedWeight) || 0), 0);
                             if (repWeight > 0) {
                                 dayProducedKg += repWeight;
-                            } else if (stats.produced > 0) {
+                                dayProducedPcs += stats.produced;
+                            } else if (stats.produced > 0 && (stats.status === 'live' || stats.status === 'closed' || isToday || isPast)) {
+                                dayProducedPcs += stats.produced;
                                 dayProducedKg += Math.round(stats.produced * unitWeight);
                             }
                         }
@@ -4196,11 +4232,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 });
 
                 // Inclui também relatórios avulsos do dia não atrelados às OPs programadas
-                if (isToday || isPast) {
+                if (isToday || isPast || isEvaluatingActiveMonday) {
                     const unlinkedReports = (shiftReports || []).filter(r => {
                         if (r.machine !== mach.name) return false;
                         const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
-                        if (repDate !== dayDateStr) return false;
+                        const matchDate = repDate === dayDateStr || (isEvaluatingActiveMonday && (repDate === saturdayStr || repDate === sundayStr || repDate === todayStr));
+                        if (!matchDate) return false;
                         return !machOps.some(o => o.id === r.productionOrderId || o.orderNumber === r.orderNumber);
                     });
                     unlinkedReports.forEach(r => {
@@ -4243,7 +4280,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             weekTotalProducedKg,
             weekPercent
         };
-    }, [availableMachines, selectedMachinesFilter, weekDays, liveNow, holidaysMap, scheduledOrders, shiftReports, trelicaModels, availableMalhaModels]);
+    }, [availableMachines, selectedMachinesFilter, liveNow, weekDays, holidaysMap, scheduledOrders, shiftReports, gauges, trelicaModels, availableMalhaModels]);
 
     return (
         <div className={`pcp-board-container bg-[#F1F5F9] text-slate-800 flex flex-col select-none ${
@@ -5870,50 +5907,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     </span>
                                                 </div>
                                             </div>
-                                        </div>
-
-                                        {/* Rodapé: Atingimento / Progresso */}
-                                        <div className="pt-1 border-t border-slate-200/80 mt-1">
-                                            {d.dayPlannedKg > 0 ? (
-                                                <div className="flex flex-col gap-0.5">
-                                                    <div className="flex items-center justify-between text-[9px] font-bold">
-                                                        <span className="text-slate-500">Atingimento:</span>
-                                                        <span className={`font-mono font-black ${
-                                                            d.percentReached >= 100 
-                                                                ? 'text-emerald-600' 
-                                                                : d.percentReached >= 70 
-                                                                    ? 'text-blue-600' 
-                                                                    : d.isFuture 
-                                                                        ? 'text-slate-400' 
-                                                                        : 'text-amber-600'
-                                                        }`}>
-                                                            {d.isFuture && d.dayProducedKg === 0 ? 'Aguardando' : `${d.percentReached}%`}
-                                                        </span>
-                                                    </div>
-                                                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                                        <div 
-                                                            className={`h-full transition-all duration-500 rounded-full ${
-                                                                d.percentReached >= 100 
-                                                                    ? 'bg-emerald-500' 
-                                                                    : d.percentReached >= 70 
-                                                                        ? 'bg-blue-500' 
-                                                                        : 'bg-amber-500'
-                                                            }`}
-                                                            style={{ width: `${Math.min(100, Math.max(0, d.percentReached))}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-[9px] text-slate-400 italic text-center">
-                                                    {d.isHoliday ? 'Folga / Feriado' : 'Sem programação'}
-                                                </div>
-                                            )}
-
-                                            {(d.dayPlannedPcs > 0 || d.dayProducedPcs > 0) && (
-                                                <div className="text-[8px] text-slate-400 font-mono text-center pt-0.5 truncate">
-                                                    Treliça/Malha: {d.dayProducedPcs.toLocaleString('pt-BR')}/{d.dayPlannedPcs.toLocaleString('pt-BR')} pçs
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 );
