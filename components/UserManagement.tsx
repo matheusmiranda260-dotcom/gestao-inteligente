@@ -456,21 +456,21 @@ const AccessHistoryModal: React.FC<{
 
     const activeSessions = useMemo(() => {
         const now = Date.now();
-        const PRESENCE_TIMEOUT_MS = 45000; // 45 segundos para detecção rápida e precisa
-        const rawActive = userLogs.filter(log => 
-            log.isActive !== false &&
-            !log.logoutAt &&
-            log.lastActivityAt &&
-            (now - new Date(log.lastActivityAt).getTime() >= -30000) &&
-            (now - new Date(log.lastActivityAt).getTime() < PRESENCE_TIMEOUT_MS)
-        );
+        const PRESENCE_TIMEOUT_MS = 30000; // 30 segundos de tolerância para presença em tempo real
+        const rawActive = userLogs.filter(log => {
+            if (log.isActive === false || log.logoutAt || !log.lastActivityAt) return false;
+            const actTime = new Date(log.lastActivityAt).getTime();
+            if (isNaN(actTime)) return false;
+            const diff = now - actTime;
+            return diff >= -5000 && diff < PRESENCE_TIMEOUT_MS;
+        });
 
         // Deduplica estritamente por dispositivo para que abas do mesmo PC contem como 1 dispositivo
         const deviceMap = new Map<string, UserAccessLog>();
         rawActive.forEach(log => {
-            const key = log.deviceId || log.deviceInfo || 'single_device';
+            const key = log.deviceId || log.deviceInfo || 'single_device_' + log.id;
             const existing = deviceMap.get(key);
-            if (!existing || new Date(log.lastActivityAt).getTime() > new Date(existing.lastActivityAt).getTime()) {
+            if (!existing || new Date(log.lastActivityAt!).getTime() > new Date(existing.lastActivityAt!).getTime()) {
                 deviceMap.set(key, log);
             }
         });
@@ -481,8 +481,9 @@ const AccessHistoryModal: React.FC<{
     const isUserOnline = activeSessions.length > 0 || Boolean(
         user.isOnline && 
         user.lastSeenAt && 
-        (Date.now() - new Date(user.lastSeenAt).getTime() >= -30000) &&
-        (Date.now() - new Date(user.lastSeenAt).getTime() < 45000)
+        !isNaN(new Date(user.lastSeenAt).getTime()) &&
+        (Date.now() - new Date(user.lastSeenAt).getTime() >= -5000) &&
+        (Date.now() - new Date(user.lastSeenAt).getTime() < 30000)
     );
 
     const totalDurationSeconds = useMemo(() => {
@@ -1008,35 +1009,35 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     })
                                     : 'Sem registro';
 
-                                const PRESENCE_TIMEOUT_MS = 45000; // 45 segundos de tolerância para sincronização em tempo real
+                                const PRESENCE_TIMEOUT_MS = 30000; // 30 segundos (3 pulsos de 10s) para presença estrita
 
                                 const allUserLogs = accessLogs
                                     .filter(log => log.userId === user.id || (log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase()))
-                                    .sort((a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime());
+                                    .sort((a, b) => new Date(b.loginAt || 0).getTime() - new Date(a.loginAt || 0).getTime());
 
                                 const userActiveLogs = allUserLogs.filter(log => {
                                     if (log.isActive === false || log.logoutAt || !log.lastActivityAt) return false;
-                                    const diff = tick - new Date(log.lastActivityAt).getTime();
-                                    return diff >= -30000 && diff < PRESENCE_TIMEOUT_MS;
+                                    const actTime = new Date(log.lastActivityAt).getTime();
+                                    if (isNaN(actTime)) return false;
+                                    const diff = tick - actTime;
+                                    return diff >= -5000 && diff < PRESENCE_TIMEOUT_MS;
                                 });
 
-                                // Deduplica estritamente por dispositivo físico para que várias abas no mesmo computador NÃO sejam contadas como múltiplos PCs
+                                // Deduplica estritamente por dispositivo físico
                                 const deviceMap = new Map<string, UserAccessLog>();
                                 userActiveLogs.forEach(log => {
-                                    const key = log.deviceId || log.deviceInfo || 'single_device';
+                                    const key = log.deviceId || log.deviceInfo || 'single_device_' + log.id;
                                     const existing = deviceMap.get(key);
-                                    if (!existing || new Date(log.lastActivityAt).getTime() > new Date(existing.lastActivityAt).getTime()) {
+                                    if (!existing || new Date(log.lastActivityAt!).getTime() > new Date(existing.lastActivityAt!).getTime()) {
                                         deviceMap.set(key, log);
                                     }
                                 });
                                 const distinctActiveLogs = Array.from(deviceMap.values());
 
-                                const isRealtimeOnline = distinctActiveLogs.length > 0 || Boolean(
-                                    user.isOnline && 
-                                    user.lastSeenAt && 
-                                    (tick - new Date(user.lastSeenAt).getTime() >= -30000) &&
-                                    (tick - new Date(user.lastSeenAt).getTime() < PRESENCE_TIMEOUT_MS)
-                                );
+                                const userLastSeenTime = user.lastSeenAt ? new Date(user.lastSeenAt).getTime() : 0;
+                                const isUserPulseFresh = user.isOnline && !isNaN(userLastSeenTime) && (tick - userLastSeenTime >= -5000) && (tick - userLastSeenTime < PRESENCE_TIMEOUT_MS);
+
+                                const isRealtimeOnline = distinctActiveLogs.length > 0 || isUserPulseFresh;
 
                                 const distinctDevicesCount = distinctActiveLogs.length > 0 
                                     ? distinctActiveLogs.length 
@@ -1045,12 +1046,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 const userAllowed = user.allowedMachines;
                                 const isCustomMachines = Array.isArray(userAllowed) && userAllowed.length > 0 && userAllowed.length < AVAILABLE_MACHINES.length;
                                 const primaryActiveLog = distinctActiveLogs[0] || userActiveLogs[0];
-                                const currentFocus = primaryActiveLog?.focusStatus || user.focusStatus || 'active';
-                                const currentPageName = primaryActiveLog?.currentPage || user.currentPage || '';
+                                const currentFocus = (primaryActiveLog?.focusStatus === 'background' || (!primaryActiveLog && user.focusStatus === 'background')) 
+                                    ? 'background' 
+                                    : 'active';
+                                const currentPageName = primaryActiveLog?.currentPage || (isRealtimeOnline ? user.currentPage : '') || '';
                                 
-                                const latestActivityDate = primaryActiveLog?.lastActivityAt || user.lastSeenAt;
+                                const latestActivityDate = primaryActiveLog?.lastActivityAt || (isUserPulseFresh ? user.lastSeenAt : null);
                                 const secondsAgo = latestActivityDate ? Math.max(0, Math.round((tick - new Date(latestActivityDate).getTime()) / 1000)) : null;
-                                const latestLogDevice = allUserLogs.find(l => l.deviceInfo)?.deviceInfo;
+                                const latestLogDevice = distinctActiveLogs[0]?.deviceInfo || allUserLogs.find(l => l.deviceInfo)?.deviceInfo;
 
                                 return (
                                     <tr key={user.id} className="bg-white border-b hover:bg-slate-50 transition-colors">
@@ -1087,20 +1090,20 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         <span className="relative flex h-2.5 w-2.5 shrink-0">
                                                             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                                                                currentFocus === 'active' ? 'bg-emerald-400' : currentFocus === 'background' ? 'bg-amber-400' : 'bg-slate-400'
+                                                                currentFocus === 'active' ? 'bg-emerald-400' : 'bg-amber-400'
                                                             }`}></span>
                                                             <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                                                                currentFocus === 'active' ? 'bg-emerald-500' : currentFocus === 'background' ? 'bg-amber-500' : 'bg-slate-400'
+                                                                currentFocus === 'active' ? 'bg-emerald-500' : 'bg-amber-500'
                                                             }`}></span>
                                                         </span>
                                                         <span className={`font-bold text-xs ${
-                                                            currentFocus === 'active' ? 'text-emerald-700' : currentFocus === 'background' ? 'text-amber-700' : 'text-slate-600'
+                                                            currentFocus === 'active' ? 'text-emerald-700' : 'text-amber-700'
                                                         }`}>
-                                                            {currentFocus === 'active' ? 'Online (Ativo)' : currentFocus === 'background' ? 'Em 2º Plano' : 'Ausente'}
+                                                            {currentFocus === 'active' ? 'Online (Ativo)' : 'Em 2º Plano'}
                                                         </span>
                                                         {secondsAgo !== null && (
                                                             <span className="text-[10px] text-slate-400 font-medium">
-                                                                ({secondsAgo < 12 ? 'agora' : `há ${secondsAgo}s`})
+                                                                ({secondsAgo < 10 ? 'agora' : `há ${secondsAgo}s`})
                                                             </span>
                                                         )}
                                                     </div>
@@ -1134,15 +1137,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                    ) : (
+                                                    ) : primaryActiveLog?.deviceInfo ? (
                                                         <div 
                                                             className="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200/90 px-1.5 py-0.5 rounded flex items-center gap-1 max-w-[210px] truncate shadow-2xs" 
-                                                            title={`Computador/Dispositivo conectado: ${primaryActiveLog?.deviceInfo || 'Computador Desktop'}`}
+                                                            title={`Computador/Dispositivo conectado: ${primaryActiveLog.deviceInfo}`}
                                                         >
-                                                            <span>{primaryActiveLog?.deviceInfo?.includes('Mobile') ? '📱' : '💻'}</span>
-                                                            <span className="truncate">{primaryActiveLog?.deviceInfo || 'Computador Conectado'}</span>
+                                                            <span>{primaryActiveLog.deviceInfo.includes('Mobile') ? '📱' : '💻'}</span>
+                                                            <span className="truncate">{primaryActiveLog.deviceInfo}</span>
                                                         </div>
-                                                    )}
+                                                    ) : null}
                                                 </div>
                                             ) : (
                                                 <div className="space-y-0.5">

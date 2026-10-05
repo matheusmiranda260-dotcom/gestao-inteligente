@@ -94,13 +94,9 @@ if (typeof window !== 'undefined') {
     });
 }
 
-export const getFocusStatus = (): 'active' | 'background' | 'idle' => {
+export const getFocusStatus = (): 'active' | 'background' => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return 'background';
-    }
-    const idleSeconds = (Date.now() - lastUserInteractionTime) / 1000;
-    if (idleSeconds > 180) { // Mais de 3 minutos sem interação na tela aberta
-        return 'idle';
     }
     return 'active';
 };
