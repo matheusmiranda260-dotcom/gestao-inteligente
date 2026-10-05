@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Page, User, Employee, UserAccessLog } from '../types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, WarningIcon } from './icons';
+import { getCustomDeviceName, setCustomDeviceName, getDeviceInfo } from '../utils/deviceTracker';
 
 export const AVAILABLE_MACHINES = [
     { id: 'Trefila 1', name: 'Trefila 1', short: 'TR 1', type: 'Trefila', icon: '⚡' },
@@ -712,6 +713,12 @@ const AccessHistoryModal: React.FC<{
                                                 <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-600 font-semibold">
                                                     <span>🕒 <strong>{startTime}</strong> até <strong>{endTime}</strong></span>
                                                 </div>
+                                                {log.deviceInfo && (
+                                                    <div className="flex items-center gap-1.5 mt-1 text-[11px] font-semibold text-slate-700 bg-slate-100/90 border border-slate-200/90 px-2 py-0.5 rounded-md max-w-fit" title={`Dispositivo/Computador utilizado: ${log.deviceInfo}`}>
+                                                        <span>{log.deviceInfo.includes('Mobile') ? '📱' : '💻'}</span>
+                                                        <span className="truncate max-w-[280px]">{log.deviceInfo}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -820,6 +827,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
     const [tick, setTick] = useState<number>(() => Date.now());
     const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // Modal para identificar e dar nome ao computador atual
+    const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+    const [deviceCustomName, setDeviceCustomName] = useState(() => getCustomDeviceName());
+
     // Ticker contínuo a cada 2 segundos para reavaliar status Online/Em 2º Plano/Offline instantaneamente
     useEffect(() => {
         const interval = setInterval(() => {
@@ -832,6 +843,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
         setIsRefreshing(true);
         setTick(Date.now());
         setTimeout(() => setIsRefreshing(false), 600);
+    };
+
+    const handleSaveDeviceName = (e: React.FormEvent) => {
+        e.preventDefault();
+        setCustomDeviceName(deviceCustomName);
+        setIsDeviceModalOpen(false);
+        setTick(Date.now());
     };
 
     // Permite gerenciar todos os usuários, mas o admin principal (id: 'admin') pode ter proteção extra se quiser
@@ -861,6 +879,58 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
             {isModalOpen && <UserModal employees={employees} onClose={() => setIsModalOpen(false)} onSubmit={handleAddUser} />}
             {editingUser && <UserModal user={editingUser} employees={employees} onClose={() => setEditingUser(null)} onSubmit={handleEditUser} />}
             {viewingHistoryUser && <AccessHistoryModal user={viewingHistoryUser} accessLogs={accessLogs} onClose={() => setViewingHistoryUser(null)} />}
+            
+            {/* Modal para Identificar / Nomear este Computador */}
+            {isDeviceModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold">
+                                💻
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Identificar este Computador</h3>
+                                <p className="text-xs text-slate-500 font-medium">Defina um nome para reconhecer este terminal em tempo real</p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleSaveDeviceName} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">
+                                    Nome deste Computador / Local:
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deviceCustomName}
+                                    onChange={(e) => setDeviceCustomName(e.target.value)}
+                                    placeholder="Ex: PC PCP Escritório, PC Balança, PC Trefila 1, Notebook Gestor"
+                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
+                                />
+                                <p className="text-[11px] text-slate-500 mt-1.5">
+                                    Informação detectada: <strong className="text-slate-700">{getDeviceInfo()}</strong>
+                                </p>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDeviceModalOpen(false)}
+                                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg text-sm transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg text-sm transition shadow-sm"
+                                >
+                                    Salvar Identificação
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {deletingUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
@@ -877,13 +947,25 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
             <header className="flex items-center justify-between mb-6 pt-4 flex-wrap gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800">Gerenciar Usuários</h1>
-                    <p className="text-xs text-slate-500 font-medium mt-1">Presença e status de engajamento em tempo real (atualizado a cada 2 segundos)</p>
+                    <p className="text-xs text-slate-500 font-medium mt-1">Presença, computadores conectados e engajamento em tempo real (atualizado a cada 2s)</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setDeviceCustomName(getCustomDeviceName());
+                            setIsDeviceModalOpen(true);
+                        }}
+                        className="bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 font-bold py-2 px-3 rounded-lg transition shadow-2xs flex items-center gap-1.5 text-xs cursor-pointer"
+                        title="Identificar e dar um nome para este computador"
+                    >
+                        <span>💻</span>
+                        <span>Identificar este PC</span>
+                    </button>
                     <button
                         type="button"
                         onClick={handleForceRefresh}
-                        className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-3.5 rounded-lg transition shadow-2xs flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                        className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-3 rounded-lg transition shadow-2xs flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
                         title="Verificar status dos usuários agora"
                     >
                         <span className={`inline-block transition-transform duration-500 ${isRefreshing ? 'rotate-180' : ''}`}>🔄</span>
@@ -891,7 +973,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                     </button>
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition shadow-sm"
+                        className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition shadow-sm text-sm"
                     >
                         Adicionar Usuário
                     </button>
@@ -907,7 +989,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 <th scope="col" className="px-6 py-3">Nome de Usuário</th>
                                 <th scope="col" className="px-6 py-3">Função</th>
                                 <th scope="col" className="px-6 py-3">Máquinas Visíveis</th>
-                                <th scope="col" className="px-6 py-3">Status</th>
+                                <th scope="col" className="px-6 py-3 min-w-[240px]">Status & Computador</th>
                                 <th scope="col" className="px-6 py-3">Acessos</th>
                                 <th scope="col" className="px-6 py-3">Último Acesso</th>
                                 <th scope="col" className="px-6 py-3">Permissões</th>
@@ -928,9 +1010,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
 
                                 const PRESENCE_TIMEOUT_MS = 45000; // 45 segundos de tolerância para sincronização em tempo real
 
-                                const userActiveLogs = accessLogs.filter(log => {
-                                    const isMatch = log.userId === user.id || (log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase());
-                                    if (!isMatch) return false;
+                                const allUserLogs = accessLogs
+                                    .filter(log => log.userId === user.id || (log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase()))
+                                    .sort((a, b) => new Date(b.loginAt).getTime() - new Date(a.loginAt).getTime());
+
+                                const userActiveLogs = allUserLogs.filter(log => {
                                     if (log.isActive === false || log.logoutAt || !log.lastActivityAt) return false;
                                     const diff = tick - new Date(log.lastActivityAt).getTime();
                                     return diff >= -30000 && diff < PRESENCE_TIMEOUT_MS;
@@ -966,12 +1050,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 
                                 const latestActivityDate = primaryActiveLog?.lastActivityAt || user.lastSeenAt;
                                 const secondsAgo = latestActivityDate ? Math.max(0, Math.round((tick - new Date(latestActivityDate).getTime()) / 1000)) : null;
+                                const latestLogDevice = allUserLogs.find(l => l.deviceInfo)?.deviceInfo;
 
                                 return (
                                     <tr key={user.id} className="bg-white border-b hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-slate-900">{user.username}</td>
                                         <td className="px-6 py-4">
-                                            {user.role === 'admin' ? (
+                                             {user.role === 'admin' ? (
                                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">👑 Administrador</span>
                                             ) : user.role === 'gestor' ? (
                                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">👔 Gestor</span>
@@ -986,7 +1071,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                                 <div className="flex flex-wrap gap-1 max-w-[220px]">
                                                     {userAllowed!.map(m => (
                                                         <span key={m} className="text-[10px] bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded border border-blue-200 shadow-2xs">
-                                                            {m.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
+                                                             {m.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
                                                         </span>
                                                     ))}
                                                 </div>
@@ -998,9 +1083,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                         </td>
                                         <td className="px-6 py-4">
                                             {isRealtimeOnline ? (
-                                                <div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="relative flex h-2.5 w-2.5">
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="relative flex h-2.5 w-2.5 shrink-0">
                                                             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
                                                                 currentFocus === 'active' ? 'bg-emerald-400' : currentFocus === 'background' ? 'bg-amber-400' : 'bg-slate-400'
                                                             }`}></span>
@@ -1019,25 +1104,59 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                                             </span>
                                                         )}
                                                     </div>
+
                                                     {currentPageName && (
-                                                        <div className="text-[10px] text-slate-500 font-semibold mt-0.5 flex items-center gap-1 truncate max-w-[170px]" title={`Visualizando: ${currentPageName}`}>
+                                                        <div className="text-[10px] text-slate-600 font-semibold flex items-center gap-1 truncate max-w-[210px]" title={`Visualizando: ${currentPageName}`}>
                                                             <span>📍</span>
                                                             <span className="truncate">{currentPageName}</span>
                                                         </div>
                                                     )}
-                                                    {distinctDevicesCount > 1 && (
-                                                        <div className="mt-1">
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded shadow-2xs animate-pulse" title={`${distinctDevicesCount} computadores/dispositivos estão conectados simultaneamente nesta conta.`}>
-                                                                ⚡ {distinctDevicesCount} PCs Conectados
-                                                            </span>
+
+                                                    {/* Computadores / Dispositivos Conectados */}
+                                                    {distinctDevicesCount > 1 ? (
+                                                        <div className="pt-0.5 space-y-1">
+                                                            <div className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded shadow-2xs">
+                                                                ⚡ {distinctDevicesCount} PCs Conectados:
+                                                            </div>
+                                                            <div className="space-y-1 max-w-[230px]">
+                                                                {distinctActiveLogs.map((dLog, idx) => (
+                                                                    <div key={dLog.id || idx} className="text-[10px] bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded flex items-center justify-between gap-1 shadow-2xs">
+                                                                        <span className="truncate flex items-center gap-1 font-semibold text-slate-800" title={dLog.deviceInfo || `Dispositivo ${idx + 1}`}>
+                                                                            <span>{dLog.deviceInfo?.includes('Mobile') ? '📱' : '💻'}</span>
+                                                                            <span className="truncate max-w-[130px]">{dLog.deviceInfo || `PC ${idx + 1}`}</span>
+                                                                        </span>
+                                                                        <span className={`text-[9px] font-black px-1 rounded shrink-0 ${
+                                                                            dLog.focusStatus === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                                                        }`}>
+                                                                            {dLog.focusStatus === 'active' ? 'Ativo' : '2º Plano'}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div 
+                                                            className="text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200/90 px-1.5 py-0.5 rounded flex items-center gap-1 max-w-[210px] truncate shadow-2xs" 
+                                                            title={`Computador/Dispositivo conectado: ${primaryActiveLog?.deviceInfo || 'Computador Desktop'}`}
+                                                        >
+                                                            <span>{primaryActiveLog?.deviceInfo?.includes('Mobile') ? '📱' : '💻'}</span>
+                                                            <span className="truncate">{primaryActiveLog?.deviceInfo || 'Computador Conectado'}</span>
                                                         </div>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="flex items-center gap-1.5 text-slate-400 font-semibold text-xs">
-                                                    <span className="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-                                                    Offline
-                                                </span>
+                                                <div className="space-y-0.5">
+                                                    <span className="flex items-center gap-1.5 text-slate-400 font-semibold text-xs">
+                                                        <span className="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
+                                                        Offline
+                                                    </span>
+                                                    {latestLogDevice && (
+                                                        <div className="text-[10px] text-slate-400 font-medium flex items-center gap-1 truncate max-w-[200px]" title={`Último computador utilizado: ${latestLogDevice}`}>
+                                                            <span>💻</span>
+                                                            <span className="truncate">{latestLogDevice}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 font-bold text-slate-700">{user.loginCount || 0}</td>

@@ -2,6 +2,26 @@
  * Utilitário para rastreamento de dispositivos, presença em tempo real e engajamento dos usuários
  */
 
+export const getCustomDeviceName = (): string => {
+    try {
+        return localStorage.getItem('msm_custom_device_name') || '';
+    } catch {
+        return '';
+    }
+};
+
+export const setCustomDeviceName = (name: string): void => {
+    try {
+        if (name && name.trim()) {
+            localStorage.setItem('msm_custom_device_name', name.trim());
+        } else {
+            localStorage.removeItem('msm_custom_device_name');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 export const getDeviceId = (): string => {
     try {
         let deviceId = localStorage.getItem('msm_device_uuid');
@@ -17,25 +37,26 @@ export const getDeviceId = (): string => {
 
 export const getDeviceInfo = (): string => {
     try {
+        const customName = getCustomDeviceName();
         const ua = navigator.userAgent;
         let browser = 'Navegador Web';
         let os = 'Dispositivo';
 
         // Detecção de Navegador
         if (ua.includes('Edg/')) {
-            browser = 'Microsoft Edge';
+            browser = 'Edge';
         } else if (ua.includes('Chrome/') && !ua.includes('Edg/')) {
-            browser = 'Google Chrome';
+            browser = 'Chrome';
         } else if (ua.includes('Safari/') && !ua.includes('Chrome/')) {
-            browser = 'Apple Safari';
+            browser = 'Safari';
         } else if (ua.includes('Firefox/')) {
-            browser = 'Mozilla Firefox';
+            browser = 'Firefox';
         } else if (ua.includes('OPR/') || ua.includes('Opera/')) {
             browser = 'Opera';
         }
 
         // Detecção de Sistema Operacional
-        if (ua.includes('Windows NT 10.0') || ua.includes('Windows NT 11.0')) {
+        if (ua.includes('Windows NT 10.0') || ua.includes('Windows NT 11.0') || ua.includes('Windows')) {
             os = 'Windows';
         } else if (ua.includes('Macintosh') || ua.includes('Mac OS X')) {
             os = 'macOS';
@@ -50,9 +71,13 @@ export const getDeviceInfo = (): string => {
         const screenRes = typeof window !== 'undefined' ? `${window.screen?.width || window.innerWidth}x${window.screen?.height || window.innerHeight}` : '';
         const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
 
-        return `${browser} (${os})${isMobile ? ' [Mobile]' : ''}${screenRes ? ` • ${screenRes}` : ''}`;
+        if (customName) {
+            return `${customName} (${browser}/${os}${screenRes ? ` • ${screenRes}` : ''})`;
+        }
+
+        return `PC ${os} (${browser}${screenRes ? ` • ${screenRes}` : ''})${isMobile ? ' [Mobile]' : ''}`;
     } catch {
-        return 'Navegador Web';
+        return 'PC Conectado (Navegador Web)';
     }
 };
 
