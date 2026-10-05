@@ -456,13 +456,14 @@ const AccessHistoryModal: React.FC<{
 
     const activeSessions = useMemo(() => {
         const now = Date.now();
-        const PRESENCE_TIMEOUT_MS = 30000; // 30 segundos de tolerância para presença em tempo real
         const rawActive = userLogs.filter(log => {
             if (log.isActive === false || log.logoutAt || !log.lastActivityAt) return false;
             const actTime = new Date(log.lastActivityAt).getTime();
             if (isNaN(actTime)) return false;
             const diff = now - actTime;
-            return diff >= -5000 && diff < PRESENCE_TIMEOUT_MS;
+            // Abas em 2º plano são limitadas pelos navegadores a rodar a cada 60s; usamos 90s de tolerância para evitar oscilação
+            const timeout = log.focusStatus === 'background' ? 90000 : 45000;
+            return diff >= -5000 && diff < timeout;
         });
 
         // Deduplica estritamente por dispositivo para que abas do mesmo PC contem como 1 dispositivo
@@ -483,7 +484,7 @@ const AccessHistoryModal: React.FC<{
         user.lastSeenAt && 
         !isNaN(new Date(user.lastSeenAt).getTime()) &&
         (Date.now() - new Date(user.lastSeenAt).getTime() >= -5000) &&
-        (Date.now() - new Date(user.lastSeenAt).getTime() < 30000)
+        (Date.now() - new Date(user.lastSeenAt).getTime() < (user.focusStatus === 'background' ? 90000 : 45000))
     );
 
     const totalDurationSeconds = useMemo(() => {
@@ -1009,8 +1010,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     })
                                     : 'Sem registro';
 
-                                const PRESENCE_TIMEOUT_MS = 30000; // 30 segundos (3 pulsos de 10s) para presença estrita
-
                                 const allUserLogs = accessLogs
                                     .filter(log => log.userId === user.id || (log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase()))
                                     .sort((a, b) => new Date(b.loginAt || 0).getTime() - new Date(a.loginAt || 0).getTime());
@@ -1020,7 +1019,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     const actTime = new Date(log.lastActivityAt).getTime();
                                     if (isNaN(actTime)) return false;
                                     const diff = tick - actTime;
-                                    return diff >= -5000 && diff < PRESENCE_TIMEOUT_MS;
+                                    // Abas em 2º plano são throttled pelo navegador para pulsar a cada 60s; 90s previne falsa desconexão
+                                    const timeout = log.focusStatus === 'background' ? 90000 : 45000;
+                                    return diff >= -5000 && diff < timeout;
                                 });
 
                                 // Deduplica estritamente por dispositivo físico
@@ -1035,7 +1036,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 const distinctActiveLogs = Array.from(deviceMap.values());
 
                                 const userLastSeenTime = user.lastSeenAt ? new Date(user.lastSeenAt).getTime() : 0;
-                                const isUserPulseFresh = user.isOnline && !isNaN(userLastSeenTime) && (tick - userLastSeenTime >= -5000) && (tick - userLastSeenTime < PRESENCE_TIMEOUT_MS);
+                                const userTimeout = user.focusStatus === 'background' ? 90000 : 45000;
+                                const isUserPulseFresh = user.isOnline && !isNaN(userLastSeenTime) && (tick - userLastSeenTime >= -5000) && (tick - userLastSeenTime < userTimeout);
 
                                 const isRealtimeOnline = distinctActiveLogs.length > 0 || isUserPulseFresh;
 
