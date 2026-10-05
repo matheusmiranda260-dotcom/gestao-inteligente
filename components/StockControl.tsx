@@ -715,6 +715,88 @@ export const getNextMalhaInternalLot = (
     return `ML-${String(nextNum).padStart(4, '0')}`;
 };
 
+export const getNextAmarrilConferenceNumber = (conferences: ConferenceData[] = [], stock: StockItem[] = []): string => {
+    const nums: number[] = [];
+
+    const checkStr = (str?: string) => {
+        if (!str) return;
+        const cleaned = str.trim();
+        const match = cleaned.match(/(?:CONF[-_]AM[-_]|AM[-_])(\d+)/i);
+        if (match) {
+            nums.push(parseInt(match[1], 10));
+        } else if (/^\d+$/.test(cleaned)) {
+            const val = parseInt(cleaned, 10);
+            if (val >= 50000 && val <= 59999) {
+                nums.push(val - 50000);
+            }
+        }
+    };
+
+    for (const c of conferences) {
+        const isAmarrilConf = Array.isArray(c.lots) && c.lots.some(l => l.materialType === 'Amarril');
+        if (isAmarrilConf || (c.conferenceNumber && c.conferenceNumber.toUpperCase().includes('AM'))) {
+            checkStr(c.conferenceNumber);
+        }
+    }
+
+    for (const s of stock) {
+        if (s.materialType === 'Amarril' || (s.conferenceNumber && s.conferenceNumber.toUpperCase().includes('AM'))) {
+            checkStr(s.conferenceNumber);
+        }
+    }
+
+    if (nums.length === 0) {
+        return 'CONF-AM-001';
+    }
+    const nextNum = Math.max(...nums) + 1;
+    return `CONF-AM-${String(nextNum).padStart(3, '0')}`;
+};
+
+export const getNextAmarrilInternalLot = (
+    stock: StockItem[] = [], 
+    currentLots: Partial<ConferenceLotData>[] = [], 
+    conferences: ConferenceData[] = []
+): string => {
+    const nums: number[] = [];
+
+    const checkStr = (str?: string) => {
+        if (!str) return;
+        const cleaned = str.trim();
+        const match = cleaned.match(/AM[-_]?(\d+)/i);
+        if (match) {
+            nums.push(parseInt(match[1], 10));
+        }
+    };
+
+    for (const s of stock) {
+        if (s.materialType === 'Amarril' && s.internalLot) {
+            checkStr(s.internalLot);
+        }
+    }
+
+    for (const c of conferences) {
+        if (Array.isArray(c.lots)) {
+            for (const l of c.lots) {
+                if (l.materialType === 'Amarril' && l.internalLot) {
+                    checkStr(l.internalLot);
+                }
+            }
+        }
+    }
+
+    for (const l of currentLots) {
+        if (l.materialType === 'Amarril' && l.internalLot) {
+            checkStr(l.internalLot);
+        }
+    }
+
+    if (nums.length === 0) {
+        return 'AM-0001';
+    }
+    const nextNum = Math.max(...nums) + 1;
+    return `AM-${String(nextNum).padStart(4, '0')}`;
+};
+
 export const getVacantElectrodeLots = (
     stock: StockItem[] = [],
     currentLots: Partial<ConferenceLotData>[] = [],
@@ -780,11 +862,12 @@ const AddConferencePage: React.FC<{
     const isInitialSabao = initialMaterialType === 'Sabão';
     const isInitialTrelica = initialMaterialType === 'Treliça';
     const isInitialMalha = initialMaterialType === 'Malha';
+    const isInitialAmarril = initialMaterialType === 'Amarril';
 
     const [conferenceData, setConferenceData] = useState<Omit<ConferenceData, 'lots'>>(() => ({
         entryDate: new Date().toISOString().split('T')[0],
-        supplier: isInitialElectrode ? 'Cobretec' : isInitialSabao ? 'Condat' : (isInitialTrelica || isInitialMalha) ? 'Produção Própria - MSM' : '', 
-        nfe: isInitialElectrode ? 'Sem Nota' : (isInitialTrelica || isInitialMalha) ? 'Produção Interna' : '', 
+        supplier: isInitialElectrode ? 'Cobretec' : isInitialSabao ? 'Condat' : (isInitialTrelica || isInitialMalha) ? 'Produção Própria - MSM' : isInitialAmarril ? 'Gerdau / MSM' : '', 
+        nfe: isInitialElectrode ? 'Sem Nota' : (isInitialTrelica || isInitialMalha) ? 'Produção Interna' : isInitialAmarril ? 'Sem Nota' : '', 
         conferenceNumber: isInitialElectrode 
             ? getNextElectrodeConferenceNumber(conferences, stock) 
             : isInitialSabao 
@@ -793,12 +876,14 @@ const AddConferencePage: React.FC<{
                     ? getNextTrelicaConferenceNumber(conferences, stock)
                     : isInitialMalha
                         ? getNextMalhaConferenceNumber(conferences, stock)
-                        : '',
+                        : isInitialAmarril
+                            ? getNextAmarrilConferenceNumber(conferences, stock)
+                            : '',
     }));
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [lots, setLots] = useState<Partial<ConferenceLotData>[]>(() => {
-        const mat = isInitialElectrode ? 'Eletrodos Treliças' : isInitialSabao ? 'Sabão' : isInitialTrelica ? 'Treliça' : isInitialMalha ? 'Malha' : 'Fio Máquina';
+        const mat = isInitialElectrode ? 'Eletrodos Treliças' : isInitialSabao ? 'Sabão' : isInitialTrelica ? 'Treliça' : isInitialMalha ? 'Malha' : isInitialAmarril ? 'Amarril' : 'Fio Máquina';
         const defaultOpts = getGaugeOptionsForMaterial(mat, gauges);
         const first = defaultOpts[0];
         const autoLot = isInitialElectrode 
@@ -809,20 +894,22 @@ const AddConferencePage: React.FC<{
                     ? getNextTrelicaInternalLot(stock, [], conferences)
                     : isInitialMalha
                         ? getNextMalhaInternalLot(stock, [], conferences)
-                        : '';
+                        : isInitialAmarril
+                            ? getNextAmarrilInternalLot(stock, [], conferences)
+                            : '';
 
         const trUnitW = parseFloat(first?.peso_final || '6.01');
         const mlUnitW = parseFloat(first?.peso_peca || first?.peso_final || '4.274');
-        const defaultWeight = isInitialElectrode ? 1 : isInitialSabao ? 25 : isInitialTrelica ? Math.round(trUnitW * 100) : isInitialMalha ? Math.round(mlUnitW * 50 * 10) / 10 : 0;
+        const defaultWeight = isInitialElectrode ? 1 : isInitialSabao ? 25 : isInitialTrelica ? Math.round(trUnitW * 100) : isInitialMalha ? Math.round(mlUnitW * 50 * 10) / 10 : isInitialAmarril ? 50 : 0;
 
         return [{
             internalLot: autoLot, 
-            runNumber: (isInitialElectrode || isInitialSabao || isInitialTrelica || isInitialMalha) ? '-' : '', 
-            steelType: (isInitialElectrode || isInitialSabao || isInitialTrelica || isInitialMalha) ? '' : '1006', 
-            bitola: first ? first.gauge : (isInitialElectrode ? '1000' : isInitialSabao ? 'Saco 25kg' : isInitialTrelica ? '12m' : isInitialMalha ? '3.40' : '8.00'), 
+            runNumber: (isInitialElectrode || isInitialSabao || isInitialTrelica || isInitialMalha || isInitialAmarril) ? '-' : '', 
+            steelType: (isInitialElectrode || isInitialSabao || isInitialTrelica || isInitialMalha || isInitialAmarril) ? '' : '1006', 
+            bitola: first ? first.gauge : (isInitialElectrode ? '1000' : isInitialSabao ? 'Saco 25kg' : isInitialTrelica ? '12m' : isInitialMalha ? '3.40' : isInitialAmarril ? '19mm x 0,86mm' : '8.00'), 
             materialType: mat, 
-            productCode: first?.code || (isInitialSabao ? '00010' : isInitialTrelica ? 'H8L12' : isInitialMalha ? '4088' : ''),
-            description: first?.description || (isInitialSabao ? 'Condat' : isInitialTrelica ? 'H-8 LEVE' : isInitialMalha ? 'Q45 - 20X20 3,40MM' : ''),
+            productCode: first?.code || (isInitialSabao ? '00010' : isInitialTrelica ? 'H8L12' : isInitialMalha ? '4088' : isInitialAmarril ? '250311' : ''),
+            description: first?.description || (isInitialSabao ? 'Condat' : isInitialTrelica ? 'H-8 LEVE' : isInitialMalha ? 'Q45 - 20X20 3,40MM' : isInitialAmarril ? 'FITA DE AÇO -AMARRIL ROLO CA60- 19MMX0,86MM' : ''),
             quantity: isInitialTrelica ? 100 : isInitialMalha ? 50 : undefined,
             labelWeight: defaultWeight
         }];
@@ -843,6 +930,7 @@ const AddConferencePage: React.FC<{
     const isAnySabao = useMemo(() => lots.some(l => l.materialType === 'Sabão'), [lots]);
     const isAnyTrelica = useMemo(() => lots.some(l => l.materialType === 'Treliça'), [lots]);
     const isAnyMalha = useMemo(() => lots.some(l => l.materialType === 'Malha'), [lots]);
+    const isAnyAmarril = useMemo(() => lots.some(l => l.materialType === 'Amarril'), [lots]);
     const isAnyRawMaterial = useMemo(() => lots.some(l => l.materialType === 'Fio Máquina' || l.materialType === 'CA-60'), [lots]);
 
     const vacantLots = useMemo(() => {
@@ -891,8 +979,19 @@ const AddConferencePage: React.FC<{
                     nfe: prev.nfe || 'Produção Interna'
                 }));
             }
+        } else if (isAnyAmarril) {
+            const currentConf = conferenceData.conferenceNumber?.trim() || '';
+            if (!currentConf || !currentConf.toUpperCase().includes('AM')) {
+                const nextConf = getNextAmarrilConferenceNumber(conferences, stock);
+                setConferenceData(prev => ({ 
+                    ...prev, 
+                    conferenceNumber: nextConf, 
+                    supplier: prev.supplier || 'Gerdau / MSM',
+                    nfe: prev.nfe || 'Sem Nota'
+                }));
+            }
         }
-    }, [isAnyElectrode, isAnySabao, isAnyTrelica, isAnyMalha, conferences, stock]);
+    }, [isAnyElectrode, isAnySabao, isAnyTrelica, isAnyMalha, isAnyAmarril, conferences, stock]);
 
     useEffect(() => {
         if (!conferenceData.conferenceNumber) {
@@ -1129,6 +1228,23 @@ const AddConferencePage: React.FC<{
                     labelWeight: Math.round(unitW * defaultPcs * 10) / 10
                 }
             ]);
+        } else if (lastLot && lastLot.materialType === 'Amarril') {
+            const nextLot = getNextAmarrilInternalLot(stock, lots, conferences);
+            const defaultOpts = getGaugeOptionsForMaterial('Amarril', gauges);
+            const fallback = defaultOpts[0];
+            setLots(prev => [
+                ...prev,
+                {
+                    internalLot: nextLot,
+                    runNumber: '-',
+                    steelType: '',
+                    bitola: lastLot.bitola || fallback?.gauge || '19mm x 0,86mm',
+                    materialType: 'Amarril',
+                    productCode: lastLot.productCode || fallback?.code || '250311',
+                    description: lastLot.description || fallback?.description || 'FITA DE AÇO -AMARRIL ROLO CA60- 19MMX0,86MM',
+                    labelWeight: lastLot.labelWeight || 50
+                }
+            ]);
         } else {
             setLots([...lots, { ...lastLot, internalLot: '', labelWeight: 0 }]);
         }
@@ -1237,6 +1353,27 @@ const AddConferencePage: React.FC<{
                         nfe: prev.nfe || 'Produção Interna'
                     }));
                 }
+            } else if (value === 'Amarril') {
+                const currentLotVal = newLots[index].internalLot?.trim() || '';
+                const isAmFormat = /^AM[-_]?\d+/i.test(currentLotVal);
+                if (!currentLotVal || !isAmFormat) {
+                    const otherLots = newLots.filter((_, i) => i !== index);
+                    const nextLot = getNextAmarrilInternalLot(stock, otherLots, conferences);
+                    newLots[index].internalLot = nextLot;
+                }
+                newLots[index].runNumber = newLots[index].runNumber || '-';
+                newLots[index].steelType = '';
+                newLots[index].labelWeight = newLots[index].labelWeight || 50;
+                const cNum = conferenceData.conferenceNumber.trim();
+                if (!cNum || !cNum.toUpperCase().includes('AM')) {
+                    const nextConf = getNextAmarrilConferenceNumber(conferences, stock);
+                    setConferenceData(prev => ({ 
+                        ...prev, 
+                        conferenceNumber: nextConf, 
+                        supplier: prev.supplier || 'Gerdau / MSM',
+                        nfe: prev.nfe || 'Sem Nota'
+                    }));
+                }
             }
         }
 
@@ -1307,6 +1444,12 @@ const AddConferencePage: React.FC<{
         } else if (isAnyTrelica && (!confNum || !confNum.toUpperCase().includes('TR'))) {
             confNum = getNextTrelicaConferenceNumber(conferences, stock);
             setConferenceData(prev => ({ ...prev, conferenceNumber: confNum }));
+        } else if (isAnyMalha && (!confNum || !confNum.toUpperCase().includes('ML'))) {
+            confNum = getNextMalhaConferenceNumber(conferences, stock);
+            setConferenceData(prev => ({ ...prev, conferenceNumber: confNum }));
+        } else if (isAnyAmarril && (!confNum || !confNum.toUpperCase().includes('AM'))) {
+            confNum = getNextAmarrilConferenceNumber(conferences, stock);
+            setConferenceData(prev => ({ ...prev, conferenceNumber: confNum }));
         }
 
         const sanitizedLots = lots.map((l, i) => {
@@ -1343,6 +1486,30 @@ const AddConferencePage: React.FC<{
                     runNumber: l.runNumber?.trim() || '-',
                     quantity: qty,
                     labelWeight: l.labelWeight && l.labelWeight > 0 ? l.labelWeight : 600
+                };
+            }
+            if (l.materialType === 'Malha') {
+                const lotVal = l.internalLot?.trim() || '';
+                const autoLot = lotVal || getNextMalhaInternalLot(stock, lots.slice(0, i), conferences);
+                const qty = l.quantity && l.quantity > 0 ? Number(l.quantity) : 50;
+                return {
+                    ...l,
+                    steelType: '',
+                    internalLot: autoLot,
+                    runNumber: l.runNumber?.trim() || '-',
+                    quantity: qty,
+                    labelWeight: l.labelWeight && l.labelWeight > 0 ? l.labelWeight : 213.7
+                };
+            }
+            if (l.materialType === 'Amarril') {
+                const lotVal = l.internalLot?.trim() || '';
+                const autoLot = lotVal || getNextAmarrilInternalLot(stock, lots.slice(0, i), conferences);
+                return {
+                    ...l,
+                    steelType: '',
+                    internalLot: autoLot,
+                    runNumber: l.runNumber?.trim() || '-',
+                    labelWeight: l.labelWeight && l.labelWeight > 0 ? l.labelWeight : 50
                 };
             }
             return l;
@@ -1523,6 +1690,10 @@ const AddConferencePage: React.FC<{
                                     <span className="text-purple-800 bg-purple-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-purple-300">
                                         🕸️ Auto (CONF-ML-001+)
                                     </span>
+                                ) : isAnyAmarril ? (
+                                    <span className="text-teal-800 bg-teal-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-teal-300">
+                                        🔗 Auto (CONF-AM-001+)
+                                    </span>
                                 ) : null}
                             </div>
                             <div className="relative">
@@ -1530,12 +1701,13 @@ const AddConferencePage: React.FC<{
                                     type="text" 
                                     value={conferenceData.conferenceNumber} 
                                     onChange={e => setConferenceData({ ...conferenceData, conferenceNumber: e.target.value })} 
-                                    placeholder={isAnyElectrode ? "Ex: 10000" : isAnySabao ? "Ex: CONF-SB-001" : isAnyTrelica ? "Ex: CONF-TR-001" : isAnyMalha ? "Ex: CONF-ML-001" : ""}
+                                    placeholder={isAnyElectrode ? "Ex: 10000" : isAnySabao ? "Ex: CONF-SB-001" : isAnyTrelica ? "Ex: CONF-TR-001" : isAnyMalha ? "Ex: CONF-ML-001" : isAnyAmarril ? "Ex: CONF-AM-001" : ""}
                                     className={`w-full p-2 border rounded text-center font-bold ${
                                         isAnyElectrode ? 'bg-amber-50/60 border-amber-300 text-slate-900' :
                                         isAnySabao ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950' :
                                         isAnyTrelica ? 'bg-blue-50/60 border-blue-300 text-blue-950' :
-                                        isAnyMalha ? 'bg-purple-50/60 border-purple-300 text-purple-950' : ''
+                                        isAnyMalha ? 'bg-purple-50/60 border-purple-300 text-purple-950' : 
+                                        isAnyAmarril ? 'bg-teal-50/60 border-teal-300 text-teal-950' : ''
                                     } ${conferenceNumberError ? 'border-red-500 bg-red-50' : ''}`} 
                                     required 
                                 />
@@ -1587,6 +1759,19 @@ const AddConferencePage: React.FC<{
                                         }}
                                         title="Recalcular conferência de malha"
                                         className="absolute right-1 top-1 bottom-1 px-2 text-[10px] font-bold bg-purple-200 text-purple-900 rounded hover:bg-purple-300"
+                                    >
+                                        Auto
+                                    </button>
+                                )}
+                                {isAnyAmarril && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextConf = getNextAmarrilConferenceNumber(conferences, stock);
+                                            setConferenceData(prev => ({ ...prev, conferenceNumber: nextConf }));
+                                        }}
+                                        title="Recalcular conferência de amarril"
+                                        className="absolute right-1 top-1 bottom-1 px-2 text-[10px] font-bold bg-teal-200 text-teal-900 rounded hover:bg-teal-300"
                                     >
                                         Auto
                                     </button>
@@ -1847,6 +2032,22 @@ const AddConferencePage: React.FC<{
                         </div>
                     )}
 
+                    {isAnyAmarril && (
+                        <div className="bg-teal-50 border-2 border-teal-400 rounded-xl p-3.5 mx-6 mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-fadeIn">
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-2xl">🔗</span>
+                                <div>
+                                    <p className="text-xs font-black text-teal-900 uppercase tracking-wide">
+                                        Entrada de Insumo: Amarril (Fita de Aço / Presilhas)
+                                    </p>
+                                    <p className="text-xs font-medium text-teal-800">
+                                        Lotes sequenciais exclusivos (<strong className="text-teal-950 font-bold">AM-0001+</strong>) e conferência automática (<strong className="text-teal-950 font-bold">CONF-AM-001+</strong>).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="p-4 flex justify-end">
                         <input type="file" accept="image/*" capture="environment" className="hidden" id="scan-ia" onChange={handleGlobalScan} />
                         <label htmlFor="scan-ia" className="bg-[#0F3F5C] text-white px-6 py-2 rounded-lg font-bold cursor-pointer flex items-center gap-2"><CameraIcon className="h-5 w-5" /> {isScanning ? 'Lendo...' : 'Leitura IA'}</label>
@@ -1856,13 +2057,13 @@ const AddConferencePage: React.FC<{
                             <thead className="bg-slate-50 border-y">
                                 <tr>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        Lote Interno {isAnyElectrode ? <span className="text-amber-600 font-bold block text-[9px]">⚡ Auto (10001+)</span> : isAnySabao ? <span className="text-emerald-600 font-bold block text-[9px]">🧼 Auto (SB-0001+)</span> : isAnyTrelica ? <span className="text-blue-600 font-bold block text-[9px]">📐 Auto (TR-0001+)</span> : isAnyMalha ? <span className="text-purple-600 font-bold block text-[9px]">🕸️ Auto (ML-0001+)</span> : ''}
+                                        Lote Interno {isAnyElectrode ? <span className="text-amber-600 font-bold block text-[9px]">⚡ Auto (10001+)</span> : isAnySabao ? <span className="text-emerald-600 font-bold block text-[9px]">🧼 Auto (SB-0001+)</span> : isAnyTrelica ? <span className="text-blue-600 font-bold block text-[9px]">📐 Auto (TR-0001+)</span> : isAnyMalha ? <span className="text-purple-600 font-bold block text-[9px]">🕸️ Auto (ML-0001+)</span> : isAnyAmarril ? <span className="text-teal-600 font-bold block text-[9px]">🔗 Auto (AM-0001+)</span> : ''}
                                     </th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">Tipo de Aço</th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">Corrida</th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">Material</th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        {isAnyElectrode ? 'Modelo / Código' : isAnySabao ? 'Embalagem / Produto' : isAnyTrelica ? 'Modelo / Ficha Técnica' : isAnyMalha ? 'Modelo / Painel / Ficha Técnica' : 'Bitola'}
+                                        {isAnyElectrode ? 'Modelo / Código' : isAnySabao ? 'Embalagem / Produto' : isAnyTrelica ? 'Modelo / Ficha Técnica' : isAnyMalha ? 'Modelo / Painel / Ficha Técnica' : isAnyAmarril ? 'Especificação / Produto' : 'Bitola'}
                                     </th>
                                     {(isAnyTrelica || isAnyMalha) && (
                                         <th className={`p-3 text-center font-bold uppercase text-[10px] w-36 ${isAnyMalha ? 'text-purple-900 bg-purple-50/60' : 'text-blue-900 bg-blue-50/60'}`}>
@@ -1870,7 +2071,7 @@ const AddConferencePage: React.FC<{
                                         </th>
                                     )}
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]">
-                                        {isAnyElectrode ? 'Qtd (un)' : isAnySabao ? 'Peso (kg) / Saco' : isAnyTrelica ? 'Peso do Pct (kg)' : isAnyMalha ? 'Peso Total (kg)' : 'Peso Etiqueta'}
+                                        {isAnyElectrode ? 'Qtd (un)' : isAnySabao ? 'Peso (kg) / Saco' : isAnyTrelica ? 'Peso do Pct (kg)' : isAnyMalha ? 'Peso Total (kg)' : isAnyAmarril ? 'Peso Total (kg)' : 'Peso Etiqueta'}
                                     </th>
                                     <th className="p-3 text-center font-bold text-slate-600 uppercase text-[10px]"></th>
                                 </tr>
@@ -1884,12 +2085,13 @@ const AddConferencePage: React.FC<{
                                                     type="text" 
                                                     value={lot.internalLot || ''} 
                                                     onChange={e => handleLotChange(index, 'internalLot', e.target.value)} 
-                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? 'Ex: 10001' : lot.materialType === 'Sabão' ? 'Ex: SB-0001' : lot.materialType === 'Treliça' ? 'Ex: TR-0001' : lot.materialType === 'Malha' ? 'Ex: ML-0001' : ''}
+                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? 'Ex: 10001' : lot.materialType === 'Sabão' ? 'Ex: SB-0001' : lot.materialType === 'Treliça' ? 'Ex: TR-0001' : lot.materialType === 'Malha' ? 'Ex: ML-0001' : lot.materialType === 'Amarril' ? 'Ex: AM-0001' : ''}
                                                     className={`w-full p-2 border rounded text-center font-bold ${
                                                         lot.materialType === 'Eletrodos Treliças' ? 'bg-amber-50/60 border-amber-300 text-amber-900' : 
                                                         lot.materialType === 'Sabão' ? 'bg-emerald-50/60 border-emerald-300 text-emerald-900' : 
                                                         lot.materialType === 'Treliça' ? 'bg-blue-50/60 border-blue-300 text-blue-900' : 
-                                                        lot.materialType === 'Malha' ? 'bg-purple-50/60 border-purple-300 text-purple-900' : ''
+                                                        lot.materialType === 'Malha' ? 'bg-purple-50/60 border-purple-300 text-purple-900' : 
+                                                        lot.materialType === 'Amarril' ? 'bg-teal-50/60 border-teal-300 text-teal-900' : ''
                                                     }`} 
                                                     required 
                                                 />
@@ -1941,11 +2143,23 @@ const AddConferencePage: React.FC<{
                                                         Auto
                                                     </button>
                                                 )}
+                                                {lot.materialType === 'Amarril' && !lot.internalLot && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const nextLot = getNextAmarrilInternalLot(stock, lots.filter((_, i) => i !== index), conferences);
+                                                            handleLotChange(index, 'internalLot', nextLot);
+                                                        }}
+                                                        className="absolute right-1 top-1 bottom-1 px-1.5 text-[9px] font-bold bg-teal-200 text-teal-900 rounded hover:bg-teal-300"
+                                                    >
+                                                        Auto
+                                                    </button>
+                                                )}
                                             </div>
                                             {duplicateErrors[index] && <p className="text-red-500 text-[9px] font-bold text-center mt-0.5">{duplicateErrors[index]}</p>}
                                         </td>
                                         <td className="p-2">
-                                            {lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' || lot.materialType === 'Malha' ? (
+                                            {lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' || lot.materialType === 'Malha' || lot.materialType === 'Amarril' ? (
                                                 <span className="text-xs text-slate-400 font-bold block text-center">-</span>
                                             ) : (
                                                 <select value={lot.steelType || ''} onChange={e => handleLotChange(index, 'steelType', e.target.value)} className="w-full p-2 border rounded text-center" required>
@@ -1958,9 +2172,9 @@ const AddConferencePage: React.FC<{
                                                 type="text" 
                                                 value={lot.runNumber || ''} 
                                                 onChange={e => handleLotChange(index, 'runNumber', e.target.value)} 
-                                                placeholder={lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' || lot.materialType === 'Malha' ? '-' : ''}
+                                                placeholder={lot.materialType === 'Eletrodos Treliças' || lot.materialType === 'Sabão' || lot.materialType === 'Treliça' || lot.materialType === 'Malha' || lot.materialType === 'Amarril' ? '-' : ''}
                                                 className="w-full p-2 border rounded text-center" 
-                                                required={lot.materialType !== 'Eletrodos Treliças' && lot.materialType !== 'Sabão' && lot.materialType !== 'Treliça' && lot.materialType !== 'Malha'} 
+                                                required={lot.materialType !== 'Eletrodos Treliças' && lot.materialType !== 'Sabão' && lot.materialType !== 'Treliça' && lot.materialType !== 'Malha' && lot.materialType !== 'Amarril'} 
                                             />
                                         </td>
                                         <td className="p-2">
@@ -2094,9 +2308,10 @@ const AddConferencePage: React.FC<{
                                                     }}
                                                     className={`w-full p-2 border rounded font-bold text-center no-spinner ${
                                                         lot.materialType === 'Treliça' ? 'border-blue-200 bg-blue-50/20' : 
-                                                        lot.materialType === 'Malha' ? 'border-purple-200 bg-purple-50/20' : ''
+                                                        lot.materialType === 'Malha' ? 'border-purple-200 bg-purple-50/20' : 
+                                                        lot.materialType === 'Amarril' ? 'border-teal-200 bg-teal-50/20' : ''
                                                     }`}
-                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? '1' : lot.materialType === 'Sabão' ? '25' : lot.materialType === 'Treliça' ? '600' : lot.materialType === 'Malha' ? '213.7' : '0'}
+                                                    placeholder={lot.materialType === 'Eletrodos Treliças' ? '1' : lot.materialType === 'Sabão' ? '25' : lot.materialType === 'Treliça' ? '600' : lot.materialType === 'Malha' ? '213.7' : lot.materialType === 'Amarril' ? '50' : '0'}
                                                     required
                                                 />
                                                 {(lot.materialType === 'Treliça' || lot.materialType === 'Malha') && (
@@ -3228,7 +3443,7 @@ const StockControl: React.FC<{
         }
     };
 
-    if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} initialMaterialType={materialFilter === 'Eletrodos Treliças' ? 'Eletrodos Treliças' : materialFilter === 'Sabão' ? 'Sabão' : materialFilter === 'Treliça' ? 'Treliça' : materialFilter === 'Malha' ? 'Malha' : undefined} />;
+    if (isAdding) return <AddConferencePage onClose={() => setIsAdding(false)} onSubmit={addConference} stock={stock} onShowReport={setReportView} conferences={conferences} onEditConference={editConference} onDeleteConference={deleteConference} gauges={gauges} isGestor={isGestor} setPage={setPage} initialMaterialType={materialFilter === 'Eletrodos Treliças' ? 'Eletrodos Treliças' : materialFilter === 'Sabão' ? 'Sabão' : materialFilter === 'Treliça' ? 'Treliça' : materialFilter === 'Malha' ? 'Malha' : materialFilter === 'Amarril' ? 'Amarril' : undefined} />;
 
     return (
         <div className={`p-4 md:p-8 space-y-6 ${isPrintModalOpen ? 'print:hidden' : ''}`}>
