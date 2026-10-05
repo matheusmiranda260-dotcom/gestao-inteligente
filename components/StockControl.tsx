@@ -9,7 +9,7 @@ import type {
     TrelicaElectrodeStock, TrelicaElectrodeType
 } from '../types';
 import {
-    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions, SteelTypeOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges
+    FioMaquinaBitolaOptions, TrefilaBitolaOptions, MaterialOptions, CA60BitolaOptions, SteelTypeOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges, DefaultAmarrilGauges
 } from '../types';
 import { extractLotDataFromImage } from '../services/geminiService';
 import ConferenceReport from './ConferenceReport';
@@ -188,6 +188,23 @@ const getGaugeOptionsForMaterial = (material: string, gauges: StockGauge[]): Gau
                     panelDimensions: m.panelDimensions,
                     peso_peca: m.peso_peca,
                     peso_final: m.peso_peca
+                } as StockGauge);
+            }
+        });
+    } else if (material === 'Amarril') {
+        DefaultAmarrilGauges.forEach(a => {
+            const defId = a.id || `default_am_${a.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = customGauges.some(g => (a.productCode && g.productCode === a.productCode) || g.id === defId);
+            if (!exists) {
+                customGauges.push({
+                    id: defId,
+                    materialType: 'Amarril',
+                    gauge: a.gauge,
+                    productCode: a.productCode,
+                    description: a.description,
+                    peso_peca: a.peso_peca,
+                    peso_final: a.peso_peca
                 } as StockGauge);
             }
         });
@@ -2559,7 +2576,7 @@ const StockControl: React.FC<{
             // ignore
         }
 
-        const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha'];
+        const materialsToInclude = materialFilter ? [materialFilter] : ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha', 'Amarril'];
         materialsToInclude.forEach(mat => {
             if (mat === 'Eletrodos Treliças') {
                 DefaultElectrodeGauges.forEach(eg => {
@@ -2592,6 +2609,26 @@ const StockControl: React.FC<{
                             productCode: sg.productCode,
                             description: sg.description,
                             label: `${matPrefix}🧼 ${sg.gauge} - ${sg.description} (Cód. ${sg.productCode})`
+                        });
+                    }
+                });
+            } else if (mat === 'Amarril') {
+                DefaultAmarrilGauges.forEach(ag => {
+                    const defId = ag.id || `default_am_${ag.productCode}`;
+                    if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                    const key = `Amarril::${ag.gauge}::${ag.productCode}::${ag.description}`;
+                    const matPrefix = !materialFilter ? `[Amarril] ` : '';
+                    const code = ag.productCode ? ` (Cód. ${ag.productCode})` : '';
+                    const weightText = ag.peso_peca ? ` [${ag.peso_peca} kg]` : '';
+                    if (!options.some(o => (ag.productCode && o.productCode === ag.productCode) || o.key === key)) {
+                        options.push({
+                            key,
+                            gauge: ag.gauge,
+                            materialType: 'Amarril',
+                            productCode: ag.productCode,
+                            description: ag.description,
+                            peso_peca: ag.peso_peca,
+                            label: `${matPrefix}🔗 ${ag.description}${code}${weightText}`
                         });
                     }
                 });

@@ -42,7 +42,7 @@ export interface EmployeeDocument {
 
 export type MachineType = 'Trefila 1' | 'Trefila 2' | 'Treliça 1' | 'Treliça 2' | 'Malha' | 'Malha 1' | 'Malha 2' | 'Corte-01' | 'Corte-02' | 'Trefila' | 'Treliça' | 'Geral' | 'Empilhadeira' | 'Desbobinadeira 1';
 
-export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças' | 'Sabão' | 'Malha';
+export type MaterialType = 'Arame' | 'Treliça' | 'Ponta' | 'Fio Máquina' | 'Sucata' | 'CA-60' | 'CA-50' | 'Eletrodos Treliças' | 'Sabão' | 'Malha' | 'Amarril';
 
 export type Bitola = string; // e.g., '3.40', '4,20', '8.00'
 
@@ -747,10 +747,29 @@ export interface UserAccessLog {
 }
 
 export const trelicaLabels = ['H08 (8m)', 'H12 (12m)', 'H6 (6m)', 'H10 (10m)'];
-export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha'];
+export const MaterialOptions = ['Fio Máquina', 'CA-60', 'Eletrodos Treliças', 'Sabão', 'Treliça', 'Malha', 'Amarril'];
 
 export const DefaultSabaoGauges: Array<{ materialType: MaterialType; gauge: string; productCode: string; description: string }> = [
     { materialType: 'Sabão', gauge: 'Saco 25kg', productCode: '00010', description: 'Condat' },
+];
+
+export const DefaultAmarrilGauges: Array<Omit<StockGauge, 'id'> & { id?: string; unit?: string; unitWeight?: number }> = [
+    {
+        materialType: 'Amarril',
+        productCode: '250311',
+        description: 'FITA DE AÇO -AMARRIL ROLO CA60- 19MMX0,86MM',
+        gauge: '19mm x 0,86mm',
+        peso_peca: '0,289',
+        peso_final: '0,289'
+    },
+    {
+        materialType: 'Amarril',
+        productCode: '2503111',
+        description: 'PRESILHA DE AÇO- AMARRIL ROLO CA60- 19MMX086MM',
+        gauge: '19mm x 0,86mm',
+        peso_peca: '0,021',
+        peso_final: '0,021'
+    }
 ];
 
 export const DefaultTrelicaGauges: Array<Omit<StockGauge, 'id'> & { id?: string }> = [

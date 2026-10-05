@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { StockItem, StockGauge } from '../types';
-import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultMalhaGauges } from '../types';
+import { MaterialOptions, FioMaquinaBitolaOptions, CA60BitolaOptions, DefaultTrelicaGauges, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultMalhaGauges, DefaultAmarrilGauges } from '../types';
 import { PrinterIcon, XIcon } from './icons';
 
 interface StockPrintModalProps {
@@ -236,6 +236,25 @@ export const StockPrintModal: React.FC<StockPrintModalProps> = ({
                         linearMeters: mg.linearMeters,
                         meshSpacing: mg.meshSpacing,
                         panelDimensions: mg.panelDimensions
+                    });
+                }
+            });
+        } else if (selectedMaterial === 'Amarril') {
+            DefaultAmarrilGauges.forEach(ag => {
+                const key = `Amarril::${ag.gauge}::${ag.productCode}::${ag.description}`;
+                if (!optionsMap.has(key)) {
+                    const code = ag.productCode ? ` (Cód. ${ag.productCode})` : '';
+                    const weightText = ag.peso_peca ? ` [${ag.peso_peca} kg]` : '';
+                    optionsMap.set(key, {
+                        key,
+                        materialType: 'Amarril',
+                        gauge: ag.gauge,
+                        productCode: ag.productCode || '',
+                        description: ag.description || '',
+                        label: `🔗 ${ag.description}${code}${weightText}`,
+                        count: 0,
+                        weight: 0,
+                        peso_peca: ag.peso_peca
                     });
                 }
             });

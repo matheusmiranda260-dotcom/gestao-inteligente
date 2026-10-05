@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { StockGauge, MaterialType } from '../types';
-import { MaterialOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges } from '../types';
+import { MaterialOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges, DefaultAmarrilGauges } from '../types';
 import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon, SearchIcon } from './icons';
 
 interface GaugesManagerProps {
@@ -197,6 +197,24 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
             const exists = result.some(g => 
                 g.materialType === 'Malha' && 
+                ((d.productCode && g.productCode === d.productCode) || 
+                 (g.description === d.description && g.gauge === d.gauge) ||
+                 g.id === defId)
+            );
+            if (!exists) {
+                result.push({
+                    id: defId,
+                    ...d
+                });
+            }
+        });
+
+        // 5. Amarril (Fitas e Presilhas): inclui itens padrão
+        DefaultAmarrilGauges.forEach(d => {
+            const defId = d.id || `default_am_${d.productCode}`;
+            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+            const exists = result.some(g => 
+                g.materialType === 'Amarril' && 
                 ((d.productCode && g.productCode === d.productCode) || 
                  (g.description === d.description && g.gauge === d.gauge) ||
                  g.id === defId)
@@ -442,6 +460,49 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             return;
         }
 
+        if (materialType === 'Amarril') {
+            const med = newGauge.trim() || '19mm x 0,86mm';
+            const desc = newDescription.trim() || 'Amarril';
+            const code = newProductCode.trim();
+
+            if (!desc && !code) {
+                alert('Por favor, informe a descrição ou código do item de amarril (ex: FITA DE AÇO, cód: 250311).');
+                return;
+            }
+
+            const existingAmarril = effectiveGauges.find(g =>
+                g.materialType === 'Amarril' &&
+                ((code && g.productCode === code) || (desc && g.description?.toLowerCase() === desc.toLowerCase()))
+            );
+
+            if (existingAmarril) {
+                onUpdate(existingAmarril.id, {
+                    materialType: 'Amarril',
+                    gauge: med,
+                    description: desc,
+                    productCode: code || existingAmarril.productCode
+                });
+                setNewGauge('');
+                setNewDescription('');
+                setNewProductCode('');
+                return;
+            }
+
+            onAdd({
+                materialType: 'Amarril',
+                gauge: med,
+                description: desc,
+                productCode: code || undefined,
+                peso_peca: '0,289',
+                peso_final: '0,289'
+            });
+
+            setNewGauge('');
+            setNewDescription('');
+            setNewProductCode('');
+            return;
+        }
+
         if (!newGauge.trim()) {
             alert('Por favor, insira o diâmetro da bitola em mm.');
             return;
@@ -539,12 +600,14 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 peso_peca: editingMlPesoPeca || item.peso_peca,
                 peso_final: editingMlPesoPeca || item.peso_final
             });
-        } else if (item?.materialType === 'Eletrodos Treliças' || item?.materialType === 'Sabão') {
+        } else if (item?.materialType === 'Eletrodos Treliças' || item?.materialType === 'Sabão' || item?.materialType === 'Amarril') {
             onUpdate(id, { 
                 materialType: item.materialType,
                 gauge: editingGauge.trim() || item.gauge,
                 description: editingDescription.trim() || item.description,
-                productCode: editingCode.trim() || item.productCode 
+                productCode: editingCode.trim() || item.productCode,
+                peso_peca: editingMlPesoPeca || item.peso_peca,
+                peso_final: editingMlPesoPeca || item.peso_final
             });
         } else {
             const normalized = editingGauge.trim().replace(',', '.');
@@ -638,6 +701,12 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                     if (codeA !== codeB) return codeA - codeB;
                     return (a.description || '').localeCompare(b.description || '');
                 }
+                if (material === 'Amarril') {
+                    const codeA = parseInt(a.productCode || '0') || 0;
+                    const codeB = parseInt(b.productCode || '0') || 0;
+                    if (codeA !== codeB) return codeA - codeB;
+                    return (a.description || '').localeCompare(b.description || '');
+                }
                 if (material === 'Sabão') {
                     return (a.description || a.gauge).localeCompare(b.description || b.gauge);
                 }
@@ -655,13 +724,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">Gerenciar Produtos, Bitolas, Eletrodos & Treliças</h1>
                         <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-                            Catálogo industrial unificado: Matéria-Prima, Insumos (Sabão), Eletrodos e Modelos de Treliça (Ficha Técnica).
+                            Catálogo industrial unificado: Matéria-Prima, Insumos (Sabão e Amarril), Eletrodos e Modelos de Treliça (Ficha Técnica).
                         </p>
                     </div>
                     <button
                         onClick={onRestoreDefaults}
                         className="bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 font-bold py-2 px-4 rounded-xl shadow-sm transition text-xs sm:text-sm flex items-center gap-2"
-                        title="Carrega as bitolas industriais padrão, eletrodos, sabão e modelos de treliça caso não existam"
+                        title="Carrega as bitolas industriais padrão, eletrodos, sabão, amarril e modelos de treliça caso não existam"
                     >
                         <ArrowPathIcon className="h-4 w-4 text-blue-600" />
                         Restaurar Padrões
@@ -675,7 +744,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                             <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
                                 <PlusIcon className="h-5 w-5" />
                             </span>
-                            {materialType === 'Treliça' ? 'Cadastrar Modelo de Treliça (Ficha Técnica)' : materialType === 'Malha' ? 'Cadastrar Malha Soldada Industrial (Ficha Técnica)' : 'Cadastrar Novo Produto / Bitola'}
+                            {materialType === 'Treliça' ? 'Cadastrar Modelo de Treliça (Ficha Técnica)' : materialType === 'Malha' ? 'Cadastrar Malha Soldada Industrial (Ficha Técnica)' : materialType === 'Amarril' ? 'Cadastrar Item de Amarril (Fitas e Presilhas)' : 'Cadastrar Novo Produto / Bitola'}
                         </h2>
 
                         {/* Seletor de Material */}
@@ -686,7 +755,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                             <div className="flex flex-wrap gap-2">
                                 {MaterialOptions.map(m => {
                                     const isSelected = materialType === m;
-                                    const icon = m === 'Treliça' ? '📐' : m === 'Sabão' ? '🧼' : m === 'Eletrodos Treliças' ? '⚡' : m === 'Malha' ? '🕸️' : '⚙️';
+                                    const icon = m === 'Treliça' ? '📐' : m === 'Sabão' ? '🧼' : m === 'Eletrodos Treliças' ? '⚡' : m === 'Malha' ? '🕸️' : m === 'Amarril' ? '🔗' : '⚙️';
                                     return (
                                         <button
                                             key={m}
@@ -699,7 +768,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                             }`}
                                         >
                                             <span>{icon}</span>
-                                            <span>{m === 'Treliça' ? 'Treliças' : m === 'Malha' ? 'Malhas' : m}</span>
+                                            <span>{m === 'Treliça' ? 'Treliças' : m === 'Malha' ? 'Malhas' : m === 'Amarril' ? 'Amarril (Fitas/Presilhas)' : m}</span>
                                         </button>
                                     );
                                 })}
@@ -1015,10 +1084,10 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                         ) : (
                             /* FORMULÁRIO PADRÃO PARA DEMAIS MATERIAIS */
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {/* Bitola / Modelo / Embalagem */}
+                                {/* Bitola / Modelo / Embalagem / Medida */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        {materialType === 'Eletrodos Treliças' ? 'Modelo / Posição' : materialType === 'Sabão' ? 'Embalagem / Apresentação' : 'Bitola (mm)'} <span className="text-red-500">*</span>
+                                        {materialType === 'Eletrodos Treliças' ? 'Modelo / Posição' : materialType === 'Sabão' ? 'Embalagem / Apresentação' : materialType === 'Amarril' ? 'Medida / Especificação' : 'Bitola (mm)'} <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -1029,7 +1098,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                 ? "Ex: Eletrodo Superior (D)" 
                                                 : materialType === 'Sabão' 
                                                     ? "Ex: Saco 25kg" 
-                                                    : "Ex: 5.00 ou 6.50"
+                                                    : materialType === 'Amarril'
+                                                        ? "Ex: 19mm x 0,86mm"
+                                                        : "Ex: 5.00 ou 6.50"
                                         }
                                         className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm font-semibold text-slate-800 text-sm"
                                         onKeyPress={e => e.key === 'Enter' && handleAdd()}
@@ -1050,9 +1121,11 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                 ? "Ex: Eletrodo Superior (D)" 
                                                 : materialType === 'Sabão' 
                                                     ? "Ex: Condat" 
-                                                    : materialType === 'CA-60' 
-                                                        ? "Ex: CA-60 5,00mm (Rolo ~2000kg)" 
-                                                        : "Ex: Fio Máquina 6,50mm Gerdau"
+                                                    : materialType === 'Amarril'
+                                                        ? "Ex: FITA DE AÇO -AMARRIL ROLO CA60- 19MMX0,86MM"
+                                                        : materialType === 'CA-60' 
+                                                            ? "Ex: CA-60 5,00mm (Rolo ~2000kg)" 
+                                                            : "Ex: Fio Máquina 6,50mm Gerdau"
                                         }
                                         className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm text-slate-800 text-sm"
                                         onKeyPress={e => e.key === 'Enter' && handleAdd()}
@@ -1062,13 +1135,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                 {/* Código do Produto */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        Cód. Produto {materialType === 'Eletrodos Treliças' ? <span className="text-orange-500 font-bold">(ex: 1000)</span> : materialType === 'Sabão' ? <span className="text-emerald-600 font-bold">(ex: 00010)</span> : '(Opcional)'}
+                                        Cód. Produto {materialType === 'Eletrodos Treliças' ? <span className="text-orange-500 font-bold">(ex: 1000)</span> : materialType === 'Sabão' ? <span className="text-emerald-600 font-bold">(ex: 00010)</span> : materialType === 'Amarril' ? <span className="text-teal-600 font-bold">(ex: 250311)</span> : '(Opcional)'}
                                     </label>
                                     <input
                                         type="text"
                                         value={newProductCode}
                                         onChange={e => setNewProductCode(e.target.value)}
-                                        placeholder={materialType === 'Eletrodos Treliças' ? "Ex: 1000" : materialType === 'Sabão' ? "Ex: 00010" : "Ex: CA60-001"}
+                                        placeholder={materialType === 'Eletrodos Treliças' ? "Ex: 1000" : materialType === 'Sabão' ? "Ex: 00010" : materialType === 'Amarril' ? "Ex: 250311" : "Ex: CA60-001"}
                                         className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm text-slate-800 text-sm uppercase font-mono"
                                         onKeyPress={e => e.key === 'Enter' && handleAdd()}
                                     />
@@ -1079,7 +1152,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                         onClick={handleAdd}
                                         className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-md transition-all flex items-center gap-2 hover:shadow-lg active:scale-95 text-sm"
                                     >
-                                        <PlusIcon className="h-4 w-4" /> {materialType === 'Eletrodos Treliças' ? 'Cadastrar Eletrodo' : materialType === 'Sabão' ? 'Cadastrar Insumo (Sabão)' : 'Cadastrar Produto'}
+                                        <PlusIcon className="h-4 w-4" /> {materialType === 'Eletrodos Treliças' ? 'Cadastrar Eletrodo' : materialType === 'Sabão' ? 'Cadastrar Insumo (Sabão)' : materialType === 'Amarril' ? 'Cadastrar Item de Amarril' : 'Cadastrar Produto'}
                                     </button>
                                 </div>
                             </div>
@@ -1091,7 +1164,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                         <SearchIcon className="h-5 w-5 text-slate-400 shrink-0" />
                         <input
                             type="text"
-                            placeholder="Buscar por bitola, modelo, descrição, código ou especificação (ex: 5.00, H-8, H8L12, condat, 00010)..."
+                            placeholder="Buscar por bitola, modelo, descrição, código ou especificação (ex: 5.00, H-8, H8L12, condat, 00010, 250311)..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             className="flex-grow outline-none text-sm text-slate-700 font-medium placeholder-slate-400"
@@ -1105,13 +1178,14 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
 
                     {/* LISTAGEM POR MATERIAL */}
                     <div className="p-6 bg-slate-50/30">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4">
                             {MaterialOptions.map(material => {
                                 const isFioMaquina = material === 'Fio Máquina';
                                 const isCA60 = material === 'CA-60';
                                 const isSabao = material === 'Sabão';
                                 const isTrelica = material === 'Treliça';
                                 const isMalha = material === 'Malha';
+                                const isAmarril = material === 'Amarril';
                                 const badgeColor = isFioMaquina 
                                     ? 'bg-amber-100 text-amber-800 border-amber-300' 
                                     : isCA60 
@@ -1122,7 +1196,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                 ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
                                                 : isMalha
                                                     ? 'bg-purple-100 text-purple-900 border-purple-300'
-                                                    : 'bg-orange-100 text-orange-900 border-orange-300';
+                                                    : isAmarril
+                                                        ? 'bg-teal-100 text-teal-900 border-teal-300'
+                                                        : 'bg-orange-100 text-orange-900 border-orange-300';
                                 const items = gaugesByMaterial[material] || [];
 
                                 return (
@@ -1137,10 +1213,12 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                     <span className="text-sm">🧼</span>
                                                 ) : isMalha ? (
                                                     <span className="text-sm">🕸️</span>
+                                                ) : isAmarril ? (
+                                                    <span className="text-sm">🔗</span>
                                                 ) : (
                                                     <ScaleIcon className="h-4 w-4 text-slate-500" />
                                                 )}
-                                                <span>{isTrelica ? 'Treliças' : isMalha ? 'Malhas' : material}</span>
+                                                <span>{isTrelica ? 'Treliças' : isMalha ? 'Malhas' : isAmarril ? 'Amarril' : material}</span>
                                             </h3>
                                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-black border ${badgeColor} shrink-0`}>
                                                 {items.length} {items.length === 1 ? 'item' : 'itens'}
@@ -1187,13 +1265,13 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                                 type="text"
                                                                                 value={editingGauge}
                                                                                 onChange={e => setEditingGauge(e.target.value)}
-                                                                                className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-mono font-bold"
+                                                                                className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-bold text-center"
                                                                             />
                                                                         </div>
                                                                     </div>
                                                                     <div className="grid grid-cols-2 gap-1.5">
                                                                         <div>
-                                                                            <label className="text-[8px] font-bold text-slate-500 uppercase block">Metros Lineares</label>
+                                                                            <label className="text-[8px] font-bold text-slate-500 uppercase block">Metros Lin.</label>
                                                                             <input
                                                                                 type="number"
                                                                                 value={editingMlMetros}
@@ -1354,14 +1432,14 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                             <div className="grid grid-cols-3 gap-2">
                                                                 <div>
                                                                     <label className="text-[10px] font-bold text-slate-500 uppercase block">
-                                                                        {g.materialType === 'Eletrodos Treliças' ? 'Modelo' : g.materialType === 'Sabão' ? 'Embalagem' : 'Bitola (mm)'}
+                                                                        {g.materialType === 'Eletrodos Treliças' ? 'Modelo' : g.materialType === 'Sabão' ? 'Embalagem' : g.materialType === 'Amarril' ? 'Medida' : 'Bitola (mm)'}
                                                                     </label>
                                                                     <input
                                                                         type="text"
                                                                         value={editingGauge}
                                                                         onChange={e => setEditingGauge(e.target.value)}
                                                                         className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-bold"
-                                                                        placeholder={g.materialType === 'Eletrodos Treliças' ? "Superior (D)" : g.materialType === 'Sabão' ? "Saco 25kg" : "5.00"}
+                                                                        placeholder={g.materialType === 'Eletrodos Treliças' ? "Superior (D)" : g.materialType === 'Sabão' ? "Saco 25kg" : g.materialType === 'Amarril' ? "19mm x 0,86mm" : "5.00"}
                                                                     />
                                                                 </div>
                                                                 <div className="col-span-2">
@@ -1383,7 +1461,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                         value={editingCode}
                                                                         onChange={e => setEditingCode(e.target.value)}
                                                                         className="w-full p-1.5 text-xs border rounded-lg bg-slate-50 font-bold uppercase font-mono"
-                                                                        placeholder={g.materialType === 'Eletrodos Treliças' ? "1000" : g.materialType === 'Sabão' ? "00010" : "CA60-001"}
+                                                                        placeholder={g.materialType === 'Eletrodos Treliças' ? "1000" : g.materialType === 'Sabão' ? "00010" : g.materialType === 'Amarril' ? "250311" : "CA60-001"}
                                                                     />
                                                                 </div>
                                                                 <div className="flex items-end gap-1.5 pt-4">
@@ -1410,6 +1488,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                 const isItemSabao = g.materialType === 'Sabão';
                                                 const isItemTrelica = g.materialType === 'Treliça';
                                                 const isItemMalha = g.materialType === 'Malha';
+                                                const isItemAmarril = g.materialType === 'Amarril';
 
                                                 return (
                                                     <div 
@@ -1419,7 +1498,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                 ? 'border-slate-200 hover:border-cyan-400 hover:shadow-md' 
                                                                 : isItemMalha
                                                                     ? 'border-slate-200 hover:border-purple-400 hover:shadow-md'
-                                                                    : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                                                                    : isItemAmarril
+                                                                        ? 'border-slate-200 hover:border-teal-400 hover:shadow-md'
+                                                                        : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
                                                         }`}
                                                     >
                                                         <div className="flex flex-col min-w-0 flex-grow pr-2">
@@ -1493,6 +1574,38 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                         <span className="text-purple-900 font-black">{g.peso_peca || g.peso_final || '-'} kg</span>
                                                                     </div>
                                                                 </>
+                                                            ) : isItemAmarril ? (
+                                                                <>
+                                                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                                                        <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 border border-teal-300">
+                                                                            {g.productCode ? `Cód. ${g.productCode}` : 'AMARRIL'}
+                                                                        </span>
+                                                                        <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                                                                            {g.gauge || '19mm x 0,86mm'}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <span className="font-black text-slate-800 text-xs tracking-tight block mb-1 leading-snug" title={g.description || 'Amarril'}>
+                                                                        {g.description || 'Item de Amarril'}
+                                                                    </span>
+
+                                                                    <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100 space-y-0.5 my-1 text-[10px]">
+                                                                        <div className="flex items-center justify-between text-slate-600">
+                                                                            <span className="text-slate-400 font-bold">Uso no Estoque:</span>
+                                                                            <span className="font-black text-teal-900">por kg</span>
+                                                                        </div>
+                                                                        {g.peso_peca && (
+                                                                            <div className="flex items-center justify-between text-slate-600">
+                                                                                <span className="text-slate-400 font-bold">Peso Unitário:</span>
+                                                                                <span className="font-bold text-slate-700">
+                                                                                    {parseFloat(String(g.peso_peca).replace(',', '.')) < 1 
+                                                                                        ? `${Math.round(parseFloat(String(g.peso_peca).replace(',', '.')) * 1000)}g / un (${g.peso_peca} kg)` 
+                                                                                        : `${g.peso_peca} kg`}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </>
                                                             ) : isElectrode ? (
                                                                 <>
                                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -1556,11 +1669,15 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                 onClick={() => {
                                                                     const label = isItemTrelica
                                                                         ? `${g.description || 'Treliça'} ${g.tamanho || g.gauge} (Cód. ${g.productCode})`
-                                                                        : isElectrode 
-                                                                            ? `${g.description || g.gauge} (Cód. ${g.productCode || g.gauge})` 
-                                                                            : isItemSabao
-                                                                                ? `${g.description || 'Sabão'} ${g.gauge} (Cód. ${g.productCode || '00010'})`
-                                                                                : `${g.gauge.replace('.', ',')} mm (${g.description || material})`;
+                                                                        : isItemMalha
+                                                                            ? `${g.description || 'Malha'} (Cód. ${g.productCode || g.gauge})`
+                                                                            : isItemAmarril
+                                                                                ? `${g.description || 'Amarril'} (Cód. ${g.productCode || g.gauge})`
+                                                                                : isElectrode 
+                                                                                    ? `${g.description || g.gauge} (Cód. ${g.productCode || g.gauge})` 
+                                                                                    : isItemSabao
+                                                                                        ? `${g.description || 'Sabão'} ${g.gauge} (Cód. ${g.productCode || '00010'})`
+                                                                                        : `${g.gauge.replace('.', ',')} mm (${g.description || material})`;
                                                                     if (confirm(`Deseja remover ${label}?`)) {
                                                                         onDelete(g.id);
                                                                         if (isItemTrelica) {
@@ -1612,6 +1729,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                         <p className="font-black mb-0.5">Catálogo Centralizado da Fábrica</p>
                         <p>
                             • <strong>Treliças:</strong> cada modelo possui suas especificações técnicas completas (diâmetro superior, inferior, senóide e peso por barra), sincronizadas com as Ordens de Produção e Suportes.<br />
+                            • <strong>Amarril (Fitas & Presilhas):</strong> Fitas de aço e presilhas para amarração de rolos e produtos, controladas por peso (kg).<br />
                             • <strong>Sabão & Insumos:</strong> cadastrados por embalagem (ex: Saco 25kg) com código e descrição de fornecedor.<br />
                             • <strong>Eletrodos & Bitolas de Aço:</strong> controlados individualmente com códigos de rastreabilidade.
                         </p>

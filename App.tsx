@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig } from './types';
-import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges } from './types';
+import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges, DefaultAmarrilGauges } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
 import StockControl from './components/StockControl';
@@ -924,6 +924,7 @@ const App: React.FC = () => {
                     DefaultTrelicaGauges.find(t => (t.id || `default_tr_${t.productCode}`) === id) ||
                     DefaultElectrodeGauges.find(e => `default_el_${e.productCode}` === id) ||
                     DefaultSabaoGauges.find(s => `default_sb_${s.productCode}` === id) ||
+                    DefaultAmarrilGauges.find(a => (a.id || `default_am_${a.productCode}`) === id) ||
                     DefaultMalhaGauges.find(m => (m.id || `default_ml_${m.productCode}`) === id);
 
                 const itemToInsert: Omit<StockGauge, 'id'> = {
@@ -1089,6 +1090,14 @@ const App: React.FC = () => {
                 ...CA60BitolaOptions.map(g => ({ materialType: 'CA-60' as MaterialType, gauge: g, description: `CA-60 ${g.replace('.', ',')}mm` })),
                 ...DefaultElectrodeGauges.map(e => ({ materialType: e.materialType, gauge: e.gauge, productCode: e.productCode, description: e.description })),
                 ...DefaultSabaoGauges.map(s => ({ materialType: s.materialType, gauge: s.gauge, productCode: s.productCode, description: s.description })),
+                ...DefaultAmarrilGauges.map(a => ({
+                    materialType: 'Amarril' as MaterialType,
+                    gauge: a.gauge,
+                    productCode: a.productCode,
+                    description: a.description,
+                    peso_peca: a.peso_peca,
+                    peso_final: a.peso_peca
+                })),
                 ...DefaultTrelicaGauges.map(t => ({
                     materialType: 'Treliça' as MaterialType,
                     gauge: t.gauge,
