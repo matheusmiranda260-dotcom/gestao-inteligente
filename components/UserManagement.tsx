@@ -455,12 +455,12 @@ const AccessHistoryModal: React.FC<{
 
     const activeSessions = useMemo(() => {
         const now = Date.now();
-        const PRESENCE_TIMEOUT_MS = 180000; // 3 minutos
+        const PRESENCE_TIMEOUT_MS = 45000; // 45 segundos para detecção rápida e precisa
         const rawActive = userLogs.filter(log => 
             log.isActive !== false &&
             !log.logoutAt &&
             log.lastActivityAt &&
-            (now - new Date(log.lastActivityAt).getTime() >= -60000) &&
+            (now - new Date(log.lastActivityAt).getTime() >= -30000) &&
             (now - new Date(log.lastActivityAt).getTime() < PRESENCE_TIMEOUT_MS)
         );
 
@@ -480,8 +480,8 @@ const AccessHistoryModal: React.FC<{
     const isUserOnline = activeSessions.length > 0 || Boolean(
         user.isOnline && 
         user.lastSeenAt && 
-        (Date.now() - new Date(user.lastSeenAt).getTime() >= -60000) &&
-        (Date.now() - new Date(user.lastSeenAt).getTime() < 180000)
+        (Date.now() - new Date(user.lastSeenAt).getTime() >= -30000) &&
+        (Date.now() - new Date(user.lastSeenAt).getTime() < 45000)
     );
 
     const totalDurationSeconds = useMemo(() => {
@@ -818,14 +818,21 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
     const [viewingHistoryUser, setViewingHistoryUser] = useState<User | null>(null);
     const [tick, setTick] = useState<number>(() => Date.now());
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Ticker contínuo a cada 10 segundos para reavaliar status Online/Offline de todos os usuários em tempo real
+    // Ticker contínuo a cada 2 segundos para reavaliar status Online/Em 2º Plano/Offline instantaneamente
     useEffect(() => {
         const interval = setInterval(() => {
             setTick(Date.now());
-        }, 10000);
+        }, 2000);
         return () => clearInterval(interval);
     }, []);
+
+    const handleForceRefresh = () => {
+        setIsRefreshing(true);
+        setTick(Date.now());
+        setTimeout(() => setIsRefreshing(false), 600);
+    };
 
     // Permite gerenciar todos os usuários, mas o admin principal (id: 'admin') pode ter proteção extra se quiser
     const manageableUsers = users.filter(u => u.username !== 'admin');
@@ -867,18 +874,29 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                 </div>
             )}
 
-            <header className="flex items-center mb-6 pt-4">
-                <h1 className="text-3xl font-bold text-slate-800">Gerenciar Usuários</h1>
+            <header className="flex items-center justify-between mb-6 pt-4 flex-wrap gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-800">Gerenciar Usuários</h1>
+                    <p className="text-xs text-slate-500 font-medium mt-1">Presença e status de engajamento em tempo real (atualizado a cada 2 segundos)</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={handleForceRefresh}
+                        className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-3.5 rounded-lg transition shadow-2xs flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                        title="Verificar status dos usuários agora"
+                    >
+                        <span className={`inline-block transition-transform duration-500 ${isRefreshing ? 'rotate-180' : ''}`}>🔄</span>
+                        Atualizar Status
+                    </button>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition shadow-sm"
+                    >
+                        Adicionar Usuário
+                    </button>
+                </div>
             </header>
-
-            <div className="mb-6 flex justify-end">
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-[#0F3F5C] hover:bg-[#0A2A3D] text-white font-bold py-2 px-4 rounded-lg transition"
-                >
-                    Adicionar Usuário
-                </button>
-            </div>
 
             <div className="bg-white p-6 rounded-xl shadow-sm">
                 <h2 className="text-xl font-semibold text-slate-700 mb-4">Lista de Usuários</h2>
@@ -908,14 +926,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                     })
                                     : 'Sem registro';
 
-                                const PRESENCE_TIMEOUT_MS = 180000; // 3 minutos de tolerância para sincronização entre computadores
+                                const PRESENCE_TIMEOUT_MS = 45000; // 45 segundos de tolerância para sincronização em tempo real
 
                                 const userActiveLogs = accessLogs.filter(log => {
                                     const isMatch = log.userId === user.id || (log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase());
                                     if (!isMatch) return false;
                                     if (log.isActive === false || log.logoutAt || !log.lastActivityAt) return false;
                                     const diff = tick - new Date(log.lastActivityAt).getTime();
-                                    return diff >= -60000 && diff < PRESENCE_TIMEOUT_MS;
+                                    return diff >= -30000 && diff < PRESENCE_TIMEOUT_MS;
                                 });
 
                                 // Deduplica estritamente por dispositivo físico para que várias abas no mesmo computador NÃO sejam contadas como múltiplos PCs
@@ -932,7 +950,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 const isRealtimeOnline = distinctActiveLogs.length > 0 || Boolean(
                                     user.isOnline && 
                                     user.lastSeenAt && 
-                                    (tick - new Date(user.lastSeenAt).getTime() >= -60000) &&
+                                    (tick - new Date(user.lastSeenAt).getTime() >= -30000) &&
                                     (tick - new Date(user.lastSeenAt).getTime() < PRESENCE_TIMEOUT_MS)
                                 );
 
@@ -945,9 +963,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                 const primaryActiveLog = distinctActiveLogs[0] || userActiveLogs[0];
                                 const currentFocus = primaryActiveLog?.focusStatus || user.focusStatus || 'active';
                                 const currentPageName = primaryActiveLog?.currentPage || user.currentPage || '';
+                                
+                                const latestActivityDate = primaryActiveLog?.lastActivityAt || user.lastSeenAt;
+                                const secondsAgo = latestActivityDate ? Math.max(0, Math.round((tick - new Date(latestActivityDate).getTime()) / 1000)) : null;
 
                                 return (
-                                    <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
+                                    <tr key={user.id} className="bg-white border-b hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-slate-900">{user.username}</td>
                                         <td className="px-6 py-4">
                                             {user.role === 'admin' ? (
@@ -992,6 +1013,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, employees, addUs
                                                         }`}>
                                                             {currentFocus === 'active' ? 'Online (Ativo)' : currentFocus === 'background' ? 'Em 2º Plano' : 'Ausente'}
                                                         </span>
+                                                        {secondsAgo !== null && (
+                                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                                ({secondsAgo < 12 ? 'agora' : `há ${secondsAgo}s`})
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {currentPageName && (
                                                         <div className="text-[10px] text-slate-500 font-semibold mt-0.5 flex items-center gap-1 truncate max-w-[170px]" title={`Visualizando: ${currentPageName}`}>

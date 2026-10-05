@@ -551,36 +551,50 @@ const App: React.FC = () => {
         logUserAction(`Acessou ${pageLabel}`, page);
     }, [page]);
 
-    // Heartbeat contínuo de presença e engajamento em tempo real (a cada 25s)
+    // Heartbeat contínuo de presença e engajamento em tempo real (a cada 10s)
     useEffect(() => {
         if (!currentUser || !currentUser.id || currentUser.id === 'local-admin-gestor') return;
 
-        const sendHeartbeat = () => {
+        const sendHeartbeat = (customFocus?: 'active' | 'background' | 'idle') => {
             const curSessionId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
             if (curSessionId) {
-                updateSessionLogDb(curSessionId);
+                updateSessionLogDb(curSessionId, undefined, customFocus);
             }
         };
 
         // Envia imediatamente
-        sendHeartbeat();
+        sendHeartbeat('active');
 
-        const interval = setInterval(sendHeartbeat, 25000);
+        // Heartbeat rápido a cada 10 segundos
+        const interval = setInterval(() => {
+            sendHeartbeat();
+        }, 10000);
 
         // Detectar alteração de visibilidade (quando minimiza ou troca de aba)
         const handleVisibility = () => {
-            const curSessionId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
-            if (curSessionId) {
-                const focus = document.visibilityState === 'hidden' ? 'background' : 'active';
-                updateSessionLogDb(curSessionId, undefined, focus);
+            const focus = document.visibilityState === 'hidden' ? 'background' : 'active';
+            sendHeartbeat(focus);
+        };
+
+        const handleWindowFocus = () => {
+            sendHeartbeat('active');
+        };
+
+        const handleWindowBlur = () => {
+            if (document.visibilityState === 'hidden') {
+                sendHeartbeat('background');
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibility);
+        window.addEventListener('focus', handleWindowFocus);
+        window.addEventListener('blur', handleWindowBlur);
 
         return () => {
             clearInterval(interval);
             document.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('focus', handleWindowFocus);
+            window.removeEventListener('blur', handleWindowBlur);
         };
     }, [currentUser?.id, page]);
 
@@ -638,14 +652,16 @@ const App: React.FC = () => {
             };
 
             window.addEventListener('beforeunload', handleBeforeUnload);
+            window.addEventListener('pagehide', handleBeforeUnload);
 
             return () => {
                 window.removeEventListener('beforeunload', handleBeforeUnload);
+                window.removeEventListener('pagehide', handleBeforeUnload);
                 const sessionLogId = sessionStorage.getItem('msm_tab_session_log_id') || localStorage.getItem('msm_session_log_id');
                 if (sessionLogId) {
                     supabase
                         .from('user_access_logs')
-                        .update({ is_active: false, last_activity_at: new Date().toISOString() })
+                        .update({ is_active: false, last_activity_at: new Date().toISOString(), logout_at: new Date().toISOString() })
                         .eq('id', sessionLogId)
                         .then();
                 }

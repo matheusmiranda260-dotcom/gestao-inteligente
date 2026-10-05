@@ -64,7 +64,7 @@ if (typeof window !== 'undefined') {
         lastUserInteractionTime = Date.now();
     };
 
-    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart', 'focus', 'wheel'].forEach(event => {
         window.addEventListener(event, updateInteraction, { passive: true });
     });
 }
@@ -74,7 +74,7 @@ export const getFocusStatus = (): 'active' | 'background' | 'idle' => {
         return 'background';
     }
     const idleSeconds = (Date.now() - lastUserInteractionTime) / 1000;
-    if (idleSeconds > 300) { // Mais de 5 minutos sem interação
+    if (idleSeconds > 180) { // Mais de 3 minutos sem interação na tela aberta
         return 'idle';
     }
     return 'active';
