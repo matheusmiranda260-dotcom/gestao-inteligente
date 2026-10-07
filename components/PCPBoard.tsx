@@ -3793,15 +3793,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 status = 'closed';
                 produced = reportsDayQty;
                 operatorName = reportOperators || logOperators || 'Encerrado';
-            } else if (isTrefila && dayLotsWeight > 0) {
-                status = 'closed';
-                produced = dayLotsWeight;
-                operatorName = reportOperators || logOperators || 'Encerrado';
+            } else if (isTrefila) {
+                // Na Trefila, a produção real do dia é EXCLUSIVAMENTE a soma dos lotes pesados no dia (dayLotsWeight).
+                // Não deve utilizar dayLogsPcs para evitar herdar peso acumulado de dias anteriores.
+                if (dayLotsWeight > 0) {
+                    status = 'closed';
+                    produced = dayLotsWeight;
+                    operatorName = reportOperators || logOperators || 'Encerrado';
+                } else {
+                    status = 'closed';
+                    produced = 0;
+                    operatorName = logOperators || 'Sem Produção';
+                }
             } else if (!isTrefila && dayPackagesQty > 0) {
                 status = 'closed';
                 produced = dayPackagesQty;
                 operatorName = reportOperators || logOperators || 'Encerrado';
-            } else if (dayLogsPcs > 0) {
+            } else if (!isTrefila && dayLogsPcs > 0) {
                 status = 'closed';
                 produced = dayLogsPcs;
                 operatorName = logOperators || 'Encerrado';
