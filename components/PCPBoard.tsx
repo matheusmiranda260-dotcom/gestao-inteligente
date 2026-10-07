@@ -62,6 +62,96 @@ interface PCPBoardProps {
     onLogout?: () => void;
 }
 
+// Letreiro Digital Inteligente: Rola o texto SOMENTE se não couber no espaço disponível (overflow).
+// Caso o texto caiba perfeitamente (ex: Treliças e Malhas de 4 a 5 dias), fica 100% FIXO e estático.
+const PCPTickerText: React.FC<{ 
+    text: string; 
+    className?: string; 
+    separator?: string;
+}> = ({ 
+    text, 
+    className = "", 
+    separator = " • "
+}) => {
+    const raw = (text || '').trim();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const measureRef = useRef<HTMLSpanElement>(null);
+    const [shouldScroll, setShouldScroll] = useState(false);
+
+    useEffect(() => {
+        if (!containerRef.current || !measureRef.current) return;
+
+        const check = () => {
+            if (!containerRef.current || !measureRef.current) return;
+            const containerWidth = containerRef.current.clientWidth;
+            const contentWidth = measureRef.current.offsetWidth;
+            
+            if (containerWidth <= 0 || contentWidth <= 0) return;
+
+            // Histerese estável: precisa ultrapassar por 6px para iniciar rolagem e não tremer na transição
+            setShouldScroll(prev => {
+                if (prev) {
+                    return contentWidth > containerWidth;
+                } else {
+                    return contentWidth > (containerWidth + 6);
+                }
+            });
+        };
+
+        check();
+
+        if (typeof window !== 'undefined' && 'ResizeObserver' in window && containerRef.current) {
+            const ro = new ResizeObserver(() => check());
+            ro.observe(containerRef.current);
+            return () => ro.disconnect();
+        }
+    }, [raw]);
+
+    if (!raw) return null;
+
+    const duration = Math.max(9, Math.round(raw.length * 0.42));
+
+    return (
+        <div 
+            ref={containerRef} 
+            className={`min-w-0 max-w-full overflow-hidden relative ${className}`} 
+            title={raw}
+        >
+            {/* Medidor invisível estático e imutável para medição precisa sem causar layout shift */}
+            <span 
+                ref={measureRef} 
+                aria-hidden="true" 
+                style={{ 
+                    position: 'absolute', 
+                    visibility: 'hidden', 
+                    whiteSpace: 'nowrap', 
+                    pointerEvents: 'none',
+                    top: 0,
+                    left: 0
+                }}
+            >
+                {raw}
+            </span>
+
+            {shouldScroll ? (
+                <div 
+                    className="pcp-ticker-track" 
+                    style={{ animationDuration: `${duration}s` }}
+                >
+                    <span className="shrink-0 pr-4 whitespace-nowrap">{raw}</span>
+                    <span className="shrink-0 pr-4 text-orange-500 font-black opacity-75">{separator}</span>
+                    <span className="shrink-0 pr-4 whitespace-nowrap">{raw}</span>
+                    <span className="shrink-0 pr-4 text-orange-500 font-black opacity-75">{separator}</span>
+                </div>
+            ) : (
+                <span className="whitespace-nowrap block truncate select-text">
+                    {raw}
+                </span>
+            )}
+        </div>
+    );
+};
+
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
 const CAPACITY_DEFAULTS = {
     Trefila: 18000,        // 18.000 kg por dia
@@ -164,13 +254,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     onLogout
 }) => {
     // Modo Visualizador (Somente Leitura - Não pode editar, criar ou excluir)
-    const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
-    const isViewer = currentUser?.role === 'viewer' || (!isGestor && !!currentUser?.permissions?.pcpBoard && !currentUser?.permissions?.trelica && !currentUser?.permissions?.trefila && !currentUser?.permissions?.malha && !currentUser?.permissions?.stock);
+    const isViewer = currentUser?.role === 'viewer' || (currentUser?.role !== 'admin' && currentUser?.role !== 'gestor' && currentUser?.username?.toLowerCase() !== 'admin' && currentUser?.username?.toLowerCase() !== 'gestor' && !currentUser?.username?.toLowerCase().includes('matheusmiranda'));
+    const isGestor = !isViewer;
 
     // Estado de cabeçalho minimizado/expandido (persistido)
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
         return localStorage.getItem('pcp_header_collapsed') === 'true';
     });
+
+    // Zoom inteligente: Ativo em Tela Cheia ou no Modo Visualizador (sem barras laterais) para máxima visibilidade
+    const isLargeZoom = Boolean(isPcpFullscreen || isViewer);
+    const isFullscreenZoom = Boolean(isPcpFullscreen);
 
     // Estado para lançamento rápido de peso de lote aguardando pesagem (Trefila 1 e 2)
     const [weighingLotModal, setWeighingLotModal] = useState<{
@@ -591,6 +685,97 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const rawName = emp?.name || appUser?.username || activeOpName;
 
+        // Último registro hoje (log de operador, produção, parada, relatório ou atividade)
+        let lastTimestampMs = 0;
+        const todayStr = formatDateString(new Date());
+
+        (liveOp.operatorLogs || []).forEach((l: any) => {
+            if (l.startTime) {
+                const t = new Date(l.startTime).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+            if (l.endTime) {
+                const t = new Date(l.endTime).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+        });
+
+        (liveOp.shiftProduction || []).forEach((sp: any) => {
+            if (sp.endTime) {
+                const t = new Date(sp.endTime).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+            if (sp.timestamp) {
+                const t = new Date(sp.timestamp).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+        });
+
+        (liveOp.processedLots || []).forEach((l: any) => {
+            if (l.endTime) {
+                const t = new Date(l.endTime).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+            if (l.timestamp) {
+                const t = new Date(l.timestamp).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+        });
+
+        (liveOp.downtimeEvents || []).forEach((e: any) => {
+            if (e.stopTime) {
+                const t = new Date(e.stopTime).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+            if (e.resumeTime) {
+                const t = new Date(e.resumeTime).getTime();
+                if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+            }
+        });
+
+        if (openDowntime?.stopTime) {
+            const t = new Date(openDowntime.stopTime).getTime();
+            if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+        }
+
+        if (liveOp.startTime) {
+            const t = new Date(liveOp.startTime).getTime();
+            if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+        }
+
+        if ((liveOp as any).updatedAt) {
+            const t = new Date((liveOp as any).updatedAt).getTime();
+            if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+        }
+
+        // Verifica relatórios do dia para esta máquina
+        (shiftReports || []).forEach((r: any) => {
+            if (r.machine === machName) {
+                const tStart = r.shiftStartTime ? new Date(r.shiftStartTime).getTime() : 0;
+                const tEnd = r.shiftEndTime ? new Date(r.shiftEndTime).getTime() : 0;
+                if (!isNaN(tStart) && formatDateString(new Date(tStart)) === todayStr && tStart > lastTimestampMs) lastTimestampMs = tStart;
+                if (!isNaN(tEnd) && formatDateString(new Date(tEnd)) === todayStr && tEnd > lastTimestampMs) lastTimestampMs = tEnd;
+            }
+        });
+
+        if (lastTimestampMs === 0 && appUser?.lastSeenAt) {
+            const t = new Date(appUser.lastSeenAt).getTime();
+            if (!isNaN(t) && formatDateString(new Date(t)) === todayStr && t > lastTimestampMs) lastTimestampMs = t;
+        }
+
+        let lastUpdateFormatted = '';
+        if (lastTimestampMs > 0) {
+            const d = new Date(lastTimestampMs);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            lastUpdateFormatted = `${hh}:${mm}`;
+        } else if (isProducing || isStopped || isPrep || isOnlineInApp) {
+            const d = new Date();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            lastUpdateFormatted = `${hh}:${mm}`;
+        }
+
         return {
             name: rawName,
             displayName: formatShortName(rawName),
@@ -600,7 +785,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             isProducing,
             statusLabel,
             jobTitle: emp?.jobTitle || 'Operador',
-            opNumber: liveOp.orderNumber
+            opNumber: liveOp.orderNumber,
+            lastUpdateFormatted
         };
     };
 
@@ -905,10 +1091,31 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             ? { totalProducedWeight: details.shiftQty } 
                             : { totalProducedQuantity: details.shiftQty };
                         await updateItem('shift_reports', matchingRep.id, repUpdates);
+                        if (isTrefila) (matchingRep as any).totalProducedWeight = details.shiftQty;
+                        else (matchingRep as any).totalProducedQuantity = details.shiftQty;
                     } catch (e) {
                         console.warn('Erro ao atualizar shift_reports:', e);
                     }
                 }
+
+                // Gravar na folha diária salva (localStorage e Supabase) para refletir instantaneamente
+                const machName = targetOrder.scheduledMachine || (targetOrder.machine as string) || 'Treliça 1';
+                const localKey = `daily_report_${machName}_${targetDateStr}`;
+                try {
+                    const existingRaw = localStorage.getItem(localKey);
+                    const existingData = existingRaw ? JSON.parse(existingRaw) : {};
+                    const newPayload = {
+                        ...existingData,
+                        date: targetDateStr,
+                        machine_type: machName,
+                        production_order: targetOrder.orderNumber,
+                        stats_shift_a: {
+                            ...(existingData.stats_shift_a || {}),
+                            pecasProduzidas: details.shiftQty
+                        }
+                    };
+                    localStorage.setItem(localKey, JSON.stringify(newPayload));
+                } catch {}
             }
 
             if (showNotification) {
@@ -1745,13 +1952,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Verifica se uma data específica é dia útil (dentro dos dias de expediente da empresa e não é feriado)
     const isWorkingDay = (d: Date | string): boolean => {
+        if (!d) return false;
         const date = typeof d === 'string' ? new Date(d + 'T00:00:00') : new Date(d);
+        if (isNaN(date.getTime())) return false;
         const dayOfWeek = date.getDay(); // 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
-        if (!activeWorkDays.includes(dayOfWeek)) {
+        if (isNaN(dayOfWeek) || !activeWorkDays.includes(dayOfWeek)) {
             return false;
         }
         const dateStr = formatDateString(date);
-        if (holidaysSet.has(dateStr)) {
+        if (!dateStr || holidaysSet.has(dateStr)) {
             return false;
         }
         return true;
@@ -1759,36 +1968,46 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Calcula a data final com base em X dias úteis a partir da data de início (Segunda a Sexta, pulando feriados)
     const calculateEndDateByWorkDays = (startDateStr: string, durationWorkingDays: number): string => {
-        const days = Math.max(1, durationWorkingDays);
+        if (!startDateStr || typeof startDateStr !== 'string' || startDateStr.trim() === '') return '';
+        const days = Math.max(1, durationWorkingDays || 1);
         const cur = new Date(startDateStr + 'T00:00:00');
+        if (isNaN(cur.getTime())) return '';
         
+        let loopLimit = 0;
         // Se a data de início informada não for dia útil, avança até o primeiro dia útil disponível
-        while (!isWorkingDay(cur)) {
+        while (!isWorkingDay(cur) && loopLimit < 365) {
             cur.setDate(cur.getDate() + 1);
+            loopLimit++;
         }
 
         // Já estamos no 1º dia útil. Contamos os dias restantes
         let counted = 1;
-        while (counted < days) {
+        loopLimit = 0;
+        while (counted < days && loopLimit < 365) {
             cur.setDate(cur.getDate() + 1);
             if (isWorkingDay(cur)) {
                 counted++;
             }
+            loopLimit++;
         }
         return formatDateString(cur);
     };
 
     // Desloca uma data em +/- dias úteis (para a função MOVER ◀ ▶ e ESTENDER)
     const shiftWorkingDay = (currentDateStr: string, direction: number): string => {
+        if (!currentDateStr || typeof currentDateStr !== 'string' || currentDateStr.trim() === '') return '';
         const cur = new Date(currentDateStr + 'T00:00:00');
+        if (isNaN(cur.getTime())) return '';
         const step = direction >= 0 ? 1 : -1;
         const totalSteps = Math.max(1, Math.abs(direction));
         let counted = 0;
-        while (counted < totalSteps) {
+        let loopLimit = 0;
+        while (counted < totalSteps && loopLimit < 365) {
             cur.setDate(cur.getDate() + step);
             if (isWorkingDay(cur)) {
                 counted++;
             }
+            loopLimit++;
         }
         return formatDateString(cur);
     };
@@ -1798,12 +2017,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (!startStr || !endStr || startStr > endStr) return 1;
         const cur = new Date(startStr + 'T00:00:00');
         const end = new Date(endStr + 'T00:00:00');
+        if (isNaN(cur.getTime()) || isNaN(end.getTime())) return 1;
         let count = 0;
-        while (cur <= end) {
+        let loopLimit = 0;
+        while (cur <= end && loopLimit < 365) {
             if (isWorkingDay(cur)) {
                 count++;
             }
             cur.setDate(cur.getDate() + 1);
+            loopLimit++;
         }
         return Math.max(1, count);
     };
@@ -3231,6 +3453,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Ajusta a duração da OP (+1 ou -1 dia útil) - ESTENDER / REDUZIR PRAZO
     const handleAdjustDuration = async (op: ProductionOrderData, durationDelta: number) => {
+        if (isViewer) {
+            showNotification?.('Perfil de visualização: alteração no cronograma desabilitada.', 'warning');
+            return;
+        }
         if (!op.plannedStartDate) return;
         
         const hasStarted = hasProductionStarted(op);
@@ -3395,8 +3621,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     };
 
     // Helper para formatar tempos em cartões:
-    // Se liveWithSeconds === true, formata como cronômetro em tempo real com segundos (ex: 51:24 ou 1h06:24)
-    // Se false, formata em horas e minutos (ex: 8h48, 29m, 0m)
+    // Se liveWithSeconds === true: ex: 5h03:10, 1h56:45, 47:41 ou 00:00
+    // Se false: ex: 8h48, 29m, 0m
     const formatShiftTimeDisplay = (ms: number, liveWithSeconds: boolean = false): string => {
         if (!ms || ms <= 0) return liveWithSeconds ? '00:00' : '0m';
         const totalSeconds = Math.floor(ms / 1000);
@@ -3444,6 +3670,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
         const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
         const unit = isTrelica || isMalha ? 'pçs' : 'kg';
+
+        // 0. Ficha de Produção Diária salva (se houver alteração explícita salva na folha diária ou ajuste manual)
+        let dailyReportPieces: number | null = null;
+        let dailyReportOp: string = '';
+        try {
+            const rawDaily = localStorage.getItem(`daily_report_${machName}_${dateStr}`);
+            if (rawDaily) {
+                const parsed = JSON.parse(rawDaily);
+                const qA = Number(parsed.stats_shift_a?.pecasProduzidas);
+                const qB = Number(parsed.stats_shift_b?.pecasProduzidas);
+                if (!isNaN(qA) && qA >= 0) {
+                    dailyReportPieces = qA + (!isNaN(qB) && qB > 0 ? qB : 0);
+                    dailyReportOp = parsed.operator_shift_a || '';
+                }
+            }
+        } catch {}
 
         // 1. Relatórios de Turno desta OP nesta data específica (ou hoje/fim de semana)
         const matchingReports = (shiftReports || []).filter(r => {
@@ -3514,9 +3756,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             todayProduced = Math.max(dayPackagesQty + reportsDayQty, dayLogsPcs, liveShiftPcs);
         }
 
-        // Produção realizada nos dias anteriores a hoje
-        const totalPastProduced = Math.max(0, totalOverall - todayProduced);
-
         let produced = 0;
         let operatorName = '';
         let status: 'live' | 'closed' | 'planned' | 'idle' = 'idle';
@@ -3529,9 +3768,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (isLive) {
                 status = 'live';
                 operatorName = liveOperator?.displayName || (liveOperator?.name ? formatShortName(liveOperator.name) : '') || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Operando';
-                produced = todayProduced;
+                produced = dailyReportPieces !== null && dailyReportPieces > todayProduced ? dailyReportPieces : todayProduced;
+            } else if (dailyReportPieces !== null && dailyReportPieces >= 0) {
+                status = 'closed';
+                produced = dailyReportPieces;
+                operatorName = dailyReportOp || reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
             } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
-                // Houve produção hoje, mas turno atual não está em andamento agora
                 status = 'closed';
                 produced = todayProduced;
                 operatorName = reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
@@ -3543,7 +3785,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 }
             }
         } else if (isPast) {
-            if (reportsDayQty > 0) {
+            if (dailyReportPieces !== null && dailyReportPieces >= 0) {
+                status = 'closed';
+                produced = dailyReportPieces;
+                operatorName = dailyReportOp || reportOperators || logOperators || 'Encerrado';
+            } else if (reportsDayQty > 0) {
                 status = 'closed';
                 produced = reportsDayQty;
                 operatorName = reportOperators || logOperators || 'Encerrado';
@@ -3688,8 +3934,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // 3. Cálculos Dinâmicos para HOJE vs PASSADO
         let dayElapsedShiftMs = 0;
-        let dayDowntimeMs = closedDowntimeMs;
+        let dayDowntimeMs = 0;
         let isProducingNow = false;
+
+        const todayMidnightMs = new Date(liveNow.getFullYear(), liveNow.getMonth(), liveNow.getDate(), 0, 0, 0, 0).getTime();
+        const todayShiftStart = new Date(liveNow);
+        todayShiftStart.setHours(startH !== undefined && !isNaN(startH) ? startH : (isTrelicaMach ? 5 : 7), startM !== undefined && !isNaN(startM) ? startM : (isTrelicaMach ? 0 : 45), 0, 0);
+
+        const todayShiftEnd = new Date(liveNow);
+        todayShiftEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : (isTrelicaMach ? 14 : 17), endM !== undefined && !isNaN(endM) ? endM : (isTrelicaMach ? 48 : 33), 0, 0);
 
         if (isToday) {
             const todayLogs = (op.operatorLogs || []).filter((l: any) => {
@@ -3709,70 +3962,153 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             const isOpCurrentlyLive = op.status === 'in_progress' || op.status === 'Em Produção';
             const hasOpenLog = activeLogs.some((l: any) => !l.endTime);
-
-            const todayShiftStart = new Date(liveNow);
-            todayShiftStart.setHours(startH !== undefined && !isNaN(startH) ? startH : (isTrelicaMach ? 5 : 7), startM !== undefined && !isNaN(startM) ? startM : (isTrelicaMach ? 0 : 45), 0, 0);
-
-            const todayShiftEnd = new Date(liveNow);
-            todayShiftEnd.setHours(endH !== undefined && !isNaN(endH) ? endH : (isTrelicaMach ? 14 : 17), endM !== undefined && !isNaN(endM) ? endM : (isTrelicaMach ? 48 : 33), 0, 0);
-
+            const hasManagerAuth = activeLogs.some((l: any) => Boolean(l.managerAuthorized));
             const hasActiveWorkToday = isOpCurrentlyLive || hasOpenLog || activeLogs.length > 0 || todayProduced > 0;
 
             if (hasActiveWorkToday) {
-                let opStartMs = todayShiftStart.getTime();
-                const todayMidnightMs = new Date(liveNow.getFullYear(), liveNow.getMonth(), liveNow.getDate(), 0, 0, 0, 0).getTime();
-                const logStartTimes = activeLogs
-                    .map((l: any) => new Date(l.startTime).getTime())
-                    .filter((t: number) => !isNaN(t));
+                // Início real da jornada hoje:
+                // Coleta todos os carimbos de data/hora registrados hoje nesta OP ou máquina
+                const candidateStarts: number[] = [];
+                const todayShiftStartMs = todayShiftStart.getTime();
 
-                if (logStartTimes.length > 0) {
-                    const earliestLogMs = Math.min(...logStartTimes);
-                    if (earliestLogMs >= todayMidnightMs) {
-                        opStartMs = earliestLogMs;
+                activeLogs.forEach((l: any) => {
+                    if (l.startTime) {
+                        const t = new Date(l.startTime).getTime();
+                        if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
+                            candidateStarts.push(t);
+                        }
                     }
+                });
+
+                (op.processedLots || []).forEach((l: any) => {
+                    const raw = l.startTime || l.endTime || l.weighedAt || l.timestamp;
+                    if (raw) {
+                        const t = new Date(raw).getTime();
+                        if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
+                            candidateStarts.push(t);
+                        }
+                    }
+                });
+
+                (op.weighedPackages || []).forEach((p: any) => {
+                    const raw = p.timestamp || p.weighedAt || p.createdAt;
+                    if (raw) {
+                        const t = new Date(raw).getTime();
+                        if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
+                            candidateStarts.push(t);
+                        }
+                    }
+                });
+
+                events.forEach((e: any) => {
+                    if (e.stopTime) {
+                        const t = new Date(e.stopTime).getTime();
+                        if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
+                            candidateStarts.push(t);
+                        }
+                    }
+                });
+
+                let shiftStartMs = todayShiftStartMs;
+                if (candidateStarts.length > 0) {
+                    shiftStartMs = Math.min(todayShiftStartMs, ...candidateStarts);
+                } else if (liveNow.getTime() < todayShiftStartMs) {
+                    shiftStartMs = liveNow.getTime();
                 }
 
-                if (isMachineStoppedNow) {
-                    // MÁQUINA PARADA:
-                    // 1. O cronômetro de parada FICA CORRENDO a cada segundo
-                    let currentStopStartMs = activeOpenStop?.stopTime 
-                        ? new Date(activeOpenStop.stopTime).getTime() 
-                        : (liveMachStatus?.durationMs ? liveNow.getTime() - liveMachStatus.durationMs : liveNow.getTime());
-                    if (isNaN(currentStopStartMs) || currentStopStartMs < todayMidnightMs) {
-                        currentStopStartMs = todayShiftStart.getTime();
-                    }
-                    const currentStopMs = Math.max(0, liveNow.getTime() - currentStopStartMs);
-                    dayDowntimeMs = closedDowntimeMs + currentStopMs;
+                shiftStartMs = Math.min(shiftStartMs, liveNow.getTime());
+                shiftStartMs = Math.max(shiftStartMs, todayMidnightMs);
 
-                    // 2. O tempo efetivo FICA PAUSADO/CONGELADO no exato momento da parada
-                    const elapsedUntilStop = Math.max(0, currentStopStartMs - opStartMs);
-                    dayElapsedShiftMs = elapsedUntilStop + currentStopMs;
-                    isProducingNow = false;
-                } else if (hasOpenLog || isOpCurrentlyLive) {
-                    // MÁQUINA EM PRODUÇÃO (NÃO PARADA):
-                    // 1. O tempo de parada FICA PARADO (congelado nas paradas já concluídas)
-                    dayDowntimeMs = closedDowntimeMs;
-
-                    // 2. O tempo efetivo FICA CORRENDO a cada segundo
-                    const hasManagerAuth = activeLogs.some((l: any) => Boolean(l.managerAuthorized));
-                    const capLimit = hasManagerAuth ? liveNow.getTime() : Math.min(liveNow.getTime(), todayShiftEnd.getTime());
-                    dayElapsedShiftMs = Math.max(0, capLimit - opStartMs);
-                    isProducingNow = true;
-                } else {
-                    // Turno encerrado hoje
-                    dayDowntimeMs = closedDowntimeMs;
+                // Momento atual ou encerramento da jornada hoje
+                let shiftCurrentMs = liveNow.getTime();
+                if (!hasOpenLog && !isOpCurrentlyLive && activeLogs.length > 0) {
+                    // Turno já encerrado hoje
                     const logEndTimes = activeLogs
                         .map((l: any) => l.endTime ? new Date(l.endTime).getTime() : 0)
                         .filter((t: number) => t > 0);
-                    const latestEndMs = logEndTimes.length > 0 ? Math.max(...logEndTimes) : todayShiftEnd.getTime();
-                    dayElapsedShiftMs = Math.max(0, latestEndMs - opStartMs);
+                    shiftCurrentMs = logEndTimes.length > 0 ? Math.max(...logEndTimes) : Math.min(liveNow.getTime(), todayShiftEnd.getTime());
                     isProducingNow = false;
+                } else {
+                    // Turno em andamento
+                    const capLimit = hasManagerAuth ? liveNow.getTime() : Math.min(liveNow.getTime(), todayShiftEnd.getTime());
+                    shiftCurrentMs = capLimit;
+                    isProducingNow = !isMachineStoppedNow;
+                }
+
+                dayElapsedShiftMs = Math.max(0, shiftCurrentMs - shiftStartMs);
+
+                // Cálculo preciso de paradas ocorridas dentro do turno de hoje
+                let currentDowntimeMs = 0;
+                const recordedKeys = new Set<string>();
+
+                events.forEach((e: any) => {
+                    if (!e || !e.stopTime) return;
+                    if (e === activeOpenStop) return; // Parada aberta tratada a seguir
+                    const stopMs = new Date(e.stopTime).getTime();
+                    if (isNaN(stopMs) || stopMs < todayMidnightMs) return;
+
+                    const reasonNorm = (e.reason || '').toLowerCase().trim();
+                    if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno')) && (!e.durationMin || e.durationMin === 0) && !e.resumeTime) {
+                        return;
+                    }
+
+                    const key = `stop-${e.stopTime}-${e.reason}`;
+                    if (recordedKeys.has(key)) return;
+
+                    let dur = 0;
+                    if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
+                        dur = Number(e.durationMin) * 60000;
+                    } else if (e.resumeTime) {
+                        const resumeMs = new Date(e.resumeTime).getTime();
+                        if (!isNaN(resumeMs) && resumeMs > stopMs) {
+                            dur = resumeMs - stopMs;
+                        }
+                    }
+                    if (dur > 0) {
+                        currentDowntimeMs += dur;
+                        recordedKeys.add(key);
+                    }
+                });
+
+                matchingReports.forEach((r: any) => {
+                    (r.downtimeEvents || []).forEach((e: any) => {
+                        if (!e || !e.stopTime) return;
+                        const key = `rep-${r.id}-${e.stopTime}-${e.reason}`;
+                        if (recordedKeys.has(key)) return;
+                        const stopMs = new Date(e.stopTime).getTime();
+                        const resumeMs = e.resumeTime ? new Date(e.resumeTime).getTime() : (isNaN(stopMs) ? 0 : stopMs + (Number(e.durationMin || 0) * 60000));
+                        if (isNaN(stopMs) || isNaN(resumeMs) || resumeMs <= stopMs) return;
+
+                        const dur = resumeMs - stopMs;
+                        if (dur > 0) {
+                            currentDowntimeMs += dur;
+                            recordedKeys.add(key);
+                        }
+                    });
+                });
+
+                // Se a máquina estiver em parada aberta AGORA (ao vivo)
+                if (isMachineStoppedNow) {
+                    if (activeOpenStop && activeOpenStop.stopTime) {
+                        const openStopMs = new Date(activeOpenStop.stopTime).getTime();
+                        if (!isNaN(openStopMs)) {
+                            const boundedOpenStopMs = Math.min(openStopMs, liveNow.getTime());
+                            const openDur = Math.max(0, liveNow.getTime() - boundedOpenStopMs);
+                            currentDowntimeMs += openDur;
+                        }
+                    } else if (liveMachStatus?.durationMs) {
+                        currentDowntimeMs += liveMachStatus.durationMs;
+                    }
+                }
+
+                dayDowntimeMs = currentDowntimeMs;
+                if (dayDowntimeMs > dayElapsedShiftMs) {
+                    dayElapsedShiftMs = dayDowntimeMs;
                 }
             }
         } else if (isPast) {
             const hasPastActivity = reportsDayQty > 0 || dayPackagesQty > 0 || dayLotsWeight > 0 || dayLogsPcs > 0 || closedDowntimeMs > 0;
             if (hasPastActivity) {
-                // Em dias passados, a jornada é limitada ao turno planejado da máquina
                 const repWithTimes = matchingReports.find(r => r.shiftStartTime && r.shiftEndTime);
                 if (repWithTimes) {
                     const s = new Date(repWithTimes.shiftStartTime).getTime();
@@ -3786,12 +4122,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     dayElapsedShiftMs = shiftPlannedDurationMs;
                 }
 
-                // Assegura que em dia passado paradas não superem 60% da jornada
-                dayDowntimeMs = Math.min(closedDowntimeMs, Math.round(dayElapsedShiftMs * 0.6));
+                dayDowntimeMs = Math.min(closedDowntimeMs, dayElapsedShiftMs);
             }
         }
 
-        const effectiveMs = Math.max(0, dayElapsedShiftMs - dayDowntimeMs);
+        let effectiveMs = 0;
+        if (todayProduced > 0 || isProducingNow) {
+            effectiveMs = Math.max(0, dayElapsedShiftMs - dayDowntimeMs);
+        }
 
         // Se está ao vivo hoje (rodando ou parado), exibe cronômetro com segundos para dar sensação imediata de "time"
         const showSecondsLive = isToday && (isProducingNow || isMachineStoppedNow);
@@ -3809,15 +4147,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const rateUnit = isTrefila ? 'kg/h' : 'pçs/h';
         const rateFormatted = ratePerHour > 0 ? `${ratePerHour.toLocaleString('pt-BR')} ${rateUnit}` : `0 ${rateUnit}`;
 
-        // Cálculo de Velocidade Real de Produção:
+        // Cálculo de Velocidade / Tempo de Ciclo Real de Produção:
         // - Trefila: metros lineares por segundo (m/s) durante o tempo efetivo
         // - Treliça: metros lineares por minuto (m/min) durante o tempo efetivo
-        // - Malha: Não exibe velocidade conforme solicitado
+        // - Malha: tempo em segundos por peça (s/pç) durante o tempo efetivo
         let speedValue = 0;
-        let speedUnit = '';
+        let speedUnit = isTrefila ? 'm/s' : isTrelica ? 'm/min' : isMalha ? 's/pç' : '';
         let speedFormatted = '';
+        // Base de tempo: efetivo; se ainda não houver efetivo suficiente, usa o tempo total do turno (igual ao ritmo H)
+        const speedBaseMs = effectiveMs >= 30000 ? effectiveMs : (totalShiftTimeMs >= 30000 ? totalShiftTimeMs : 0);
 
-        if (isTrefila && effectiveMs >= 30000 && produced > 0) {
+        if (isTrefila && speedBaseMs > 0 && produced > 0) {
             let bitolaMm = 0;
             const rawGauge = (op as any).targetGauge || (op as any).gauge || (op as any).bitola || (op as any).targetBitola;
             if (rawGauge) {
@@ -3837,14 +4177,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             const linearMass = bitolaMm * bitolaMm * 0.006162; // kg/m
             if (linearMass > 0) {
                 const totalMeters = produced / linearMass;
-                const effectiveSeconds = effectiveMs / 1000;
+                const effectiveSeconds = speedBaseMs / 1000;
                 if (effectiveSeconds > 0) {
                     speedValue = totalMeters / effectiveSeconds;
                     speedUnit = 'm/s';
                     speedFormatted = speedValue.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                 }
             }
-        } else if (isTrelica && effectiveMs >= 30000 && produced > 0) {
+        } else if (isTrelica && speedBaseMs > 0 && produced > 0) {
             let pieceLengthMeters = 0;
             const rawLen = (op as any).targetLength || (op as any).length || (op as any).barLength;
             if (rawLen) {
@@ -3862,11 +4202,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (!pieceLengthMeters) pieceLengthMeters = 6;
 
             const totalMeters = produced * pieceLengthMeters;
-            const effectiveMinutes = effectiveMs / 60000;
+            const effectiveMinutes = speedBaseMs / 60000;
             if (effectiveMinutes > 0) {
                 speedValue = totalMeters / effectiveMinutes;
                 speedUnit = 'm/min';
                 speedFormatted = speedValue.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            }
+        } else if (isMalha && speedBaseMs > 0 && produced > 0) {
+            const effectiveSeconds = speedBaseMs / 1000;
+            if (effectiveSeconds > 0) {
+                speedValue = effectiveSeconds / produced;
+                speedUnit = 's/pç';
+                speedFormatted = speedValue < 10 
+                    ? speedValue.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+                    : Math.round(speedValue).toLocaleString('pt-BR');
             }
         }
 
@@ -4296,9 +4645,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     border: 1px solid #E2E8F0;
                     box-shadow: 0 8px 30px -4px rgba(11, 43, 104, 0.1);
                 }
+
                 .pcp-timeline-grid {
                     display: grid;
-                    grid-template-columns: 210px repeat(5, minmax(160px, 1fr));
+                    grid-template-columns: 220px repeat(5, minmax(0, 1fr));
+                    width: 100%;
                 }
                 .pcp-header-cell {
                     background: #0B2B68;
@@ -4313,12 +4664,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 }
                 .pcp-op-bar {
                     position: absolute;
-                    border-radius: 10px;
-                    padding: 4px 6px;
-                    box-shadow: 0 4px 14px 0 rgba(11, 43, 104, 0.08);
+                    border-radius: 4px;
+                    padding: 2px 4px;
+                    box-shadow: 0 2px 6px 0 rgba(11, 43, 104, 0.06);
                     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                     z-index: 10;
-                    border: 1px solid #E2E8F0;
+                    border: 1px solid #CBD5E1;
                     cursor: pointer;
                     overflow: hidden;
                 }
@@ -4341,11 +4692,40 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     from { opacity: 0; transform: translateY(4px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+                .pcp-ticker-wrapper {
+                    display: inline-flex;
+                    overflow: hidden;
+                    white-space: nowrap;
+                    position: relative;
+                    max-width: 100%;
+                    vertical-align: middle;
+                    mask-image: linear-gradient(to right, transparent 0%, black 4px, black calc(100% - 6px), transparent 100%);
+                    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4px, black calc(100% - 6px), transparent 100%);
+                }
+                .pcp-ticker-track {
+                    display: inline-flex;
+                    white-space: nowrap;
+                    animation: pcpTickerScroll 14s linear infinite;
+                    will-change: transform;
+                }
+                .pcp-ticker-wrapper:hover .pcp-ticker-track {
+                    animation-play-state: paused;
+                }
+                @keyframes pcpTickerScroll {
+                    0% {
+                        transform: translateX(0%);
+                    }
+                    100% {
+                        transform: translateX(-50%);
+                    }
+                }
             `}} />
 
             {/* COLUNA PRINCIPAL: TIMELINE PCP SEMANAL */}
             <div className={`flex-1 pcp-glass rounded-2xl border border-blue-200/80 shadow-xl flex flex-col overflow-hidden relative ${
-                isPcpFullscreen ? 'h-full flex-1' : 'h-[calc(100vh-80px)]'
+                isLargeZoom ? 'pcp-zoom-large' : ''
+            } ${
+                isPcpFullscreen ? 'h-full flex-1' : 'h-[calc(100vh-112px)]'
             }`}>
                 
                 {/* Cabeçalho de Controle e Ações (Identidade Ita Aços: Azul Royal + Faixa Laranja + Branco) */}
@@ -4523,14 +4903,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 </div>
 
                 {/* Área da Timeline (Fundo Claro de Alta Legibilidade) */}
-                <div className="flex-1 overflow-auto bg-[#F8FAFC] scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
-                    <div className="min-w-[920px] min-h-full flex flex-col">
+                <div className="flex-1 min-h-0 overflow-hidden bg-[#F8FAFC] flex flex-col">
                         
                         {/* Cabeçalho dos Dias (Segunda a Sexta) com Destaque Corporativo Ita Aços */}
-                        <div className="pcp-timeline-grid pcp-header-cell border-b-2 border-orange-500 sticky top-0 z-30 shrink-0 shadow-sm">
-                            <div className="p-2 sm:p-2.5 flex items-center justify-between font-black text-xs text-white tracking-wider uppercase select-none bg-[#092354]">
+                        <div className="pcp-timeline-grid pcp-header-cell border-b-2 border-orange-500 relative z-30 shrink-0 shadow-sm">
+                            <div className={`${isLargeZoom ? 'py-2 px-3 text-xs sm:text-sm' : 'py-1.5 px-2.5 text-xs'} flex items-center justify-between font-black text-white tracking-wider uppercase select-none bg-[#092354]`}>
                                 <span>MÁQUINA</span>
-                                <span className="text-[10px] text-orange-300 font-mono font-bold bg-orange-500/20 px-2 py-0.5 rounded border border-orange-400/40">SEMANAL</span>
+                                <span className="text-[9px] text-orange-300 font-mono font-bold bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-400/40">SEMANAL</span>
                             </div>
                             
                             {weekDays.map((day, index) => {
@@ -4538,40 +4917,47 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 const isToday = dayDateStr === formatDateString(new Date());
                                 const isHoliday = holidaysMap.has(dayDateStr);
                                 const holidayName = holidaysMap.get(dayDateStr);
-                                const daysNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+                                const daysNames = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA'];
+                                const isEvenDay = index % 2 === 0; // Col 0 (Segunda), Col 2 (Quarta), Col 4 (Sexta)
                                 return (
                                     <div 
                                         key={index} 
-                                        className={`p-1.5 sm:p-2 text-center flex flex-col justify-center border-l relative ${
+                                        className={`py-1.5 px-2 text-center flex items-center justify-center gap-1.5 border-l relative overflow-hidden select-none ${
                                             isToday 
-                                                ? 'bg-[#133E82] border-l-blue-700/60 shadow-inner' 
+                                                ? 'bg-gradient-to-b from-[#184896] via-[#0F3577] to-[#082252] border-l-orange-500 shadow-md ring-1 ring-orange-500/40' 
                                                 : isHoliday 
                                                     ? 'bg-rose-950/60 border-l-rose-800/60' 
-                                                    : 'bg-[#0B2B68] border-l-blue-800/60'
+                                                    : isEvenDay
+                                                        ? 'bg-[#020b1c] border-l-slate-900' 
+                                                        : 'bg-[#1d59ad] border-l-blue-700/60'
                                         }`}
                                     >
-                                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                            <span className={`text-xs sm:text-sm font-black tracking-widest uppercase block ${
-                                                isToday ? 'text-orange-400' : isHoliday ? 'text-rose-300' : 'text-blue-100'
-                                            }`}>
-                                                {daysNames[index]}
-                                            </span>
-                                            {isHoliday && (
-                                                <span 
-                                                    className="bg-rose-500/30 text-rose-200 text-[9px] font-black px-1.5 py-0.5 rounded border border-rose-400/60 shadow-sm truncate max-w-[130px]"
-                                                    title={`Feriado: ${holidayName}`}
-                                                >
-                                                    🌴 {holidayName}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <span className={`text-sm sm:text-base font-black block mt-0.5 ${
-                                            isToday ? 'text-white font-extrabold' : isHoliday ? 'text-rose-200' : 'text-blue-200'
+                                        <span className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} font-black tracking-wider uppercase ${
+                                            isToday ? 'text-amber-300 drop-shadow-sm' : isHoliday ? 'text-rose-300' : 'text-blue-100'
+                                        }`}>
+                                            {daysNames[index]}
+                                        </span>
+                                        <span className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} font-mono font-black ${
+                                            isToday ? 'text-white font-black' : isHoliday ? 'text-rose-200' : 'text-blue-200'
                                         }`}>
                                             {formatFriendlyDate(day)}
                                         </span>
                                         {isToday && (
-                                            <div className="absolute bottom-0 left-0 w-full h-[3px] bg-orange-500 shadow-sm" />
+                                            <span className="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[8.5px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse ml-0.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                                HOJE
+                                            </span>
+                                        )}
+                                        {isHoliday && (
+                                            <span 
+                                                className="bg-rose-500/30 text-rose-200 text-[8.5px] font-black px-1.5 py-0.5 rounded border border-rose-400/60 shadow-sm truncate max-w-[90px]"
+                                                title={`Feriado: ${holidayName}`}
+                                            >
+                                                🌴 {holidayName}
+                                            </span>
+                                        )}
+                                        {isToday && (
+                                            <div className="absolute bottom-0 left-0 w-full h-[3.5px] bg-gradient-to-r from-orange-500 via-amber-300 to-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.9)]" />
                                         )}
                                         {isHoliday && !isToday && (
                                             <div className="absolute bottom-0 left-0 w-full h-[3px] bg-rose-500" />
@@ -4602,33 +4988,69 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     return track;
                                 };
 
-                                const hasExtraTrefilaStats = machOps.some(op => {
+                                const hasOpWithAlert = machOps.some(op => {
+                                    const prog = getOPProgress(op);
+                                    return prog.isLive && (prog.isStopped || prog.isPrep);
+                                });
+                                const hasOpWithLiveLot = machOps.some(op => {
                                     const isTr = (typeof op.machine === 'string' && op.machine.startsWith('Trefila')) || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
                                     const prog = getOPProgress(op);
-                                    const hasLiveLot = isTr && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
-                                    const hasPending = isTr && (op.processedLots || []).some((l: any) => l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0);
-                                    return hasLiveLot || hasPending;
+                                    return isTr && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
+                                });
+                                const hasOpWithPendingWeight = machOps.some(op => {
+                                    const isTr = (typeof op.machine === 'string' && op.machine.startsWith('Trefila')) || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
+                                    return isTr && (op.processedLots || []).some((l: any) => l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0);
                                 });
 
-                                const baseTrackHeight = hasExtraTrefilaStats ? (isPcpFullscreen ? 218 : 228) : (isPcpFullscreen ? 176 : 186);
+                                let calculatedMinHeight = isLargeZoom ? 155 : 130;
+                                if (hasOpWithAlert) calculatedMinHeight += 24;
+                                if (hasOpWithLiveLot) calculatedMinHeight += 28;
+                                if (hasOpWithPendingWeight) calculatedMinHeight += 24;
+
+                                let baseTrackHeight = isLargeZoom ? 260 : 200;
+                                if (hasOpWithAlert) baseTrackHeight += (isLargeZoom ? 28 : 24);
+                                if (hasOpWithLiveLot) baseTrackHeight += (isLargeZoom ? 30 : 26);
+                                if (hasOpWithPendingWeight) baseTrackHeight += (isLargeZoom ? 26 : 22);
+
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
-                                const rowMinHeight = maxTracks > 1 
-                                    ? (10 + maxTracks * (baseTrackHeight + 6)) 
-                                    : baseTrackHeight;
+                                const isMachineEmpty = machOps.length === 0;
 
                                 return (
                                     <div 
                                         key={mach.name} 
-                                        className="pcp-timeline-grid pcp-track-row relative flex-1 min-h-0 border-b border-slate-200"
-                                        style={{ minHeight: `${rowMinHeight}px` }}
+                                        className={`pcp-timeline-grid pcp-track-row relative border-b border-slate-200 ${
+                                            isMachineEmpty 
+                                                ? 'shrink-0' 
+                                                : 'flex-1'
+                                        }`}
+                                        style={{
+                                            minHeight: isMachineEmpty ? '42px' : `${calculatedMinHeight}px`
+                                        }}
                                     >
                                         {/* Coluna da Máquina (Fundo Branco Limpo com Indicador Ita Aços) */}
-                                        <div className={`p-2 sm:p-2.5 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
+                                        {isMachineEmpty ? (
+                                            <div className={`px-2 py-1 flex items-center justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-slate-50/90 h-full`}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-blue-950 text-sm font-black tracking-wider">{mach.name}</span>
+                                                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Sem OP</span>
+                                                </div>
+                                                {!isViewer && (
+                                                    <button
+                                                        onClick={() => handleOpenCreateModal(mach.name)}
+                                                        className="w-5 h-5 rounded bg-slate-200 hover:bg-orange-500 text-slate-600 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-sm text-xs font-bold"
+                                                        title={`Criar OP para ${mach.name}`}
+                                                    >
+                                                        <PlusIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className={`p-1.5 sm:p-2 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
                                             {/* Topo: Nome da Máquina (clicável para abrir turnos e paradas se não for visualizador) + Botão Nova OP */}
                                             <div className="flex items-center justify-between gap-2 pb-1">
                                                 {isViewer ? (
                                                     <div 
-                                                        className="text-blue-950 text-base sm:text-lg font-black tracking-wider block shrink-0 select-none"
+                                                        className={`text-blue-950 ${isLargeZoom ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'} font-black tracking-wider block shrink-0 select-none`}
                                                         title={`Máquina ${mach.name}`}
                                                     >
                                                         <span>{mach.name}</span>
@@ -4637,7 +5059,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     <button
                                                         type="button"
                                                         onClick={() => handleOpenMachineShiftModal(mach.name)}
-                                                        className="text-blue-950 text-base sm:text-lg font-black tracking-wider block shrink-0 hover:text-orange-600 transition-all text-left flex items-center gap-1.5 group cursor-pointer"
+                                                        className={`text-blue-950 ${isLargeZoom ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'} font-black tracking-wider block shrink-0 hover:text-orange-600 transition-all text-left flex items-center gap-1.5 group cursor-pointer`}
                                                         title={`Configuração da Máquina ${mach.name} (Comandos de OP, Ferramentas, Turnos e Paradas)`}
                                                     >
                                                         <span className="group-hover:underline underline-offset-4 decoration-orange-500">{mach.name}</span>
@@ -4666,19 +5088,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 title={`Nenhum operador com turno ativo na máquina ${mach.name}. Turno Encerrado.`}
                                                             >
                                                                 <div className="flex items-center gap-1.5 min-w-0">
-                                                                    <div className="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
-                                                                        <ClockIcon className="w-3.5 h-3.5 text-slate-500" />
+                                                                    <div className={`${isLargeZoom ? 'w-7 h-7' : 'w-6 h-6'} rounded-lg bg-slate-200 flex items-center justify-center shrink-0`}>
+                                                                        <ClockIcon className={`${isLargeZoom ? 'w-4 h-4' : 'w-3.5 h-3.5'} text-slate-500`} />
                                                                     </div>
                                                                     <div className="flex flex-col min-w-0">
-                                                                        <span className="text-[10px] font-black tracking-wide text-slate-700 uppercase truncate">
+                                                                        <span className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px]'} font-black tracking-wide text-slate-700 uppercase truncate`}>
                                                                             Turno Encerrado
                                                                         </span>
-                                                                        <span className="text-[8px] font-medium text-slate-500 truncate">
+                                                                        <span className={`${isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[8px]'} font-medium text-slate-500 truncate`}>
                                                                             Aguardando operador
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                                <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 shrink-0">
+                                                                <span className={`${isLargeZoom ? 'text-[9px] sm:text-[10px]' : 'text-[8px]'} font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 shrink-0`}>
                                                                     Off
                                                                 </span>
                                                             </div>
@@ -4692,19 +5114,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 title={`Turno iniciado automaticamente pelo sistema para ${mach.name}. Aguardando check-in do operador no aplicativo.`}
                                                             >
                                                                 <div className="flex items-center gap-1.5 min-w-0">
-                                                                    <div className="w-6 h-6 rounded-lg bg-amber-200 flex items-center justify-center shrink-0 text-amber-800">
-                                                                        <ClockIcon className="w-3.5 h-3.5" />
+                                                                    <div className={`${isLargeZoom ? 'w-7 h-7' : 'w-6 h-6'} rounded-lg bg-amber-200 flex items-center justify-center shrink-0 text-amber-800`}>
+                                                                        <ClockIcon className={`${isLargeZoom ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} />
                                                                     </div>
                                                                     <div className="flex flex-col min-w-0">
-                                                                        <span className="text-[10px] font-black tracking-wide text-amber-900 uppercase truncate">
+                                                                        <span className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px]'} font-black tracking-wide text-amber-900 uppercase truncate`}>
                                                                             Turno Aberto (Auto)
                                                                         </span>
-                                                                        <span className="text-[8px] font-bold text-amber-700 truncate">
+                                                                        <span className={`${isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[8px]'} font-bold text-amber-700 truncate`}>
                                                                             Aguardando Check-in
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                                <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-200 text-amber-800 shrink-0">
+                                                                <span className={`${isLargeZoom ? 'text-[9px] sm:text-[10px]' : 'text-[8px]'} font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-200 text-amber-800 shrink-0`}>
                                                                     Auto
                                                                 </span>
                                                             </div>
@@ -4722,7 +5144,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
                                                                 else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
                                                             }}
-                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 ${
+                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 overflow-hidden w-full ${
                                                                 isViewer 
                                                                     ? 'cursor-default' 
                                                                     : 'cursor-pointer hover:shadow-md active:scale-[0.98]'
@@ -4741,7 +5163,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     <img 
                                                                         src={operator.photoUrl} 
                                                                         alt={operator.name} 
-                                                                        className={`w-7 h-7 rounded-full object-cover border-2 shadow-sm ${
+                                                                        className={`${isLargeZoom ? 'w-8 h-8' : 'w-7 h-7'} rounded-full object-cover border-2 shadow-sm ${
                                                                             isOperating 
                                                                                 ? 'border-emerald-500 ring-1 ring-emerald-400/40' 
                                                                                 : isOnline 
@@ -4750,7 +5172,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         }`}
                                                                     />
                                                                 ) : (
-                                                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-[10px] border-2 uppercase shadow-sm ${
+                                                                    <div className={`${isLargeZoom ? 'w-8 h-8 text-xs' : 'w-7 h-7 text-[10px]'} rounded-full flex items-center justify-center font-black border-2 uppercase shadow-sm ${
                                                                         isOperating 
                                                                             ? 'bg-emerald-100 text-emerald-800 border-emerald-400' 
                                                                             : isOnline 
@@ -4773,18 +5195,34 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 />
                                                             </div>
 
-                                                            {/* Nome e Status */}
-                                                            <div className="flex flex-col min-w-0 flex-1">
-                                                                <span className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight block">
+                                                            {/* Nome do Operador (Linha 1) / Status (Linha 2) / Relógio (Linha 3 em baixo do status) */}
+                                                            <div className="flex flex-col min-w-0 flex-1 justify-center">
+                                                                <span 
+                                                                    className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-[13px]'} font-black text-slate-900 truncate leading-tight block`}
+                                                                    title={operator.displayName}
+                                                                >
                                                                     {operator.displayName}
                                                                 </span>
-                                                                <span className={`text-[10px] sm:text-[11px] font-bold tracking-wide truncate flex items-center gap-1 ${
-                                                                    isOperating ? 'text-emerald-700' : isOnline ? 'text-blue-700' : 'text-slate-500'
-                                                                }`}>
-                                                                    {isOperating && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping" />}
-                                                                    {!isOperating && isOnline && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />}
-                                                                    {operator.statusLabel}
-                                                                </span>
+                                                                <div className="flex items-center gap-1 min-w-0 mt-0.5">
+                                                                    <span className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px] sm:text-[11px]'} font-bold tracking-tight truncate flex items-center gap-1 min-w-0 ${
+                                                                        isOperating ? 'text-emerald-700' : isOnline ? 'text-blue-700' : 'text-slate-500'
+                                                                    }`}>
+                                                                        {isOperating && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping shrink-0" />}
+                                                                        {!isOperating && isOnline && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse shrink-0" />}
+                                                                        <span className="truncate">{operator.statusLabel}</span>
+                                                                    </span>
+                                                                </div>
+                                                                {operator.lastUpdateFormatted && (
+                                                                    <div className="mt-1 flex items-center">
+                                                                        <span 
+                                                                            className={`inline-flex items-center gap-1 ${isLargeZoom ? 'text-[11px] sm:text-xs' : 'text-[10px] sm:text-[11px]'} font-mono font-black text-slate-700 bg-white/95 px-1.5 py-0.5 rounded-md border border-slate-300 shadow-2xs shrink-0`} 
+                                                                            title={`Último registro do operador hoje: ${operator.lastUpdateFormatted}`}
+                                                                        >
+                                                                            <ClockIcon className={`${isLargeZoom ? 'w-3.5 h-3.5' : 'w-3 h-3'} text-slate-500 shrink-0`} />
+                                                                            <span>{operator.lastUpdateFormatted}</span>
+                                                                        </span>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );
@@ -4817,14 +5255,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             }`}
                                                             title={isExceeded ? "Tempo Ultrapassado!" : "Alerta de Parada/Preparação"}
                                                         >
-                                                            <div className={`flex items-center gap-1 font-black text-[8px] uppercase tracking-wide ${isExceeded ? 'text-rose-600' : 'text-amber-700'}`}>
+                                                            <div className={`flex items-center gap-1 font-black ${isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[8px]'} uppercase tracking-wide ${isExceeded ? 'text-rose-600' : 'text-amber-700'}`}>
                                                                 <span className={`w-1.5 h-1.5 rounded-full ${isExceeded ? 'bg-rose-600 animate-ping' : 'bg-amber-500'}`} />
                                                                 {isExceeded ? '🚨 TEMPO ULTRAPASSADO' : liveInfo.state === 'prep' ? '⚡ PREPARAÇÃO' : '⚠️ ALERTA: PARADA'}
                                                             </div>
-                                                            <span className={`text-[8px] font-bold truncate block ${isExceeded ? 'text-rose-900' : 'text-amber-900'}`} title={liveInfo.reason}>
+                                                            <span className={`${isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[8px]'} font-bold truncate block ${isExceeded ? 'text-rose-900' : 'text-amber-900'}`} title={liveInfo.reason}>
                                                                 {liveInfo.reason}
                                                             </span>
-                                                            <span className={`text-[9px] font-mono font-black block ${isExceeded ? 'text-rose-700' : 'text-amber-800'}`}>
+                                                            <span className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[9px]'} font-mono font-black block ${isExceeded ? 'text-rose-700' : 'text-amber-800'}`}>
                                                                 ⏱️ {formatDuration(liveInfo.durationMs)}
                                                             </span>
                                                         </div>
@@ -4834,26 +5272,30 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 return null;
                                              })()}
                                          </div>
+                                        )}
 
-                                        {/* Grade de fundo (5 Colunas de dias com visual claro e límpido) */}
+                                        {/* Grade de fundo (5 Colunas de dias com visual alternado para distinguir cada dia) */}
                                         {Array.from({ length: 5 }).map((_, colIndex) => {
                                             const targetDay = weekDays[colIndex];
                                             const targetDayStr = formatDateString(targetDay);
                                             const dayMachProd = getMachineDayProduction(mach.name, targetDay);
                                             const isHolidayCell = holidaysMap.has(targetDayStr);
                                             const holidayCellName = holidaysMap.get(targetDayStr);
+                                            const isEvenCol = colIndex % 2 === 0; // Col 0 (Segunda), Col 2 (Quarta), Col 4 (Sexta)
                                             return (
                                                 <div 
                                                     key={colIndex}
                                                     onClick={() => !isViewer && handleOpenCreateModal(mach.name, targetDayStr)}
-                                                    className={`border-l border-slate-200/80 relative flex flex-col justify-between p-2 group/cell transition-colors ${
+                                                    className={`border-l relative flex flex-col justify-between p-2 group/cell transition-colors ${
                                                         isViewer ? 'cursor-default' : 'cursor-pointer'
                                                     } ${
                                                         dayMachProd.isToday 
-                                                            ? 'bg-blue-50/40 hover:bg-blue-100/50' 
+                                                            ? 'bg-blue-50/70 hover:bg-blue-100/70 border-l-blue-400' 
                                                             : isHolidayCell 
-                                                                ? 'bg-rose-50/40 hover:bg-rose-100/50' 
-                                                                : 'bg-white hover:bg-slate-50/80'
+                                                                ? 'bg-rose-50/70 hover:bg-rose-100/70 border-l-rose-300' 
+                                                                : dayMachProd.isPast
+                                                                    ? 'bg-emerald-50/30 hover:bg-emerald-100/40 border-l-emerald-300'
+                                                                    : 'bg-amber-50/25 hover:bg-amber-100/40 border-l-amber-200'
                                                     }`}
                                                     title={isViewer ? `Produção de ${mach.name} no dia ${formatFriendlyDate(targetDay)}` : isHolidayCell ? `Feriado: ${holidayCellName}. Clique para programar OP` : `Clique para programar OP em ${mach.name} no dia ${formatFriendlyDate(targetDay)}`}
                                                 >
@@ -4926,6 +5368,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
 
                                             const prog = getOPProgress(op);
+                                            const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
                                             // Lotes que aguardam pesagem na Trefila (finalizados na máquina, mas sem peso balança ainda)
                                             const pendingWeightLots = isTrefila 
                                                 ? (op.processedLots || []).filter((l: any) => 
@@ -4933,15 +5376,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                   )
                                                 : [];
 
-                                            const thisOpHasExtra = isTrefila && ((prog.isLive && Boolean(op.activeLotProcessing?.lotId)) || pendingWeightLots.length > 0);
-                                            const cardHeight = thisOpHasExtra ? (isPcpFullscreen ? 212 : 222) : (isPcpFullscreen ? 170 : 180);
+                                            const opHasAlert = prog.isLive && (prog.isStopped || prog.isPrep);
+                                            const opHasLiveLot = isTrefila && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
+                                            const opHasPendingWeight = pendingWeightLots.length > 0;
+                                            
+                                            let opCardHeight = isLargeZoom ? 282 : 215;
+                                            if (opHasAlert) opCardHeight += (isLargeZoom ? 34 : 30);
+                                            if (opHasLiveLot) opCardHeight += (isLargeZoom ? 36 : 32);
+                                            if (opHasPendingWeight) opCardHeight += (isLargeZoom ? 32 : 28);
 
                                             const track = getOpTrack(op);
-                                            const leftStyle = `calc(210px + (100% - 210px) * ${colStart / 5} + 4px)`;
-                                            const widthStyle = `calc((100% - 210px) * ${spanColumns / 5} - 8px)`;
+                                            const machColWidth = 220;
+                                            const leftStyle = `calc(220px + (100% - 220px) * ${colStart / 5})`;
+                                            const widthStyle = `calc((100% - 220px) * ${spanColumns / 5})`;
                                             const cardVerticalStyle = maxTracks > 1
-                                                ? { top: `${3 + track * (baseTrackHeight + 6)}px`, height: `${cardHeight}px` }
-                                                : { top: '3px', bottom: '3px' };
+                                                ? { top: `${track * baseTrackHeight}px`, height: `${opCardHeight}px` }
+                                                : { top: '0px', bottom: '0px' };
                                             const title = op.orderNumber;
                                             
                                             let displayProductCode = op.productCode || '';
@@ -5157,8 +5607,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             return (
                                                 <div
                                                     key={op.id}
-                                                    onClick={isViewer ? undefined : () => setDrawerOP(op)}
-                                                    className={`pcp-op-bar absolute animate-fade ${barBg} ${barGlowRing} ${isViewer ? '!cursor-default' : ''}`}
+                                                    onClick={() => !isViewer && setDrawerOP(op)}
+                                                    className={`pcp-op-bar absolute animate-fade ${barBg} ${barGlowRing} ${isViewer ? 'cursor-default' : 'cursor-pointer'}`}
                                                     style={{
                                                         left: leftStyle,
                                                         width: widthStyle,
@@ -5166,16 +5616,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     }}
                                                 >
                                                     <div className="flex flex-col h-full justify-between gap-1">
-                                                        <div className="flex items-center justify-between gap-2 shrink-0 pb-1 border-b border-slate-200/80 flex-wrap sm:flex-nowrap">
+                                                        <div className="flex items-center justify-between gap-1.5 shrink-0 pb-0.5 border-b border-slate-200/80 flex-nowrap overflow-hidden">
                                                             {/* Lado Esquerdo: #OP# + Descrição Completa + Status Badges */}
-                                                            <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                                                            <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
                                                                 {isViewer ? (
-                                                                    <span className="text-sm sm:text-base font-black text-blue-900 tracking-wide select-none shrink-0">
+                                                                    <span className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} font-black text-blue-900 tracking-wide select-none shrink-0`}>
                                                                         <span>#{title}#</span>
                                                                     </span>
                                                                 ) : (
                                                                     <span 
-                                                                        className="text-sm sm:text-base font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center flex-wrap gap-1 shrink-0"
+                                                                        className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center gap-1 shrink-0`}
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             setEditingInProgressOP(op);
@@ -5186,56 +5636,36 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     </span>
                                                                 )}
                                                                 {subtitle && (
-                                                                    <span 
-                                                                        className="text-xs sm:text-sm text-slate-800 font-bold tracking-normal"
-                                                                        title={subtitle}
-                                                                    >
-                                                                        {subtitle}
-                                                                    </span>
+                                                                    <div className="min-w-0 flex-1 max-w-full overflow-hidden flex items-center">
+                                                                        <PCPTickerText 
+                                                                            text={subtitle}
+                                                                            className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} text-slate-800 font-bold tracking-normal`}
+                                                                        />
+                                                                    </div>
                                                                 )}
                                                                 
                                                                 {prog.isPending && (
-                                                                    <span className="flex items-center gap-1 text-[9.5px] font-black uppercase bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-300 shadow-sm shrink-0">
+                                                                    <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-100 text-amber-900 rounded border border-amber-300 shadow-sm shrink-0`}>
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                                                                         AGENDADA
                                                                     </span>
                                                                 )}
-                                                                {prog.isLive && prog.isStopped && (
-                                                                    <span className={`flex items-center gap-1 text-[9.5px] font-black uppercase text-white px-2.5 py-0.5 rounded-md shadow-sm shrink-0 ${
-                                                                        isDowntimeOverLimit ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 animate-pulse'
-                                                                    }`}>
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0" />
-                                                                        {isDowntimeOverLimit ? 'TEMPO ULTRAPASSADO' : 'ALERTA: PARADA'}: {prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})
-                                                                    </span>
-                                                                )}
-                                                                {prog.isLive && prog.isPrep && (
-                                                                    <span className={`flex items-center gap-1 text-[9.5px] font-black uppercase text-white px-2.5 py-0.5 rounded-md shadow-sm shrink-0 ${
-                                                                        isDowntimeOverLimit ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 animate-pulse'
-                                                                    }`}>
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
-                                                                        {(() => {
-                                                                            const isRedundant = (prog.downtimeReason || '').trim().toLowerCase() === 'preparação' || (prog.downtimeReason || '').trim().toLowerCase() === 'preparacao';
-                                                                            const baseText = isDowntimeOverLimit ? 'PREPARAÇÃO ULTRAPASSADA' : 'PREPARAÇÃO';
-                                                                            return isRedundant ? `${baseText} (${formatDuration(prog.downtimeDurationMs)})` : `${baseText}: ${prog.downtimeReason} (${formatDuration(prog.downtimeDurationMs)})`;
-                                                                        })()}
-                                                                    </span>
-                                                                )}
                                                                 {prog.isLive && prog.isOffline && (
-                                                                    <span className="flex items-center gap-1 text-[9.5px] font-black uppercase bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-300 shrink-0">
+                                                                    <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-slate-100 text-slate-700 rounded border border-slate-300 shrink-0`}>
                                                                         DESLIGADA
                                                                     </span>
                                                                 )}
                                                                 {prog.isCompleted && (
-                                                                    <span className="text-[9.5px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-300 shrink-0">
+                                                                    <span className={`text-[9px] ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-emerald-100 text-emerald-800 rounded border border-emerald-300 shrink-0`}>
                                                                         CONCLUÍDA
                                                                     </span>
                                                                 )}
                                                             </div>
 
                                                             {/* Lado Direito do Topo: Mover / Estender Duração + Barra de Progresso Real */}
-                                                            <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center gap-1 shrink-0 ml-auto select-none flex-nowrap" onClick={(e) => e.stopPropagation()}>
                                                                 {!isViewer && !hasProductionStarted(op) && (
-                                                                    <div className="flex items-center gap-0.5 bg-white/95 px-1.5 py-0.5 rounded-lg border border-slate-200/90 shadow-xs">
+                                                                    <div className="flex items-center gap-0.5 bg-white/95 px-1 py-0.5 rounded border border-slate-200/90 shadow-xs">
                                                                         <button 
                                                                             onClick={() => handleShiftOP(op, -1)}
                                                                             className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer" 
@@ -5243,7 +5673,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         >
                                                                             ◀
                                                                         </button>
-                                                                        <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Mover</span>
+                                                                        <span className="text-[8.5px] uppercase font-bold text-slate-500 tracking-wider">Mover</span>
                                                                         <button 
                                                                             onClick={() => handleShiftOP(op, 1)}
                                                                             className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer"
@@ -5256,28 +5686,28 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                                 {/* Pill de Duração / Extensão */}
                                                                 <div 
-                                                                    className="flex items-center gap-1 bg-white/95 px-2 py-0.5 rounded-lg border border-slate-200/90 shadow-xs text-slate-700 select-none"
+                                                                    className="flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs text-slate-700 select-none"
                                                                     title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}.` : "Duração estimada em dias úteis"}
                                                                 >
-                                                                    <span className="text-[9.5px] text-slate-600 font-bold flex items-center gap-1">
+                                                                    <span className="text-[9px] text-slate-600 font-bold flex items-center gap-0.5">
                                                                         <span>⏱️</span>
-                                                                        <span className="hidden sm:inline">{hasProductionStarted(op) ? 'Estender:' : 'Duração:'}</span>
+                                                                        <span className="hidden sm:inline">{hasProductionStarted(op) ? 'Estender:' : 'Dur:'}</span>
                                                                     </span>
                                                                     {isViewer ? (
-                                                                        <span className="font-black text-xs text-slate-900 px-1 font-mono">{op.estimatedDurationDays || 1}d</span>
+                                                                        <span className="font-black text-xs text-slate-900 px-0.5 font-mono">{op.estimatedDurationDays || 1}d</span>
                                                                     ) : (
-                                                                        <div className="flex items-center gap-0.5 ml-0.5">
+                                                                        <div className="flex items-center gap-0.5">
                                                                             <button 
                                                                                 onClick={() => handleAdjustDuration(op, -1)}
-                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                                className="w-3.5 h-3.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
                                                                                 title={hasProductionStarted(op) ? "Reduzir extensão" : "Diminuir duração"}
                                                                             >
                                                                                 -
                                                                             </button>
-                                                                            <span className="font-black text-xs text-slate-900 px-1 font-mono">{op.estimatedDurationDays || 1}d</span>
+                                                                            <span className="font-black text-xs text-slate-900 px-0.5 font-mono">{op.estimatedDurationDays || 1}d</span>
                                                                             <button 
                                                                                 onClick={() => handleAdjustDuration(op, 1)}
-                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                                className="w-3.5 h-3.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
                                                                                 title="Estender duração (+1 dia)"
                                                                             >
                                                                                 +
@@ -5293,13 +5723,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         if (isViewer) return;
                                                                         handleOpenAdjustQuantity(op, { mode: 'total' });
                                                                     }}
-                                                                    className={`flex items-center gap-1.5 bg-white/95 px-2 py-0.5 rounded-lg border border-slate-200/90 shadow-xs min-w-[145px] sm:min-w-[185px] select-none ${
+                                                                    className={`flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs min-w-[125px] sm:min-w-[155px] select-none ${
                                                                         isViewer ? 'cursor-default' : 'hover:bg-white transition-all hover:border-slate-300 cursor-pointer'
                                                                     }`}
                                                                     title={isViewer ? `Progresso: ${prog.produced.toLocaleString('pt-BR')} / ${prog.target.toLocaleString('pt-BR')} ${prog.unit} (${prog.pct}%)` : "Clique para ajustar quantidade total produzida da OP (Gestor)"}
                                                                 >
                                                                     <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-700 leading-none">
+                                                                        <div className="flex items-center justify-between text-[9.5px] font-mono font-bold text-slate-700 leading-none">
                                                                             <span className="truncate">
                                                                                 {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
                                                                             </span>
@@ -5317,30 +5747,30 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         </div>
 
                                                         {trefilaDashStats && (
-                                                            <div className={`flex items-center justify-between gap-2 text-xs font-mono font-bold px-2.5 py-0.5 rounded-md border shadow-xs shrink-0 overflow-hidden ${
+                                                            <div className={`flex items-center justify-between gap-1.5 text-[10.5px] sm:text-[11px] font-mono font-bold px-2 py-0.5 rounded border shadow-xs shrink-0 overflow-hidden ${
                                                                 trefilaDashStats.isPaused 
                                                                     ? "bg-amber-50/95 border-amber-300 text-slate-800" 
                                                                     : "bg-blue-50/90 border-blue-200 text-slate-800"
                                                             }`}>
                                                                 <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                                                    <span className="text-blue-900 font-black text-xs sm:text-sm truncate">
+                                                                    <span className="text-blue-900 font-black text-xs truncate">
                                                                         Lote {trefilaDashStats.lotIdStr}
                                                                     </span>
-                                                                    <span className="text-slate-600 font-bold text-xs">
+                                                                    <span className="text-slate-600 font-bold text-[11px]">
                                                                         ({trefilaDashStats.lotWeight.toLocaleString('pt-BR')}kg)
                                                                     </span>
                                                                     {trefilaDashStats.isPaused && (
-                                                                        <span className="inline-flex items-center gap-1 text-[8.5px] uppercase font-black px-1.5 py-0.5 rounded bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0" title={trefilaDashStats.pauseReason || 'Pausado em parada / fim de turno'}>
+                                                                        <span className="inline-flex items-center gap-1 text-[8px] uppercase font-black px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0" title={trefilaDashStats.pauseReason || 'Pausado em parada / fim de turno'}>
                                                                             <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
                                                                             Pausado
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <div className="flex items-center gap-2 shrink-0 text-xs">
+                                                                <div className="flex items-center gap-2 shrink-0 text-[10.5px] sm:text-[11px]">
                                                                     <span className="text-slate-600">
                                                                         Feito: <strong className={trefilaDashStats.isPaused ? "text-amber-900 font-black" : "text-blue-900 font-black"}>{formatDuration(trefilaDashStats.elapsedMs)}</strong>
                                                                     </span>
-                                                                    <span className={`px-2 py-0.5 rounded font-black ${
+                                                                    <span className={`px-1.5 py-0.5 rounded font-black text-[9.5px] sm:text-[10px] ${
                                                                         trefilaDashStats.isDelayed 
                                                                             ? "bg-rose-100 text-rose-800 border border-rose-300 shadow-sm" 
                                                                             : trefilaDashStats.isPaused
@@ -5452,7 +5882,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                         {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
                                                         <div 
-                                                            className="grid gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200 flex-1 min-h-0"
+                                                            className="grid gap-0.5 p-0.5 bg-slate-100/90 rounded-lg border border-slate-200 flex-1 min-h-[56px]"
                                                             style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -5461,317 +5891,361 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 const currentDay = weekDays[dayIdx];
                                                                 const dayStats = getOpDayStats(op, currentDay, mach.name);
                                                                 const dayColName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][dayIdx] || '';
+                                                                const isEvenDayCol = dayIdx % 2 === 0; // Seg (0), Qua (2), Sex (4)
 
                                                                 const hasRealPastProd = dayStats.isPast && dayStats.produced > 0;
                                                                 const isIdlePast = dayStats.isPast && dayStats.produced === 0;
 
+                                                                const isDayCardStopped = dayStats.isToday && (
+                                                                    (prog.isLive && (prog.isStopped || prog.isPrep)) ||
+                                                                    dayStats.isMachineStoppedNow ||
+                                                                    Boolean(liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep'))
+                                                                );
+
+                                                                const dayStopReason = (prog.isLive && (prog.isStopped || prog.isPrep) && prog.downtimeReason)
+                                                                    || (liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep') ? liveMach.reason : '')
+                                                                    || (trefilaDashStats?.isPaused ? trefilaDashStats.pauseReason : '')
+                                                                    || 'Parada';
+
+                                                                const isDayStopExceeded = isDowntimeOverLimit || Boolean((liveMach as any)?.isOverLimit);
+                                                                const isDayPrepState = (prog.isLive && prog.isPrep) || (liveMach?.state === 'prep');
+
+                                                                const stopDurationMs = (liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep') && liveMach.durationMs > 0)
+                                                                    ? liveMach.durationMs
+                                                                    : (prog.downtimeDurationMs > 0 ? prog.downtimeDurationMs : 0);
+
+                                                                const stopTimerFormatted = stopDurationMs > 0 
+                                                                    ? formatDuration(stopDurationMs) 
+                                                                    : (dayStats.downtimeFormatted || '00:00:00');
+
                                                                 return (
                                                                     <div 
                                                                         key={dayIdx} 
-                                                                        onClick={isViewer ? undefined : () => {
-                                                                            setSelectedDailyReport({ 
-                                                                                op, 
-                                                                                date: currentDay, 
-                                                                                dateStr: formatDateString(currentDay), 
-                                                                                dayName: dayColName, 
-                                                                                produced: dayStats.produced, 
-                                                                                unit: dayStats.unit 
+                                                                        onClick={() => {
+                                                                            if (isViewer) return;
+                                                                            setSelectedDailyReport({
+                                                                                op,
+                                                                                date: currentDay,
+                                                                                dateStr: formatDateString(currentDay),
+                                                                                dayName: dayColName,
+                                                                                produced: dayStats.produced,
+                                                                                unit: dayStats.unit
                                                                             });
                                                                         }}
-                                                                        className={`flex flex-col justify-between p-1.5 rounded-xl border text-left transition-all select-none h-full min-h-0 overflow-hidden ${
-                                                                            isViewer ? 'cursor-default' : 'cursor-pointer hover:shadow-lg'
+                                                                        className={`[container-type:inline-size] flex items-center justify-between p-1 sm:p-1.5 rounded-lg border text-left transition-all select-none h-full min-h-0 overflow-hidden ${
+                                                                            isViewer ? 'cursor-default' : 'cursor-pointer hover:shadow-lg hover:brightness-95 active:scale-[0.99]'
                                                                         } ${
                                                                             dayStats.isToday 
-                                                                                ? (prog.isLive && (prog.isStopped || prog.isPrep))
-                                                                                    ? (isDowntimeOverLimit
+                                                                                ? isDayCardStopped
+                                                                                    ? (isDayStopExceeded
                                                                                         ? 'bg-rose-50 border-2 border-rose-600 text-rose-950 shadow-md ring-2 ring-rose-400 animate-pulse'
                                                                                         : 'bg-amber-50 border-2 border-amber-500 text-amber-950 shadow-md ring-2 ring-amber-400 animate-pulse')
-                                                                                    : 'bg-blue-50/95 border-2 border-blue-500 text-blue-950 shadow-sm ring-1 ring-blue-300'
-                                                                                : hasRealPastProd
-                                                                                    ? 'bg-emerald-50 border-2 border-emerald-400 text-emerald-950 shadow-sm hover:border-emerald-500' 
-                                                                                    : dayStats.isFuture
-                                                                                        ? 'bg-slate-100/90 border-2 border-dashed border-slate-300 text-slate-700 hover:border-blue-400 hover:bg-slate-100'
-                                                                                        : isIdlePast
-                                                                                            ? 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
-                                                                                            : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+                                                                                    : 'bg-gradient-to-br from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] border-2 border-blue-800 text-blue-950 shadow-md ring-2 ring-blue-500/80 hover:border-blue-900'
+                                                                                : dayStats.isPast
+                                                                                    ? hasRealPastProd
+                                                                                        ? 'bg-emerald-50/85 border-2 border-emerald-400 text-emerald-950 shadow-xs hover:border-emerald-500 hover:bg-emerald-100/70'
+                                                                                        : 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
+                                                                                    : 'bg-[#FEFCE8]/90 border-2 border-dashed border-amber-300/90 text-amber-950 shadow-2xs hover:bg-[#FEF9C3] hover:border-amber-400'
                                                                         }`}
                                                                         title={isViewer ? `Produção de ${dayColName} ${formatFriendlyDate(currentDay)}: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : `Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
                                                                     >
-                                                                        <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-black uppercase tracking-wider mb-0.5 min-w-0">
-                                                                            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                                                                                <span className={`truncate shrink-0 ${
-                                                                                    dayStats.isToday 
-                                                                                        ? (prog.isLive && (prog.isStopped || prog.isPrep))
-                                                                                            ? (isDowntimeOverLimit ? 'text-rose-700 font-extrabold' : 'text-amber-800 font-extrabold')
-                                                                                            : 'text-blue-800 font-extrabold'
-                                                                                        : dayStats.isHoliday 
-                                                                                            ? 'text-rose-600' 
-                                                                                            : hasRealPastProd 
-                                                                                                ? 'text-emerald-800 font-extrabold' 
-                                                                                                : dayStats.isFuture
-                                                                                                    ? 'text-slate-600 font-bold'
-                                                                                                    : 'text-slate-500'
-                                                                                }`}>
-                                                                                    {dayColName} {formatFriendlyDate(currentDay)}
-                                                                                </span>
-
-                                                                                {dayStats.isToday && (
-                                                                                    prog.isLive && (prog.isStopped || prog.isPrep) ? (
-                                                                                        isDowntimeOverLimit ? (
-                                                                                            <span className="flex items-center gap-1 text-[8px] sm:text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-600 text-white tracking-wider shadow-sm animate-pulse shrink-0">
-                                                                                                <span className="w-1 h-1 rounded-full bg-white animate-ping" />
-                                                                                                ULTRAPASSADO
-                                                                                            </span>
-                                                                                        ) : (
-                                                                                            <span className="flex items-center gap-1 text-[8px] sm:text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-wider shadow-sm animate-pulse shrink-0">
-                                                                                                <span className="w-1 h-1 rounded-full bg-white" />
-                                                                                                {prog.isPrep ? 'PREP' : 'ALERTA'}
-                                                                                            </span>
-                                                                                        )
-                                                                                    ) : (
-                                                                                        <span className="flex items-center gap-1 text-[8px] sm:text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-600 text-white tracking-wider shadow-sm shrink-0">
-                                                                                            <span className="w-1 h-1 rounded-full bg-white pulse-live" />
-                                                                                            EM PRODUÇÃO
-                                                                                        </span>
-                                                                                    )
-                                                                                )}
-                                                                                {dayStats.isHoliday && !dayStats.isToday && (
-                                                                                    <span className="text-[8px] sm:text-[8.5px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 shrink-0" title={`Feriado: ${dayStats.holidayName}`}>
-                                                                                        🌴 Feriado
-                                                                                    </span>
-                                                                                )}
-                                                                                {hasRealPastProd && (
-                                                                                    <span className="text-[8px] sm:text-[8.5px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-sm tracking-wider shrink-0">
-                                                                                        ✓ Concluído
-                                                                                    </span>
-                                                                                )}
-                                                                                {isIdlePast && !dayStats.isHoliday && (
-                                                                                    <span className="text-[8px] sm:text-[8.5px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                                                                                        Sem prod.
-                                                                                    </span>
-                                                                                )}
-                                                                                {dayStats.isFuture && !dayStats.isHoliday && (
-                                                                                    <span className="text-[8px] sm:text-[8.5px] font-black px-1.5 py-0.5 rounded bg-slate-200/90 text-slate-700 border border-slate-300 tracking-wider shrink-0">
-                                                                                        🎯 Meta
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="flex items-center justify-between gap-1.5 my-0.5 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-2 min-w-0 w-full h-full">
                                                                             {dayStats.isHoliday && dayStats.produced === 0 ? (
-                                                                                <span className="text-xs font-black text-rose-600 font-mono tracking-tight">
-                                                                                    Folga / Feriado
-                                                                                </span>
-                                                                            ) : (
-                                                                                <div className="flex items-center gap-1 min-w-0 flex-1">
-                                                                                    {/* Botão Menos Rápido para Gestor */}
-                                                                                    {isGestor && !dayStats.isFuture && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
-                                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 hover:border-rose-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
-                                                                                            title={`Subtrair 1 ${dayStats.unit} deste turno`}
-                                                                                        >
-                                                                                            -
-                                                                                        </button>
-                                                                                    )}
+                                                                                <div className="flex items-center justify-center w-full">
+                                                                                    <span className={`${isLargeZoom ? 'text-sm' : 'text-xs'} font-black text-rose-600 font-mono tracking-tight`}>
+                                                                                        Folga / Feriado
+                                                                                    </span>
+                                                                                </div>
+                                                                            ) : isDayCardStopped ? (
+                                                                                /* Layout Especial em Caso de Parada / Preparação: Destaque total para o Motivo da Parada em largura total com Ticker inteligente, engrenagem parada e luz de alerta */
+                                                                                <div className="flex flex-col justify-between w-full h-full min-w-0 p-1 gap-1 select-none">
+                                                                                    {/* Top Row: Engrenagem Parada + Sinal de Alerta com Luz Vermelha Pulsante */}
+                                                                                    <div className="flex items-center justify-between gap-1.5 w-full px-0.5">
+                                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                                            {/* Engrenagem Estática / Travada */}
+                                                                                            <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-5 h-5' : 'w-4 h-4'}`} title="Máquina Parada / Interrompida">
+                                                                                                <svg 
+                                                                                                    className={`${isLargeZoom ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} ${isDayStopExceeded ? 'text-rose-700' : 'text-amber-800'} drop-shadow-2xs`} 
+                                                                                                    viewBox="0 0 24 24" 
+                                                                                                    fill="currentColor"
+                                                                                                >
+                                                                                                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
+                                                                                                </svg>
+                                                                                                <span className="absolute -bottom-0.5 -right-0.5 text-[8px] sm:text-[9px] leading-none">⛔</span>
+                                                                                            </div>
 
-                                                                                    <div 
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            if (isViewer) return;
-                                                                                            handleOpenAdjustQuantity(op, {
-                                                                                                mode: 'shift',
-                                                                                                dayStats: dayStats,
-                                                                                                targetDay: currentDay,
-                                                                                                dayColName: dayColName,
-                                                                                                operatorName: dayStats.operatorName,
-                                                                                                shiftProduced: dayStats.produced
-                                                                                            });
-                                                                                        }}
-                                                                                        className={`flex items-baseline gap-0.5 select-none min-w-0 ${
-                                                                                            isViewer ? 'cursor-default' : 'cursor-pointer group/qty hover:bg-white px-1 py-0.5 rounded-md transition-all'
-                                                                                        }`}
-                                                                                        title={isViewer ? `Total produzido no turno: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Clique para abrir ajuste de contagem (Gestor)"}
-                                                                                    >
-                                                                                        <span className={`text-lg sm:text-xl md:text-[22px] font-black font-mono tracking-tight whitespace-nowrap leading-none ${
-                                                                                            isViewer ? '' : 'group-hover/qty:text-orange-600 transition-colors'
-                                                                                        } ${
-                                                                                            dayStats.isToday 
-                                                                                                ? (prog.isLive && (prog.isStopped || prog.isPrep))
-                                                                                                    ? (isDowntimeOverLimit ? 'text-rose-950 font-black' : 'text-amber-950 font-black')
-                                                                                                    : 'text-blue-950 font-black' 
-                                                                                                : hasRealPastProd
-                                                                                                    ? 'text-emerald-950 font-black' 
-                                                                                                    : dayStats.isFuture
-                                                                                                        ? 'text-slate-700 font-black'
-                                                                                                        : isIdlePast
-                                                                                                            ? 'text-slate-400'
-                                                                                                            : 'text-slate-800'
-                                                                                        }`}>
-                                                                                            {dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR')}
+                                                                                            {/* Tag Máquina Parada com Pulso Vermelho */}
+                                                                                            <div className={`flex items-center gap-1 px-1.5 py-0.2 rounded-full ${
+                                                                                                isDayStopExceeded 
+                                                                                                    ? 'bg-rose-900/15 border border-rose-600/30' 
+                                                                                                    : 'bg-amber-900/15 border border-amber-600/30'
+                                                                                            } backdrop-blur-2xs shadow-2xs`}>
+                                                                                                <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+                                                                                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isDayStopExceeded ? 'bg-rose-500' : 'bg-amber-500'} opacity-75`} />
+                                                                                                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 ${isDayStopExceeded ? 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.9)]' : 'bg-amber-600 shadow-[0_0_8px_rgba(217,119,6,0.9)]'}`} />
+                                                                                                </span>
+                                                                                                <span className={`${isLargeZoom ? 'text-[8.5px] sm:text-[9.5px]' : 'text-[7px] sm:text-[7.5px]'} font-black uppercase tracking-wider ${isDayStopExceeded ? 'text-rose-950' : 'text-amber-950'} font-mono leading-none`}>
+                                                                                                    {isDayStopExceeded ? 'Parada Crítica' : isDayPrepState ? 'Preparação' : 'Máquina Parada'}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        <span className={`${isLargeZoom ? 'text-xs' : 'text-[10px]'} animate-bounce shrink-0`}>
+                                                                                            {isDayStopExceeded ? '🚨' : '⚠️'}
                                                                                         </span>
-                                                                                        <span className={`text-[11px] sm:text-xs font-extrabold text-slate-600 font-mono shrink-0 ml-0.5 ${
-                                                                                            isViewer ? '' : 'group-hover/qty:text-orange-600 transition-colors'
-                                                                                        }`}>{dayStats.unit}</span>
-                                                                                        {!isViewer && (
-                                                                                            <span className="opacity-0 group-hover/qty:opacity-100 text-[10px] text-orange-500 transition-opacity shrink-0 ml-0.5" title="Ajustar Quantidade">✏️</span>
-                                                                                        )}
                                                                                     </div>
 
-                                                                                    {/* Botão Mais Rápido para Gestor */}
-                                                                                    {isGestor && !dayStats.isFuture && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
-                                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
-                                                                                            title={`Adicionar 1 ${dayStats.unit} a este turno`}
-                                                                                        >
-                                                                                            +
-                                                                                        </button>
+                                                                                    {/* Center: Faixa de Alerta com Motivo da Parada Centralizado */}
+                                                                                    <div className={`flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg border shadow-xs min-w-0 w-full overflow-hidden ${
+                                                                                        isDayStopExceeded
+                                                                                            ? 'bg-rose-100/95 text-rose-950 border-rose-400 ring-1 ring-rose-400/40'
+                                                                                            : isDayPrepState
+                                                                                                ? 'bg-amber-100/95 text-amber-950 border-amber-400 ring-1 ring-amber-400/40'
+                                                                                                : 'bg-amber-100/95 text-amber-950 border-amber-400 ring-1 ring-amber-400/40'
+                                                                                    }`}>
+                                                                                        <div className="min-w-0 flex-1 overflow-hidden text-center">
+                                                                                            <PCPTickerText 
+                                                                                                text={dayStopReason.toUpperCase()}
+                                                                                                className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px] sm:text-[11px]'} font-black uppercase tracking-tight text-slate-900 leading-tight`}
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    {/* Bottom Row: Produção Feita vs Cronômetro de Tempo Parado */}
+                                                                                    <div className="flex items-center justify-between gap-1 min-w-0 w-full px-0.5">
+                                                                                        {/* Lado Esquerdo: Quantidade Produzida */}
+                                                                                        <div className="flex items-baseline gap-1 min-w-0 shrink-0">
+                                                                                            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-slate-500 font-mono">
+                                                                                                Prod:
+                                                                                            </span>
+                                                                                            <div className="flex items-baseline gap-0.5">
+                                                                                                {isGestor && !dayStats.isFuture && (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
+                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0 mr-0.5"
+                                                                                                        title={`Subtrair 1 ${dayStats.unit}`}
+                                                                                                    >
+                                                                                                        -
+                                                                                                    </button>
+                                                                                                )}
+                                                                                                <span 
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        if (isViewer) return;
+                                                                                                        handleOpenAdjustQuantity(op, {
+                                                                                                            mode: 'shift',
+                                                                                                            dayStats: dayStats,
+                                                                                                            targetDay: currentDay,
+                                                                                                            dayColName: dayColName,
+                                                                                                            operatorName: dayStats.operatorName,
+                                                                                                            shiftProduced: dayStats.produced
+                                                                                                        });
+                                                                                                    }}
+                                                                                                    className={`font-black font-mono text-base sm:text-lg md:text-xl text-slate-950 tracking-tight whitespace-nowrap leading-none ${
+                                                                                                        isViewer ? '' : 'cursor-pointer hover:underline'
+                                                                                                    }`}
+                                                                                                    title={isViewer ? `Produção: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Ajustar contagem"}
+                                                                                                >
+                                                                                                    {dayStats.produced.toLocaleString('pt-BR')}
+                                                                                                </span>
+                                                                                                <span className="text-xs font-black text-slate-700 font-mono">
+                                                                                                    {dayStats.unit}
+                                                                                                </span>
+                                                                                                {isGestor && !dayStats.isFuture && (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
+                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0 ml-0.5"
+                                                                                                        title={`Adicionar 1 ${dayStats.unit}`}
+                                                                                                    >
+                                                                                                        +
+                                                                                                    </button>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {/* Lado Direito: Cronômetro Parado em Destaque */}
+                                                                                        <div className={`flex items-center gap-1 font-mono px-1.5 py-0.5 rounded-md border shadow-2xs shrink-0 ${
+                                                                                            isDayStopExceeded
+                                                                                                ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                                                                                : 'bg-amber-50 text-amber-900 border-amber-300'
+                                                                                        }`}>
+                                                                                            <span className="text-[8.5px] sm:text-[9.5px] font-bold">⏱️</span>
+                                                                                            <strong className="text-xs sm:text-[13px] font-black tracking-tight">
+                                                                                                {stopTimerFormatted}
+                                                                                            </strong>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="flex flex-col items-center justify-center min-w-0 flex-1 overflow-hidden h-full">
+                                                                                    {/* Engrenagens Animadas e Status "Em Produção" */}
+                                                                                    {dayStats.isToday && !isDayCardStopped && (dayStats.isProducingNow || op.isCurrentlyRunning || dayStats.status === 'live') && (
+                                                                                        <div className={`flex items-center gap-1.5 select-none ${isLargeZoom ? 'mb-1' : 'mb-0.5'}`}>
+                                                                                            {/* Par de Engrenagens Intertravadas Girando */}
+                                                                                            <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-6 h-5' : 'w-4 h-3.5'}`} title="Máquina em Produção Ativa">
+                                                                                                {/* Engrenagem Maior (Sentido Horário) */}
+                                                                                                <svg 
+                                                                                                    className={`${isLargeZoom ? 'w-4.5 h-4.5 -top-0.5 -right-0.5' : 'w-3 h-3 -top-0.5 -right-0.5'} text-blue-950 animate-spin absolute drop-shadow-xs`} 
+                                                                                                    style={{ animationDuration: '3.5s' }}
+                                                                                                    viewBox="0 0 24 24" 
+                                                                                                    fill="currentColor"
+                                                                                                >
+                                                                                                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
+                                                                                                </svg>
+                                                                                                {/* Engrenagem Menor (Sentido Anti-Horário) */}
+                                                                                                <svg 
+                                                                                                    className={`${isLargeZoom ? 'w-3.5 h-3.5 -bottom-0.5 -left-0.5' : 'w-2.5 h-2.5 -bottom-0.5 -left-0.5'} text-blue-800 animate-spin absolute drop-shadow-xs`} 
+                                                                                                    style={{ animationDuration: '2.5s', animationDirection: 'reverse' }}
+                                                                                                    viewBox="0 0 24 24" 
+                                                                                                    fill="currentColor"
+                                                                                                >
+                                                                                                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
+                                                                                                </svg>
+                                                                                            </div>
+
+                                                                                            {/* Tag Em Produção com Pulso Verde */}
+                                                                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-900/15 border border-blue-900/20 backdrop-blur-2xs shadow-2xs">
+                                                                                                <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+                                                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+                                                                                                </span>
+                                                                                                <span className={`${isLargeZoom ? 'text-[8.5px] sm:text-[9.5px]' : 'text-[7px] sm:text-[7.5px]'} font-black uppercase tracking-wider text-blue-950 font-mono leading-none`}>
+                                                                                                    Em Produção
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
                                                                                     )}
+
+                                                                                    {/* Quantidade Produzida */}
+                                                                                    {(() => {
+                                                                                        const formattedQtyStr = dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR');
+                                                                                        const isVeryLongQty = formattedQtyStr.length >= 6; // ex: 10.315 ou 22.000
+                                                                                        const isLongQty = formattedQtyStr.length >= 4; // ex: 2.000 ou 6.929
+
+                                                                                        const qtyTextSizeClass = dayStats.hasTimeStats
+                                                                                            ? (isFullscreenZoom
+                                                                                                ? (isVeryLongQty ? 'text-xl sm:text-2xl lg:text-3xl' : isLongQty ? 'text-2xl sm:text-3xl lg:text-[34px]' : 'text-2xl sm:text-3xl lg:text-4xl')
+                                                                                                : isLargeZoom
+                                                                                                    ? (isVeryLongQty ? 'text-base sm:text-lg lg:text-xl' : isLongQty ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl')
+                                                                                                    : (isVeryLongQty ? 'text-sm sm:text-base' : isLongQty ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'))
+                                                                                            : (isFullscreenZoom
+                                                                                                ? (isVeryLongQty ? 'text-2xl sm:text-3.5xl lg:text-4xl' : 'text-3xl sm:text-4xl lg:text-5xl')
+                                                                                                : isLargeZoom
+                                                                                                    ? (isVeryLongQty ? 'text-xl sm:text-2.5xl lg:text-3xl' : 'text-2xl sm:text-3xl lg:text-4xl')
+                                                                                                    : (isVeryLongQty ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'));
+
+                                                                                        return (
+                                                                                            <div className="flex items-center justify-center gap-1 min-w-0 w-full overflow-hidden">
+                                                                                                {/* Botão Menos Rápido para Gestor */}
+                                                                                                {isGestor && !dayStats.isFuture && (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
+                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 hover:border-rose-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
+                                                                                                        title={`Subtrair 1 ${dayStats.unit} deste turno`}
+                                                                                                    >
+                                                                                                        -
+                                                                                                    </button>
+                                                                                                )}
+
+                                                                                                <div 
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        if (isViewer) return;
+                                                                                                        handleOpenAdjustQuantity(op, {
+                                                                                                            mode: 'shift',
+                                                                                                            dayStats: dayStats,
+                                                                                                            targetDay: currentDay,
+                                                                                                            dayColName: dayColName,
+                                                                                                            operatorName: dayStats.operatorName,
+                                                                                                            shiftProduced: dayStats.produced
+                                                                                                        });
+                                                                                                    }}
+                                                                                                    className={`flex items-baseline justify-center gap-0.5 select-none min-w-0 ${
+                                                                                                        isViewer ? 'cursor-default' : 'cursor-pointer group/qty hover:bg-white/80 px-1 py-0.5 rounded-md transition-all'
+                                                                                                    }`}
+                                                                                                    title={isViewer ? `Total produzido no turno: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Clique para abrir ajuste de contagem (Gestor)"}
+                                                                                                >
+                                                                                                    <span className={`${qtyTextSizeClass} font-mono font-black tracking-tight whitespace-nowrap leading-none ${
+                                                                                                        dayStats.isToday 
+                                                                                                            ? 'text-blue-950' 
+                                                                                                            : dayStats.isPast 
+                                                                                                                ? 'text-emerald-600/70 font-bold' 
+                                                                                                                : 'text-amber-600/60 font-bold'
+                                                                                                    }`}>
+                                                                                                        {formattedQtyStr}
+                                                                                                    </span>
+                                                                                                    <span className={`${isFullscreenZoom ? (isVeryLongQty ? 'text-xs sm:text-sm' : 'text-sm sm:text-base') : 'text-xs sm:text-sm'} font-semibold font-mono shrink-0 ml-0.5 leading-none ${
+                                                                                                        dayStats.isToday 
+                                                                                                            ? 'text-blue-700 font-black' 
+                                                                                                            : dayStats.isPast 
+                                                                                                                ? 'text-emerald-500/60' 
+                                                                                                                : 'text-amber-500/55'
+                                                                                                    }`}>
+                                                                                                        {dayStats.unit}
+                                                                                                    </span>
+                                                                                                    {!isViewer && (
+                                                                                                        <span className="opacity-0 group-hover/qty:opacity-100 text-[9px] text-orange-500 transition-opacity shrink-0 ml-0.5" title="Ajustar Quantidade">✏️</span>
+                                                                                                    )}
+                                                                                                </div>
+
+                                                                                                {/* Botão Mais Rápido para Gestor */}
+                                                                                                {isGestor && !dayStats.isFuture && (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
+                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
+                                                                                                        title={`Adicionar 1 ${dayStats.unit} a este turno`}
+                                                                                                    >
+                                                                                                        +
+                                                                                                    </button>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        );
+                                                                                    })()}
                                                                                 </div>
                                                                             )}
 
-                                                                            {/* Estatística de Tempo (Efetivo e Parado) - Cronômetro em Tempo Real e Ritmo por Hora */}
-                                                                            {dayStats.hasTimeStats && (
+                                                                            {/* Estatística de Tempo (Efetivo e Parado) - Calibração Responsiva e Sem Cortes */}
+                                                                            {!isDayCardStopped && dayStats.hasTimeStats && (
                                                                                 <div 
-                                                                                    className={`flex flex-col justify-center px-1.5 py-0.5 rounded-lg border shadow-xs text-right shrink-0 select-none pointer-events-none gap-0.5 transition-all min-w-[78px] sm:min-w-[86px] ${
+                                                                                    className={`flex flex-col justify-center ${isFullscreenZoom ? 'gap-0.5 px-2 py-0.5 min-w-[115px] sm:min-w-[130px] lg:min-w-[140px]' : isLargeZoom ? 'gap-0.5 px-1.5 py-0.5 min-w-[105px] sm:min-w-[120px]' : 'gap-0.5 px-1.5 py-0.5 min-w-[85px] sm:min-w-[95px]'} rounded-xl border shrink-0 select-none pointer-events-none transition-all h-full max-h-full overflow-hidden shadow-xs ${
                                                                                         dayStats.isMachineStoppedNow
-                                                                                            ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30'
-                                                                                            : dayStats.isProducingNow
-                                                                                                ? 'bg-emerald-50/95 border-emerald-300 ring-1 ring-emerald-400/30'
-                                                                                                : 'bg-white/95 border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]'
+                                                                                            ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30 text-amber-900'
+                                                                                            : dayStats.isToday
+                                                                                                ? 'bg-white/95 border-2 border-blue-400 shadow-xs ring-1 ring-blue-300/60 text-blue-950'
+                                                                                                : 'bg-emerald-50/60 border border-emerald-200/60 text-emerald-700/80 shadow-2xs'
                                                                                     }`}
-                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ Velocidade: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
+                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ ${dayStats.speedUnit === 's/pç' ? 'Tempo por Peça' : 'Velocidade'}: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
                                                                                 >
-                                                                                    <div className={`text-[7px] sm:text-[7.5px] font-black uppercase tracking-widest text-center pb-0.5 border-b mb-0.5 select-none leading-none ${
-                                                                                        dayStats.isMachineStoppedNow 
-                                                                                            ? 'text-amber-800 border-amber-200/80' 
-                                                                                            : dayStats.isProducingNow 
-                                                                                                ? 'text-emerald-800 border-emerald-200/80' 
-                                                                                                : 'text-slate-400 border-slate-200/80'
+                                                                                    <div className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px] pb-0.2' : isLargeZoom ? 'text-[8px] sm:text-[8.5px] pb-0.2' : 'text-[7px] sm:text-[7.5px] pb-0.2'} font-black uppercase tracking-wider border-b text-center leading-none ${
+                                                                                        dayStats.isToday ? 'text-blue-700 border-blue-200' : 'text-emerald-500/70 border-emerald-100'
                                                                                     }`}>
                                                                                         Estatísticas
                                                                                     </div>
-                                                                                    <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[8.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                            dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
-                                                                                        }`}>
-                                                                                            {dayStats.isProducingNow ? (
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                                                                                            ) : (
-                                                                                                <span className="text-[7.5px]">⚡</span>
-                                                                                            )}
-                                                                                            EF:
-                                                                                        </span>
-                                                                                        <span className={`text-[11px] sm:text-[12px] font-black font-mono tracking-tight leading-none ${
-                                                                                            dayStats.isProducingNow ? 'text-emerald-700' : 'text-slate-700'
-                                                                                        }`}>
-                                                                                            {dayStats.effectiveFormatted}
-                                                                                        </span>
+                                                                                    <div className={`grid grid-cols-[auto_1fr] items-center ${isFullscreenZoom ? 'gap-x-2 gap-y-0 text-[11px] sm:text-xs' : isLargeZoom ? 'gap-x-1.5 gap-y-0 text-[10px] sm:text-[11px]' : 'gap-x-1 gap-y-0 text-[8px] sm:text-[8.5px]'} leading-tight font-mono`}>
+                                                                                        <span className={`font-black uppercase tracking-wider text-left ${dayStats.isToday ? 'text-blue-800' : 'text-emerald-600/70'}`}>EF:</span>
+                                                                                        <strong className={`font-black ${isFullscreenZoom ? 'text-[15.5px] sm:text-[17px] lg:text-[18.5px]' : isLargeZoom ? 'text-[13.5px] sm:text-[15px] lg:text-[16px]' : 'text-[10.5px] sm:text-[11.5px]'} text-right leading-none ${dayStats.isToday ? 'text-emerald-700' : 'text-emerald-600/80'}`}>{dayStats.effectiveFormatted}</strong>
+                                                                                        <span className={`font-black uppercase tracking-wider text-left ${dayStats.isToday ? 'text-blue-800' : 'text-emerald-600/70'}`}>PAR:</span>
+                                                                                        <strong className={`font-black ${isFullscreenZoom ? 'text-[15.5px] sm:text-[17px] lg:text-[18.5px]' : isLargeZoom ? 'text-[13.5px] sm:text-[15px] lg:text-[16px]' : 'text-[10.5px] sm:text-[11.5px]'} text-right leading-none ${dayStats.isMachineStoppedNow ? 'text-amber-700 font-extrabold' : dayStats.isToday ? 'text-slate-600' : 'text-emerald-600/60'}`}>{dayStats.downtimeFormatted}</strong>
                                                                                     </div>
-                                                                                    <div className="flex items-center justify-between gap-1 leading-none">
-                                                                                        <span className={`text-[8.5px] uppercase font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                            dayStats.isMachineStoppedNow ? 'text-amber-800' : 'text-slate-400'
-                                                                                        }`}>
-                                                                                            {dayStats.isMachineStoppedNow ? (
-                                                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block" />
-                                                                                            ) : (
-                                                                                                <span className="text-[7.5px]">⏱️</span>
-                                                                                            )}
-                                                                                            PAR:
-                                                                                        </span>
-                                                                                        <span className={`text-[11px] sm:text-[12px] font-black font-mono tracking-tight leading-none ${
-                                                                                            dayStats.isMachineStoppedNow 
-                                                                                                ? 'text-amber-700 font-extrabold' 
-                                                                                                : dayStats.downtimeMs > 0 
-                                                                                                    ? 'text-amber-600' 
-                                                                                                    : 'text-slate-400'
-                                                                                        }`}>
-                                                                                            {dayStats.downtimeFormatted}
-                                                                                        </span>
+                                                                                    <div className={`flex flex-col border-t border-slate-200/70 ${isLargeZoom ? 'gap-0.2 pt-0.5' : 'gap-0.2 pt-0.2'}`}>
+                                                                                        {dayStats.ratePerHour > 0 && (
+                                                                                            <div className="flex items-center justify-between gap-1 leading-none font-mono">
+                                                                                                <span className={`${isFullscreenZoom ? 'text-[10.5px] sm:text-xs' : isLargeZoom ? 'text-[9.5px] sm:text-[10.5px]' : 'text-[8px]'} text-slate-500`}>🚀</span>
+                                                                                                <strong className={`text-slate-800 font-black ${isFullscreenZoom ? 'text-[11px] sm:text-xs' : isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9.5px]'} text-right leading-none`}>{dayStats.ratePerHour.toLocaleString('pt-BR')} <span className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px]' : isLargeZoom ? 'text-[8px] sm:text-[8.5px]' : 'text-[7px] sm:text-[7.5px]'} font-semibold text-slate-500`}>{dayStats.rateUnit}</span></strong>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {Boolean(dayStats.speedUnit) && (
+                                                                                            <div className="flex items-center justify-between gap-1 leading-none font-mono">
+                                                                                                <span className={`${isFullscreenZoom ? 'text-[10.5px] sm:text-xs' : isLargeZoom ? 'text-[9.5px] sm:text-[10.5px]' : 'text-[8px]'} text-slate-500`}>⚡</span>
+                                                                                                <strong className={`text-slate-800 font-black ${isFullscreenZoom ? 'text-[11px] sm:text-xs' : isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9.5px]'} text-right leading-none`}>{dayStats.speedValue > 0 ? dayStats.speedFormatted : '—'} <span className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px]' : isLargeZoom ? 'text-[8px] sm:text-[8.5px]' : 'text-[7px] sm:text-[7.5px]'} font-semibold text-slate-500`}>{dayStats.speedUnit}</span></strong>
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
-                                                                                    {dayStats.ratePerHour > 0 && (
-                                                                                        <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
-                                                                                            <span className={`text-[8px] font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
-                                                                                            }`}>
-                                                                                                <span className="text-[7px]">🚀</span>
-                                                                                                H:
-                                                                                            </span>
-                                                                                            <span className={`text-[10px] sm:text-[11px] font-black font-mono tracking-tight leading-none ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
-                                                                                            }`}>
-                                                                                                {dayStats.ratePerHour.toLocaleString('pt-BR')}<span className="text-[7px] font-bold text-slate-500 ml-0.5">{dayStats.rateUnit}</span>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {dayStats.speedValue > 0 && (
-                                                                                        <div className="flex items-center justify-between gap-1 leading-none pt-0.5 border-t border-slate-200/80 mt-0.5">
-                                                                                            <span className={`text-[8px] font-black tracking-tight flex items-center gap-0.5 ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-800' : 'text-slate-500'
-                                                                                            }`}>
-                                                                                                <span className="text-[7px]">⚡</span>
-                                                                                            </span>
-                                                                                            <span className={`text-[10px] sm:text-[11px] font-black font-mono tracking-tight leading-none ${
-                                                                                                dayStats.isProducingNow ? 'text-emerald-900 font-extrabold' : 'text-slate-800'
-                                                                                            }`}>
-                                                                                                {dayStats.speedFormatted}<span className="text-[7px] font-bold text-slate-500 ml-0.5">{dayStats.speedUnit}</span>
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    )}
                                                                                 </div>
-                                                                            )}
-                                                                        </div>
-
-                                                                        <div className="flex items-center justify-between text-[9.5px] sm:text-[10.5px] truncate pt-0.5 mt-0.5 border-t border-slate-200/80">
-                                                                            <span className="truncate flex items-center gap-1 font-semibold min-w-0">
-                                                                                {dayStats.isHoliday ? (
-                                                                                    <span className="text-rose-600 truncate font-bold">
-                                                                                        🌴 {dayStats.holidayName || 'Sem expediente'}
-                                                                                    </span>
-                                                                                ) : dayStats.isToday ? (
-                                                                                    prog.isLive && (prog.isStopped || prog.isPrep) ? (
-                                                                                        isDowntimeOverLimit ? (
-                                                                                            <>
-                                                                                                <span className="text-rose-600">🚨</span>
-                                                                                                <strong className="text-rose-900 truncate font-black">{prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})</strong>
-                                                                                            </>
-                                                                                        ) : (
-                                                                                            <>
-                                                                                                <span className="text-amber-600">⚠️</span>
-                                                                                                <strong className="text-amber-900 truncate font-black">{prog.downtimeReason} ({formatDuration(prog.downtimeDurationMs)})</strong>
-                                                                                            </>
-                                                                                        )
-                                                                                    ) : (
-                                                                                        <>
-                                                                                            <span className="text-blue-600">⚡</span>
-                                                                                            <strong className="text-blue-950 truncate font-bold">{dayStats.operatorName || 'Turno Ativo'}</strong>
-                                                                                        </>
-                                                                                    )
-                                                                                ) : hasRealPastProd ? (
-                                                                                    <>
-                                                                                        <span className="text-emerald-600 font-bold">✓</span>
-                                                                                        <span className="text-emerald-900 font-bold truncate">{dayStats.operatorName || 'Encerrado'}</span>
-                                                                                    </>
-                                                                                ) : isIdlePast ? (
-                                                                                    <span className="text-slate-400 truncate">{dayStats.operatorName ? `👤 ${dayStats.operatorName}` : 'Sem turno'}</span>
-                                                                                ) : (
-                                                                                    <span className="text-slate-500 font-medium italic">Planejado</span>
-                                                                                )}
-                                                                            </span>
-
-                                                                            {/* Última hora de atualização (apenas no dia atual / em produção) */}
-                                                                            {dayStats.isToday && dayStats.lastUpdateFormatted && (
-                                                                                <span 
-                                                                                    className="text-[8px] sm:text-[8.5px] font-mono font-bold text-slate-600 bg-white/90 px-1 py-0.2 rounded border border-slate-200/90 shrink-0 ml-1 flex items-center gap-0.5 shadow-xs"
-                                                                                    title={`Última atualização registrada hoje: ${dayStats.lastUpdateFormatted}`}
-                                                                                >
-                                                                                    <span className="text-[7.5px] opacity-80">🕒</span>
-                                                                                    <span>{dayStats.lastUpdateFormatted}</span>
-                                                                                </span>
                                                                             )}
                                                                         </div>
                                                                     </div>
@@ -5788,122 +6262,66 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         </div>
 
                         {/* RODAPÉ DE TOTAIS DIÁRIOS (SOMA DE TODAS AS MÁQUINAS: PLANEJADO vs PRODUZIDO EM KG) */}
-                        <div className="pcp-timeline-grid sticky bottom-0 z-30 shrink-0 bg-white/95 backdrop-blur-md border-t-2 border-orange-500 shadow-[0_-4px_20px_rgba(11,43,104,0.12)]">
+                        <div className="pcp-timeline-grid relative z-30 shrink-0 bg-white/95 backdrop-blur-md border-t-2 border-orange-500 shadow-[0_-4px_20px_rgba(11,43,104,0.12)]">
                             {/* Coluna 1: Indicador Geral e Resumo da Semana */}
-                            <div className="p-2 sm:p-2.5 flex flex-col justify-between border-r border-slate-200 border-l-4 border-l-orange-500 sticky left-0 z-40 bg-gradient-to-br from-[#092354] via-[#0C2B68] to-[#0A1F48] text-white shadow-md select-none">
-                                <div>
-                                    <div className="flex items-center justify-between gap-1 mb-1">
-                                        <span className="text-xs font-black tracking-wider uppercase text-white flex items-center gap-1.5">
-                                            <span>📊 TOTAIS (KG)</span>
-                                        </span>
-                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-500/30 text-orange-300 border border-orange-400/40">
-                                            Geral
-                                        </span>
-                                    </div>
-                                    <p className="text-[9px] text-blue-200/80 leading-tight">
-                                        Soma de todas as máquinas
-                                    </p>
+                            <div className="px-3 py-1 flex items-center justify-between border-r border-slate-700/60 border-l-4 border-l-orange-500 sticky left-0 z-40 bg-gradient-to-br from-[#092354] via-[#0C2B68] to-[#0A1F48] text-white shadow-md select-none min-h-[44px] overflow-hidden">
+                                <div className="flex flex-col justify-center min-w-0">
+                                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-white flex items-center gap-1 leading-none">
+                                        <span>📊 TOTAIS</span>
+                                    </span>
+                                    <span className="text-[9.5px] sm:text-[10px] font-mono text-blue-200/80 leading-tight mt-1 truncate">
+                                        {selectedMachinesFilter.length} Máquinas
+                                    </span>
                                 </div>
-
-                                {/* Resumo Semanal Acumulado */}
-                                <div className="bg-blue-950/80 rounded-lg p-1.5 border border-blue-400/20 my-1 flex flex-col gap-1">
-                                    <div className="flex items-center justify-between text-[9px]">
-                                        <span className="text-blue-300 font-bold uppercase">Plan. Semana:</span>
-                                        <span className="font-mono font-black text-white text-xs">
-                                            ~{weekDailyTotals.weekTotalPlannedKg.toLocaleString('pt-BR')} kg
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[9px]">
-                                        <span className="text-emerald-400 font-bold uppercase">Prod. Semana:</span>
-                                        <span className="font-mono font-black text-emerald-300 text-xs">
-                                            {weekDailyTotals.weekTotalProducedKg.toLocaleString('pt-BR')} kg
-                                        </span>
-                                    </div>
+                                
+                                <div className="flex flex-col items-end justify-center shrink-0">
                                     {weekDailyTotals.weekTotalPlannedKg > 0 && (
-                                        <div className="pt-1 border-t border-blue-800/60 flex items-center justify-between text-[8.5px]">
-                                            <span className="text-blue-200">Evolução:</span>
-                                            <span className="font-mono font-bold text-orange-300">
-                                                {weekDailyTotals.weekPercent}% da meta
-                                            </span>
+                                        <div className="flex items-center gap-1 font-mono leading-none mb-0.5">
+                                            <span className="text-[8.5px] uppercase font-bold text-slate-300">Meta:</span>
+                                            <span className="text-xs sm:text-sm font-black text-orange-400">{weekDailyTotals.weekPercent}%</span>
                                         </div>
                                     )}
-                                </div>
-
-                                <div className="text-[8px] text-blue-300/70 text-center font-mono">
-                                    {selectedMachinesFilter.length === availableMachines.length 
-                                        ? 'Todas as 4 máquinas' 
-                                        : `${selectedMachinesFilter.length} máquinas filtradas`}
+                                    <div className="text-[10px] sm:text-xs font-mono font-black text-emerald-300 leading-none">
+                                        {weekDailyTotals.weekTotalProducedKg.toLocaleString('pt-BR')} kg
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Colunas 2 a 6: Cada dia da semana (Segunda a Sexta) */}
+                            {/* Colunas 2 a 6: Cada dia da semana (Segunda a Sexta) - Prod e Plan em linha e com fontes ampliadas */}
                             {weekDailyTotals.days.map((d, index) => {
-                                const daysNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+                                const isEvenCol = index % 2 === 0;
                                 return (
                                     <div 
                                         key={index} 
-                                        className={`p-2 sm:p-2.5 flex flex-col justify-between border-l text-left transition-all select-none ${
+                                        className={`px-3 py-1 flex items-center justify-between border-l text-left transition-all select-none gap-2 min-h-[44px] ${
                                             d.isToday 
-                                                ? 'bg-blue-50/90 border-l-blue-500 shadow-inner' 
+                                                ? (isEvenCol
+                                                    ? 'bg-[#CBDDF2] border-l-blue-500 shadow-inner'
+                                                    : 'bg-blue-50/90 border-l-blue-500 shadow-inner') 
                                                 : d.isHoliday 
                                                     ? 'bg-rose-50/70 border-l-rose-300' 
-                                                    : 'bg-white border-l-slate-200'
+                                                    : isEvenCol
+                                                        ? 'bg-[#CBDDF2] border-l-slate-400/80'
+                                                        : 'bg-white border-l-slate-200'
                                         }`}
                                     >
-                                        {/* Topo do Card: Nome do Dia + Tag de Status */}
-                                        <div className="flex items-center justify-between gap-1 mb-1">
-                                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">
-                                                {daysNames[index]} {formatFriendlyDate(d.day)}
-                                            </span>
-                                            {d.isToday ? (
-                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-blue-600 text-white tracking-wider flex items-center gap-1 shadow-xs">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                                                    Hoje
-                                                </span>
-                                            ) : d.isHoliday ? (
-                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 tracking-wider">
-                                                    🌴 Feriado
-                                                </span>
-                                            ) : d.isPast ? (
-                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 tracking-wider">
-                                                    Realizado
-                                                </span>
-                                            ) : (
-                                                <span className="text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 tracking-wider">
-                                                    Previsto
-                                                </span>
-                                            )}
+                                        {/* Produzido */}
+                                        <div className="flex items-center gap-1.5 font-mono leading-none min-w-0">
+                                            <span className="text-[9.5px] sm:text-[10.5px] lg:text-xs text-slate-500 uppercase font-black shrink-0">PROD:</span>
+                                            <strong className={`text-sm sm:text-base lg:text-lg font-black tracking-tight truncate ${d.dayProducedKg > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                                {d.dayProducedKg > 0 ? `${d.dayProducedKg.toLocaleString('pt-BR')} kg` : d.isFuture ? '-' : '0 kg'}
+                                            </strong>
                                         </div>
 
-                                        {/* Valores: Produzido e Planejado */}
-                                        <div className="flex flex-col gap-1 my-0.5">
-                                            {/* Produzido */}
-                                            <div className="flex items-center justify-between gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200/80">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
-                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                                                    Produzido:
-                                                </span>
-                                                <div className="text-right">
-                                                    <span className={`text-xs sm:text-sm font-black font-mono tracking-tight ${
-                                                        d.dayProducedKg > 0 ? 'text-emerald-700' : 'text-slate-400'
-                                                    }`}>
-                                                        {d.dayProducedKg > 0 ? `${d.dayProducedKg.toLocaleString('pt-BR')} kg` : d.isFuture ? '-' : '0 kg'}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                        {/* Divisor vertical */}
+                                        <div className="h-5 w-px bg-slate-300 shrink-0" />
 
-                                            {/* Planejado */}
-                                            <div className="flex items-center justify-between gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200/80">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
-                                                    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                                                    Planejado:
-                                                </span>
-                                                <div className="text-right">
-                                                    <span className="text-xs sm:text-sm font-black font-mono text-blue-900 tracking-tight">
-                                                        {d.dayPlannedKg > 0 ? `~${d.dayPlannedKg.toLocaleString('pt-BR')} kg` : '-'}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                        {/* Programado / Planejado */}
+                                        <div className="flex items-center gap-1.5 font-mono leading-none min-w-0">
+                                            <span className="text-[9.5px] sm:text-[10.5px] lg:text-xs text-slate-500 uppercase font-black shrink-0">PLAN:</span>
+                                            <strong className="text-sm sm:text-base lg:text-lg font-black text-blue-950 tracking-tight truncate">
+                                                {d.dayPlannedKg > 0 ? `~${d.dayPlannedKg.toLocaleString('pt-BR')} kg` : '-'}
+                                            </strong>
                                         </div>
                                     </div>
                                 );
@@ -5911,7 +6329,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         </div>
                     </div>
                 </div>
-            </div>
 
             {/* ========================================================================= */}
             {/* MODAL 1: CRIAR NOVA ORDEM DIRETA NO PCP COM TODAS AS REGRAS DAS MÁQUINAS */}
@@ -9264,75 +9681,79 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <span>Restante: {Math.max(0, prog.target - prog.produced).toLocaleString('pt-BR')} {prog.unit}</span>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => handleOpenAdjustQuantity(drawerOP, { mode: 'total' })}
-                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
-                                        title="Ajustar quantidade produzida desta OP no PCP e sincronizar com o operador"
-                                    >
-                                        <span>✏️</span>
-                                        <span>Ajustar Quantidade Produzida (Gestor)</span>
-                                    </button>
+                                    {!isViewer && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenAdjustQuantity(drawerOP, { mode: 'total' })}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                                                title="Ajustar quantidade produzida desta OP no PCP e sincronizar com o operador"
+                                            >
+                                                <span>✏️</span>
+                                                <span>Ajustar Quantidade Produzida (Gestor)</span>
+                                            </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingInProgressOP(drawerOP)}
-                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
-                                        title="Editar OP em Produção (Nome, Meta, Turnos Finalizados)"
-                                    >
-                                        <PencilIcon className="w-4 h-4 text-orange-600" />
-                                        <span>Editar OP em Produção (Nome, Meta, Turnos)</span>
-                                    </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingInProgressOP(drawerOP)}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                                                title="Editar OP em Produção (Nome, Meta, Turnos Finalizados)"
+                                            >
+                                                <PencilIcon className="w-4 h-4 text-orange-600" />
+                                                <span>Editar OP em Produção (Nome, Meta, Turnos)</span>
+                                            </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const today = new Date();
-                                            setSelectedDailyReport({
-                                                op: drawerOP,
-                                                date: today,
-                                                dateStr: formatDateString(today),
-                                                dayName: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][today.getDay()],
-                                                produced: (drawerOP.actualProducedQuantity || drawerOP.actualProducedWeight || 0),
-                                                unit: (drawerOP.machine && drawerOP.machine.startsWith('Trefila')) ? 'kg' : 'pçs'
-                                            });
-                                        }}
-                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
-                                        title="Ver paradas e motivos por dia desta OP"
-                                    >
-                                        <span>🛑</span>
-                                        <span>Ver Paradas e Motivos (Por Dia)</span>
-                                    </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const today = new Date();
+                                                    setSelectedDailyReport({
+                                                        op: drawerOP,
+                                                        date: today,
+                                                        dateStr: formatDateString(today),
+                                                        dayName: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][today.getDay()],
+                                                        produced: (drawerOP.actualProducedQuantity || drawerOP.actualProducedWeight || 0),
+                                                        unit: (drawerOP.machine && drawerOP.machine.startsWith('Trefila')) ? 'kg' : 'pçs'
+                                                    });
+                                                }}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                                                title="Ver paradas e motivos por dia desta OP"
+                                            >
+                                                <span>🛑</span>
+                                                <span>Ver Paradas e Motivos (Por Dia)</span>
+                                            </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const today = new Date();
-                                            const dateStr = formatDateString(today);
-                                            const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
-                                            const todayStats = getOpDayStats(drawerOP, today, machine);
-                                            const cleanTarget = String(drawerOP.targetBitola || '').replace('mm', '').trim();
-                                            const isTrefilaMach = String(machine || '').toLowerCase().includes('trefila');
-                                            let opCode = drawerOP.productCode;
-                                            let opDesc = drawerOP.productDescription;
-                                            if (isTrefilaMach && (!opCode || !opDesc) && (cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || drawerOP.orderNumber === '87493')) {
-                                                opCode = opCode || '8624';
-                                                opDesc = opDesc || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
-                                            }
-                                            setOfficialReportModalData({
-                                                op: { ...drawerOP, productCode: opCode, productDescription: opDesc },
-                                                dateStr,
-                                                machine,
-                                                initialProduced: todayStats.produced,
-                                                initialOperator: todayStats.operatorName
-                                            });
-                                        }}
-                                        className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
-                                        title="Abrir Ficha Oficial de Produção Diária (Impressão e WhatsApp)"
-                                    >
-                                        <span>📄</span>
-                                        <span>Ficha Diária Oficial (A4 / WhatsApp)</span>
-                                    </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const today = new Date();
+                                                    const dateStr = formatDateString(today);
+                                                    const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
+                                                    const todayStats = getOpDayStats(drawerOP, today, machine);
+                                                    const cleanTarget = String(drawerOP.targetBitola || '').replace('mm', '').trim();
+                                                    const isTrefilaMach = String(machine || '').toLowerCase().includes('trefila');
+                                                    let opCode = drawerOP.productCode;
+                                                    let opDesc = drawerOP.productDescription;
+                                                    if (isTrefilaMach && (!opCode || !opDesc) && (cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || drawerOP.orderNumber === '87493')) {
+                                                        opCode = opCode || '8624';
+                                                        opDesc = opDesc || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
+                                                    }
+                                                    setOfficialReportModalData({
+                                                        op: { ...drawerOP, productCode: opCode, productDescription: opDesc },
+                                                        dateStr,
+                                                        machine,
+                                                        initialProduced: todayStats.produced,
+                                                        initialOperator: todayStats.operatorName
+                                                    });
+                                                }}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
+                                                title="Abrir Ficha Oficial de Produção Diária (Impressão e WhatsApp)"
+                                            >
+                                                <span>📄</span>
+                                                <span>Ficha Diária Oficial (A4 / WhatsApp)</span>
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             );
                         })()}

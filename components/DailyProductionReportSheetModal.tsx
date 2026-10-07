@@ -192,25 +192,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return match?.name || '';
     };
 
-    // Auto-preencher operador e auxiliar a partir da Gestão de Pessoas se ainda estiverem vazios
-    useEffect(() => {
-        if (loadedEmployees && loadedEmployees.length > 0) {
-            if (!assistantShiftA) {
-                const autoAux = findEmployeeByMachineAndRole(machine, 'auxiliar');
-                if (autoAux) {
-                    const full = getEmployeeForOperator(autoAux).name || autoAux;
-                    setAssistantShiftA(full);
-                }
-            }
-            if (!operatorShiftA) {
-                const autoOp = findEmployeeByMachineAndRole(machine, 'operador');
-                if (autoOp) {
-                    const full = getEmployeeForOperator(autoOp).name || autoOp;
-                    setOperatorShiftA(full);
-                }
-            }
-        }
-    }, [loadedEmployees, machine]);
+
 
     // Helper para buscar operador por nome ou identificador e retornar Nome Oficial e Foto
     const getEmployeeForOperator = (nameOrId?: string): { name: string; photoUrl?: string; initials: string } => {
@@ -350,6 +332,26 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     // Atualização de Produção (Pesagens)
     const [productionUpdates, setProductionUpdates] = useState<ProductionUpdateRow[]>([]);
 
+    // Auto-preencher operador e auxiliar a partir da Gestão de Pessoas se ainda estiverem vazios
+    useEffect(() => {
+        if (loadedEmployees && loadedEmployees.length > 0) {
+            if (!assistantShiftA) {
+                const autoAux = findEmployeeByMachineAndRole(machine, 'auxiliar');
+                if (autoAux) {
+                    const full = getEmployeeForOperator(autoAux).name || autoAux;
+                    setAssistantShiftA(full);
+                }
+            }
+            if (!operatorShiftA) {
+                const autoOp = findEmployeeByMachineAndRole(machine, 'operador');
+                if (autoOp) {
+                    const full = getEmployeeForOperator(autoOp).name || autoOp;
+                    setOperatorShiftA(full);
+                }
+            }
+        }
+    }, [loadedEmployees, machine, assistantShiftA, operatorShiftA]);
+
     // Refs
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reportIdRef = useRef<string | null>(null);
@@ -364,6 +366,48 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 4000);
+    };
+
+    // Helper para cálculo da carga horária líquida a partir do horário programado
+    const calculateShiftNetDuration = (
+        scheduleStr?: string, 
+        noLunch: boolean = false
+    ): { formattedStr: string; timeStr: string; totalSeconds: number } => {
+        if (!scheduleStr || !scheduleStr.includes('às')) {
+            return { formattedStr: '8h 48m', timeStr: '08:48:00', totalSeconds: 8 * 3600 + 48 * 60 };
+        }
+
+        const parts = scheduleStr.split('às').map(p => p.trim());
+        if (parts.length < 2) {
+            return { formattedStr: '8h 48m', timeStr: '08:48:00', totalSeconds: 8 * 3600 + 48 * 60 };
+        }
+
+        const [startH, startM] = parts[0].split(':').map(Number);
+        const [endH, endM] = parts[1].split(':').map(Number);
+
+        if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
+            return { formattedStr: '8h 48m', timeStr: '08:48:00', totalSeconds: 8 * 3600 + 48 * 60 };
+        }
+
+        let startTotalMin = startH * 60 + startM;
+        let endTotalMin = endH * 60 + endM;
+        if (endTotalMin < startTotalMin) {
+            endTotalMin += 24 * 60; // Cruzamento de meia-noite
+        }
+
+        const grossMin = endTotalMin - startTotalMin;
+        // Se a jornada for de tempo integral (>= 6 horas) e não for 'noLunch', desconta 1 hora de almoço (60 min)
+        const lunchDeductionMin = (!noLunch && grossMin >= 360) ? 60 : 0;
+        const netMin = Math.max(0, grossMin - lunchDeductionMin);
+
+        const netHours = Math.floor(netMin / 60);
+        const netMinutes = netMin % 60;
+
+        const formattedStr = `${netHours}h ${String(netMinutes).padStart(2, '0')}m`;
+        const timeStr = `${String(netHours).padStart(2, '0')}:${String(netMinutes).padStart(2, '0')}:00`;
+        const totalSeconds = netMin * 60;
+
+        return { formattedStr, timeStr, totalSeconds };
     };
 
     // Helpers de tempo
@@ -396,15 +440,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
     // Sanitização ativa: se horasTrabalhadas vier com valor desproporcional (> 11h, ex: 21:19:32 de operador que não encerrou no app)
     useEffect(() => {
-        const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
-        const defaultShiftA = isTrelica ? '08:48:00' : '09:48:00';
+        const netA = calculateShiftNetDuration(statsShiftA.horarioTurnoPrevisto, shiftCfg.noLunch);
+        const netB = calculateShiftNetDuration(statsShiftB.horarioTurnoPrevisto, shiftCfg.noLunch);
         if (timeToSeconds(statsShiftA.horasTrabalhadas) > 11 * 3600) {
-            setStatsShiftA(prev => ({ ...prev, horasTrabalhadas: defaultShiftA }));
+            setStatsShiftA(prev => ({ ...prev, horasTrabalhadas: netA.timeStr }));
         }
         if (timeToSeconds(statsShiftB.horasTrabalhadas) > 11 * 3600) {
-            setStatsShiftB(prev => ({ ...prev, horasTrabalhadas: isTrelica ? '08:48:00' : '09:00:00' }));
+            setStatsShiftB(prev => ({ ...prev, horasTrabalhadas: statsShiftB.horarioTurnoPrevisto ? netB.timeStr : '00:00:00' }));
         }
-    }, [machine, statsShiftA.horasTrabalhadas, statsShiftB.horasTrabalhadas]);
+    }, [machine, statsShiftA.horasTrabalhadas, statsShiftB.horasTrabalhadas, statsShiftA.horarioTurnoPrevisto, statsShiftB.horarioTurnoPrevisto, shiftCfg.noLunch]);
 
     // Formatação da Data
     const safeDateObj = useMemo(() => {
@@ -1633,9 +1677,76 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const schedEndB = resolvedCfg.shift2End || (isTrelica ? '23:36' : '23:59');
         const shiftScheduleStrB = `${schedStartB} às ${schedEndB}`;
 
-        // Carga horária programada do turno (ex: Treliça = 8h48 -> 08:48:00)
-        const shiftHoursA = isTrelica ? '08:48:00' : '09:48:00';
-        const shiftHoursB = hasRealTurnoB ? (isTrelica ? '08:48:00' : '09:00:00') : '00:00:00';
+        // Carga horária programada líquida do turno calculada dinamicamente a partir do horário e almoço
+        const netDurationA = calculateShiftNetDuration(shiftScheduleStrA, resolvedCfg.noLunch);
+        const shiftHoursA = netDurationA.timeStr;
+        const netDurationB = calculateShiftNetDuration(shiftScheduleStrB, resolvedCfg.noLunch);
+        const shiftHoursB = hasRealTurnoB ? netDurationB.timeStr : '00:00:00';
+
+        // Detecção de atraso de início do operador: se o turno começou às schedStartA (ex: 07:45)
+        // e o operador logou/iniciou às 07:52, inserir parada automática "AGUARDANDO OPERADOR INICIAR O TURNO"
+        const [schedH, schedM] = schedStartA.split(':').map(Number);
+        if (!isNaN(schedH) && !isNaN(schedM)) {
+            const schedMin = schedH * 60 + schedM;
+            let earliestActivityMin = Infinity;
+            let earliestActivityTimeStr = '';
+
+            // 1. Checar primeiro login do operador no dia
+            (productionOrders || []).concat(op ? [op] : []).forEach(o => {
+                const oMach = o.scheduledMachine || (o.machine as string);
+                const isSameMachine = oMach === machine || oMach?.toLowerCase() === machine.toLowerCase() || 
+                    (machine.toLowerCase().includes('trefila') && (oMach || '').toLowerCase().includes('trefila'));
+                if (isSameMachine) {
+                    (o.operatorLogs || []).forEach(l => {
+                        if (l.startTime && matchesDate(l.startTime, selectedDate)) {
+                            const d = new Date(l.startTime);
+                            const min = d.getHours() * 60 + d.getMinutes();
+                            if (min >= schedMin && min < earliestActivityMin) {
+                                earliestActivityMin = min;
+                                earliestActivityTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                            }
+                        }
+                    });
+                }
+            });
+
+            // 2. Checar paradas registradas
+            stopsListA.forEach(s => {
+                const [sH, sM] = (s.inicio || '').split(':').map(Number);
+                if (!isNaN(sH) && !isNaN(sM)) {
+                    const min = sH * 60 + sM;
+                    if (min >= schedMin && min < earliestActivityMin) {
+                        earliestActivityMin = min;
+                        earliestActivityTimeStr = s.inicio;
+                    }
+                }
+            });
+
+            // 3. Checar relatórios de turno
+            dayShiftReports.forEach(r => {
+                if (r.shiftStartTime && matchesDate(r.shiftStartTime, selectedDate)) {
+                    const d = new Date(r.shiftStartTime);
+                    const min = d.getHours() * 60 + d.getMinutes();
+                    if (min >= schedMin && min < earliestActivityMin) {
+                        earliestActivityMin = min;
+                        earliestActivityTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    }
+                }
+            });
+
+            // Se o primeiro evento ocorreu após o início do turno (atraso >= 1 min e <= 8 horas)
+            if (earliestActivityMin < Infinity && earliestActivityMin > schedMin && (earliestActivityMin - schedMin) <= 480) {
+                const hasStartStop = stopsListA.some(s => s.inicio === schedStartA);
+                if (!hasStartStop) {
+                    stopsListA.unshift({
+                        id: `auto-op-delay-start-${Date.now()}`,
+                        inicio: schedStartA,
+                        fim: earliestActivityTimeStr,
+                        motivo: 'AGUARDANDO OPERADOR INICIAR O TURNO'
+                    });
+                }
+            }
+        }
 
         const updates = isTrefila
             ? generateTrefilaProductionUpdates(op, stock, selectedDate)
@@ -1822,19 +1933,20 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 mergedStopsB.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftB(mergedStopsB);
                 const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
-                const defaultShiftA = isTrelica ? '08:48:00' : '09:48:00';
                 const defaultSchedA = isTrelica ? '05:00 às 14:48' : '07:45 às 17:33';
 
                 const rawStatsA = dbReport.stats_shift_a || {};
-                const workedSecA = timeToSeconds(rawStatsA.horasTrabalhadas || '');
-                // Sanitizar valores legados inválidos (> 11h como 21:19:32 de app esquecido aberto, 09:49:05 ou zero)
-                const horasTrabalhadasA = (workedSecA > 11 * 3600 || workedSecA === 0 || rawStatsA.horasTrabalhadas === '09:49:05' || (isTrelica && rawStatsA.horasTrabalhadas === '09:00:00'))
-                    ? defaultShiftA
-                    : (rawStatsA.horasTrabalhadas || defaultShiftA);
-
                 const horarioTurnoA = (rawStatsA.horarioTurnoPrevisto && rawStatsA.horarioTurnoPrevisto.includes('às'))
                     ? rawStatsA.horarioTurnoPrevisto
                     : defaultSchedA;
+                const netDurationA = calculateShiftNetDuration(horarioTurnoA, shiftCfg.noLunch);
+                const defaultShiftA = netDurationA.timeStr;
+
+                const workedSecA = timeToSeconds(rawStatsA.horasTrabalhadas || '');
+                // Sanitizar valores legados inválidos (> 11h como 21:19:32 de app esquecido aberto, 09:49:05, 09:48:00 com almoço não descontado ou zero)
+                const horasTrabalhadasA = (workedSecA > 11 * 3600 || workedSecA === 0 || rawStatsA.horasTrabalhadas === '09:49:05' || rawStatsA.horasTrabalhadas === '09:48:00' || (isTrelica && rawStatsA.horasTrabalhadas === '09:00:00'))
+                    ? defaultShiftA
+                    : (rawStatsA.horasTrabalhadas || defaultShiftA);
 
                 // Sincronização inteligente com a produção real do chão de fábrica:
                 let piecesAFromDb = (initialProduced !== undefined && initialProduced > 0)
@@ -1857,12 +1969,13 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 }
 
                 const defaultSchedB = isTrelica ? '14:48 às 23:36' : '14:00 às 23:59';
-                const defaultShiftB = isTrelica ? '08:48:00' : '09:00:00';
                 const workedSecB = timeToSeconds(rawStatsB.horasTrabalhadas || '');
                 const hasHoursB = workedSecB > 0 && workedSecB < 12 * 3600;
                 const horarioTurnoB = (rawStatsB.horarioTurnoPrevisto && rawStatsB.horarioTurnoPrevisto.includes('às'))
                     ? rawStatsB.horarioTurnoPrevisto
                     : (hasHoursB ? defaultSchedB : '');
+                const netDurationB = calculateShiftNetDuration(horarioTurnoB || defaultSchedB, shiftCfg.noLunch);
+                const defaultShiftB = netDurationB.timeStr;
 
                 const currentDesc = dbReport.product_description || op.trelicaModel || 'TRELIÇA';
                 const currentSize = resolvedTamanhoA;
@@ -2086,6 +2199,29 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 setReportId(data.id);
                 reportIdRef.current = data.id;
             }
+
+            // Sincronizar quantidade com shift_reports e production_orders
+            const totalPecasDay = (Number(safePecasA) || 0) + (Number(dataToSave.statsShiftB?.pecasProduzidas) || 0);
+            const matchingRep = (shiftReports || []).find(r => {
+                const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
+                if (!isThisOp) return false;
+                const repDate = r.date || (r.shiftStartTime ? String(r.shiftStartTime).split('T')[0] : '');
+                return repDate === targetDate;
+            });
+
+            if (matchingRep) {
+                try {
+                    const repUpdates: any = isTrefila 
+                        ? { totalProducedWeight: totalPecasDay } 
+                        : { totalProducedQuantity: totalPecasDay };
+                    await supabase.from('shift_reports').update(repUpdates).eq('id', matchingRep.id);
+                    if (isTrefila) (matchingRep as any).totalProducedWeight = totalPecasDay;
+                    else (matchingRep as any).totalProducedQuantity = totalPecasDay;
+                } catch (e) {
+                    console.warn('Erro ao atualizar shift_reports:', e);
+                }
+            }
+
             setSaveStatus('saved');
             if (showNotification) {
                 showToast('Relatório salvo no Banco de Dados com sucesso!', 'success');
@@ -2214,8 +2350,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const rawSecondsParadoA = computeIntervalSeconds(stopsShiftA);
         const rawSecondsParadoB = computeIntervalSeconds(stopsShiftB);
 
-        const totalWorkedA = timeToSeconds(statsShiftA.horasTrabalhadas) || 9 * 3600;
-        const totalWorkedB = timeToSeconds(statsShiftB.horasTrabalhadas) || 9 * 3600;
+        const netDurationA = calculateShiftNetDuration(statsShiftA.horarioTurnoPrevisto, shiftCfg.noLunch);
+        const totalWorkedA = timeToSeconds(statsShiftA.horasTrabalhadas) || netDurationA.totalSeconds;
+
+        const netDurationB = calculateShiftNetDuration(statsShiftB.horarioTurnoPrevisto, shiftCfg.noLunch);
+        const totalWorkedB = timeToSeconds(statsShiftB.horasTrabalhadas) || netDurationB.totalSeconds;
 
         const secondsParadoA = Math.min(rawSecondsParadoA, totalWorkedA);
         const percentParadoA = totalWorkedA > 0 ? (secondsParadoA / totalWorkedA) * 100 : 0;
@@ -3223,15 +3362,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <input 
                                                 type="text" 
                                                 value={statsShiftA.horarioTurnoPrevisto || (machine.toLowerCase().includes('treli') ? '05:00 às 14:48' : '07:45 às 17:33')} 
-                                                onChange={e => setStatsShiftA({ ...statsShiftA, horarioTurnoPrevisto: e.target.value })}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    const net = calculateShiftNetDuration(val, shiftCfg.noLunch);
+                                                    setStatsShiftA({ ...statsShiftA, horarioTurnoPrevisto: val, horasTrabalhadas: net.timeStr });
+                                                }}
                                                 className="modern-editable-input font-black text-xs text-slate-800 w-36 text-center border-b border-slate-300"
-                                                placeholder="05:00 às 14:48"
+                                                placeholder="07:45 às 17:33"
                                             />
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-[9.5px] font-bold text-slate-500 uppercase">Carga Horária:</span>
                                             <span className="text-[10px] font-black text-[#002060] bg-white px-2 py-0.5 rounded border border-slate-200">
-                                                {machine.toLowerCase().includes('treli') ? '8h 48m' : '9h 48m'}
+                                                {calculateShiftNetDuration(statsShiftA.horarioTurnoPrevisto || (machine.toLowerCase().includes('treli') ? '05:00 às 14:48' : '07:45 às 17:33'), shiftCfg.noLunch).formattedStr}
                                             </span>
                                         </div>
                                     </div>
@@ -3358,7 +3501,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <input 
                                                 type="text" 
                                                 value={statsShiftB.horarioTurnoPrevisto || (statsShiftB.horasTrabalhadas !== '00:00:00' ? (machine.toLowerCase().includes('treli') ? '14:48 às 23:36' : '14:00 às 23:59') : '')} 
-                                                onChange={e => setStatsShiftB({ ...statsShiftB, horarioTurnoPrevisto: e.target.value })}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    const net = calculateShiftNetDuration(val, shiftCfg.noLunch);
+                                                    setStatsShiftB({ ...statsShiftB, horarioTurnoPrevisto: val, horasTrabalhadas: val ? net.timeStr : '00:00:00' });
+                                                }}
                                                 className="modern-editable-input font-black text-xs text-slate-800 w-36 text-center border-b border-slate-300"
                                                 placeholder="14:48 às 23:36"
                                             />
@@ -3368,7 +3515,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                 <>
                                                     <span className="text-[9.5px] font-bold text-slate-500 uppercase">Carga Horária:</span>
                                                     <span className="text-[10px] font-black text-[#002060] bg-white px-2 py-0.5 rounded border border-slate-200">
-                                                        {machine.toLowerCase().includes('treli') ? '8h 48m' : '9h 00m'}
+                                                        {calculateShiftNetDuration(statsShiftB.horarioTurnoPrevisto || (machine.toLowerCase().includes('treli') ? '14:48 às 23:36' : '14:00 às 23:59'), shiftCfg.noLunch).formattedStr}
                                                     </span>
                                                 </>
                                             ) : (

@@ -42,7 +42,7 @@ import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
 import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption, fetchPcpShiftConfig } from './services/supabaseService';
-import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS, checkMachineShiftStatus } from './services/shiftConfigService';
+import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS, checkMachineShiftStatus, resolveMachineShiftConfig } from './services/shiftConfigService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 import { getDeviceId, getDeviceInfo, getFocusStatus, getPageFriendlyName } from './utils/deviceTracker';
 
@@ -2104,16 +2104,56 @@ const App: React.FC = () => {
             !event.resumeTime ? { ...event, resumeTime: now } : event
         );
 
+        // Se o operador estiver iniciando após o horário programado do turno (ex: turno 07:45, operador entrou 07:52),
+        // registrar evento de parada "Aguardando Operador Iniciar o Turno" cobrindo o intervalo 07:45 -> 07:52.
+        const nowDate = new Date(now);
+        const shiftCfg = resolveMachineShiftConfig(order.scheduledMachine || order.machine, pcpShiftConfig);
+        const workStart = shiftCfg.workStart || '07:45';
+        const [wH, wM] = workStart.split(':').map(Number);
+        
+        let delayedStartDowntime: DowntimeEvent | null = null;
+        if (!isNaN(wH) && !isNaN(wM)) {
+            const shiftStartDate = new Date(nowDate);
+            shiftStartDate.setHours(wH, wM, 0, 0);
+            
+            const diffMs = nowDate.getTime() - shiftStartDate.getTime();
+            const isToday = nowDate.toDateString() === shiftStartDate.toDateString();
+            
+            // Checar se já houve algum check-in de operador hoje nesta OP
+            const hadPriorCheckinToday = (order.operatorLogs || []).some(l => {
+                if (!l.startTime) return false;
+                const d = new Date(l.startTime);
+                return d.toDateString() === nowDate.toDateString() && d.getTime() < (shiftStartDate.getTime() + 60000);
+            });
+
+            if (isToday && diffMs >= 60000 && diffMs < 12 * 3600 * 1000 && !hadPriorCheckinToday) {
+                const hasExistingCoverage = (order.downtimeEvents || []).some(ev => {
+                    const st = ev.stopTime ? new Date(ev.stopTime).getTime() : 0;
+                    return Math.abs(st - shiftStartDate.getTime()) < 3 * 60000;
+                });
+                
+                if (!hasExistingCoverage) {
+                    delayedStartDowntime = {
+                        stopTime: shiftStartDate.toISOString(),
+                        resumeTime: now,
+                        reason: 'Aguardando Operador Iniciar o Turno'
+                    };
+                }
+            }
+        }
+
+        const baseEvents = delayedStartDowntime ? [delayedStartDowntime, ...closedEvents] : closedEvents;
+
         const updates: Partial<ProductionOrderData> = {
             operatorLogs: updatedLogs,
-            downtimeEvents: closedEvents,
+            downtimeEvents: baseEvents,
         };
 
         // For Trefila: if no active lot, add a prep event (machine needs setup)
         // NOTE: We do NOT add a stuck event for Treliça here - let the operators start directly
         if (order.machine.startsWith('Trefila') && (!order.activeLotProcessing || !order.activeLotProcessing.lotId)) {
             updates.downtimeEvents = [
-                ...closedEvents,
+                ...baseEvents,
                 {
                     stopTime: now,
                     resumeTime: null,
@@ -3526,8 +3566,8 @@ const App: React.FC = () => {
         }
     };
 
-    const isGestorUser = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
-    const isViewerUser = currentUser?.role === 'viewer' || (!isGestorUser && !!currentUser?.permissions?.pcpBoard && !currentUser?.permissions?.trelica && !currentUser?.permissions?.trefila && !currentUser?.permissions?.malha && !currentUser?.permissions?.stock);
+    const isViewerUser = currentUser?.role === 'viewer' || (currentUser?.role !== 'admin' && currentUser?.role !== 'gestor' && currentUser?.username?.toLowerCase() !== 'admin' && currentUser?.username?.toLowerCase() !== 'gestor' && !currentUser?.username?.toLowerCase().includes('matheusmiranda'));
+    const isGestorUser = !isViewerUser;
     const isPcpFocus = (page === 'pcpBoard' && (isPcpFullscreen || isViewerUser));
 
     return (
