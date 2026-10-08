@@ -353,8 +353,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
-    const [selectedDailyReport, setSelectedDailyReport] = useState<{ op: ProductionOrderData, date: Date, dateStr: string, dayName: string, produced: number, unit: string } | null>(null);
-    const [officialReportModalData, setOfficialReportModalData] = useState<{ op: ProductionOrderData; dateStr: string; machine: string; initialProduced?: number; initialOperator?: string } | null>(null);
+    const [selectedDailyReport, setSelectedDailyReport] = useState<{ op: ProductionOrderData, date: Date, dateStr: string, dayName: string, produced: number, unit: string, dayStats?: any } | null>(null);
+    const [officialReportModalData, setOfficialReportModalData] = useState<{ op: ProductionOrderData; dateStr: string; machine: string; initialProduced?: number; initialOperator?: string; initialDayStats?: any } | null>(null);
 
     type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
     const [trelicaModels, setTrelicaModels] = useState<TrelicaModel[]>(() => {
@@ -5968,7 +5968,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                 dateStr: formatDateString(currentDay),
                                                                                 dayName: dayColName,
                                                                                 produced: dayStats.produced,
-                                                                                unit: dayStats.unit
+                                                                                unit: dayStats.unit,
+                                                                                dayStats
                                                                             });
                                                                         }}
                                                                         className={`[container-type:inline-size] flex items-center justify-between p-1 sm:p-1.5 rounded-lg border text-left transition-all select-none h-full min-h-0 overflow-hidden ${
@@ -9750,13 +9751,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 type="button"
                                                 onClick={() => {
                                                     const today = new Date();
+                                                    const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
+                                                    const todayStats = getOpDayStats(drawerOP, today, machine);
                                                     setSelectedDailyReport({
                                                         op: drawerOP,
                                                         date: today,
                                                         dateStr: formatDateString(today),
                                                         dayName: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][today.getDay()],
-                                                        produced: (drawerOP.actualProducedQuantity || drawerOP.actualProducedWeight || 0),
-                                                        unit: (drawerOP.machine && drawerOP.machine.startsWith('Trefila')) ? 'kg' : 'pçs'
+                                                        produced: todayStats.produced,
+                                                        unit: (drawerOP.machine && drawerOP.machine.startsWith('Trefila')) ? 'kg' : 'pçs',
+                                                        dayStats: todayStats
                                                     });
                                                 }}
                                                 className="mt-2 w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
@@ -9786,7 +9790,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         dateStr,
                                                         machine,
                                                         initialProduced: todayStats.produced,
-                                                        initialOperator: todayStats.operatorName
+                                                        initialOperator: todayStats.operatorName,
+                                                        initialDayStats: todayStats
                                                     });
                                                 }}
                                                 className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
@@ -10908,6 +10913,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     gauges={gauges}
                     employees={employees}
                     users={users}
+                    getOpDayStats={getOpDayStats}
                 />
             )}
 
@@ -10923,6 +10929,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     productionOrders={productionOrders}
                     initialProduced={officialReportModalData.initialProduced}
                     initialOperator={officialReportModalData.initialOperator}
+                    initialDayStats={officialReportModalData.initialDayStats}
                     shiftConfig={shiftConfig}
                     stock={stock}
                     gauges={gauges}
@@ -11059,6 +11066,7 @@ interface DailyDowntimeReportModalProps {
         dayName: string;
         produced: number;
         unit: string;
+        dayStats?: any;
     };
     onClose: () => void;
     weekDays: Date[];
@@ -11069,6 +11077,7 @@ interface DailyDowntimeReportModalProps {
     gauges?: StockGauge[];
     employees?: Employee[];
     users?: User[];
+    getOpDayStats?: (op: ProductionOrderData, date: Date, machName: string) => any;
 }
 
 const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
@@ -11081,7 +11090,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     stock = [],
     gauges = [],
     employees = [],
-    users = []
+    users = [],
+    getOpDayStats
 }) => {
     const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
     const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
@@ -11352,17 +11362,40 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     const activeLabel = selectedDateStr === 'ALL' ? 'Todas as Paradas da OP' : (selectedTab?.label || selectedDateStr);
 
     const targetReportDateStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
+    const machName = activeOp.scheduledMachine || (activeOp.machine as string) || 'Malha 1';
+
+    // Obter estatísticas dinâmicas fiéis do PCP para o dia ativo (Ritmo, Ciclo, Efetivo, Paradas, Produção)
+    const activeDayStats = useMemo(() => {
+        if (getOpDayStats && targetReportDateStr) {
+            const targetDate = new Date(targetReportDateStr + 'T12:00:00');
+            return getOpDayStats(activeOp, targetDate, machName);
+        }
+        return targetReportDateStr === data.dateStr ? data.dayStats : undefined;
+    }, [getOpDayStats, activeOp, targetReportDateStr, machName, data.dateStr, data.dayStats]);
 
     // Calcular produção e operador para a data ativa na Ficha Oficial
     const { dayProduced, dayOperator } = useMemo(() => {
         let produced = 0;
         let operatorName = '';
 
-        // 1. ShiftReports correspondentes a esta OP e data
-        const opReports = (shiftReports || []).filter(r => 
+        // 1. ShiftReports correspondentes a esta OP e data (Deduplicados)
+        const opReportsRaw = (shiftReports || []).filter(r => 
             (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
             (r.date === targetReportDateStr || parseDateOnly(r.shiftStartTime || r.shiftEndTime) === targetReportDateStr)
         );
+        const opReportsMap = new Map<string, ShiftReport>();
+        opReportsRaw.forEach(r => {
+            const shiftKey = `${(r.shift || '').toLowerCase().trim()}_${(r.operator || '').toLowerCase().trim()}`;
+            if (!opReportsMap.has(shiftKey)) {
+                opReportsMap.set(shiftKey, r);
+            } else {
+                const ex = opReportsMap.get(shiftKey)!;
+                if (Number(r.totalProducedQuantity || r.totalProducedWeight || 0) > Number(ex.totalProducedQuantity || ex.totalProducedWeight || 0)) {
+                    opReportsMap.set(shiftKey, r);
+                }
+            }
+        });
+        const opReports = Array.from(opReportsMap.values());
 
         opReports.forEach(r => {
             if (!operatorName && r.operator) operatorName = r.operator;
@@ -11370,7 +11403,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         });
 
         // 2. Lotes processados se for Trefila (somente lotes pesados/finalizados)
-        const isTrefilaMach = (activeOp.scheduledMachine || activeOp.machine || '').toLowerCase().includes('trefila');
+        const isTrefilaMach = machName.toLowerCase().includes('trefila');
         if (isTrefilaMach) {
             const pLots = activeOp.processedLots || (activeOp as any).processed_lots || [];
             let lotWeight = 0;
@@ -11400,16 +11433,28 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             if (produced === 0) {
                 if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
                     produced += Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+                } else if (!l.endTime && l.startQuantity !== undefined) {
+                    const currentTotal = isTrefilaMach 
+                        ? Number(activeOp.actualProducedWeight || 0) 
+                        : Number(activeOp.actualProducedQuantity || 0);
+                    produced += Math.max(0, currentTotal - Number(l.startQuantity));
                 }
             }
         });
 
-        // 4. Se a data bater com data.dateStr e produced ainda for 0, usar data.produced
-        if (targetReportDateStr === data.dateStr && (produced === 0 || !produced)) {
+        // 4. Se houver activeDayStats fiel calculado pelo PCP para esta data, priorizar
+        if (activeDayStats?.produced !== undefined && activeDayStats.produced > 0) {
+            produced = activeDayStats.produced;
+        } else if (targetReportDateStr === data.dateStr && data.produced > 0) {
+            produced = data.produced;
+        } else if (targetReportDateStr === data.dateStr && (produced === 0 || !produced)) {
             produced = data.produced || 0;
         }
 
-        // 6. Operador fallback das paradas ou da OP
+        // 5. Operador fallback das paradas, de activeDayStats ou da OP
+        if (!operatorName && activeDayStats?.operatorName) {
+            operatorName = activeDayStats.operatorName;
+        }
         if (!operatorName) {
             const stopWithOp = allStops.find(s => s.dateStr === targetReportDateStr && s.operator);
             if (stopWithOp) operatorName = stopWithOp.operator!;
@@ -11419,7 +11464,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         }
 
         return { dayProduced: produced, dayOperator: operatorName };
-    }, [activeOp, targetReportDateStr, shiftReports, allStops, data.dateStr, data.produced]);
+    }, [activeOp, targetReportDateStr, shiftReports, allStops, data.dateStr, data.produced, machName, activeDayStats]);
 
     return (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[140] p-3 sm:p-4 animate-fade" onClick={onClose}>
@@ -11542,7 +11587,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                             </button>
                         </div>
                         <span className="text-lg font-black text-[#00E5FF] font-mono mt-0.5">
-                            {data.dateStr === selectedDateStr ? data.produced.toLocaleString('pt-BR') : '-'} <span className="text-xs font-bold text-[#00E5FF]/70">{data.unit}</span>
+                            {(activeDayStats?.produced !== undefined ? activeDayStats.produced : (dayProduced > 0 ? dayProduced : (data.dateStr === selectedDateStr ? data.produced : 0))).toLocaleString('pt-BR')} <span className="text-xs font-bold text-[#00E5FF]/70">{data.unit}</span>
                         </span>
                     </div>
                 </div>
@@ -11876,8 +11921,9 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     }}
                     shiftReports={shiftReports}
                     productionOrders={productionOrders}
-                    initialProduced={dayProduced > 0 ? dayProduced : (selectedDateStr === data.dateStr ? data.produced : undefined)}
-                    initialOperator={dayOperator}
+                    initialProduced={activeDayStats?.produced !== undefined && activeDayStats.produced > 0 ? activeDayStats.produced : (dayProduced > 0 ? dayProduced : (targetReportDateStr === data.dateStr ? data.produced : undefined))}
+                    initialOperator={activeDayStats?.operatorName || dayOperator}
+                    initialDayStats={activeDayStats || (targetReportDateStr === data.dateStr ? data.dayStats : undefined)}
                     shiftConfig={shiftConfig}
                     stock={stock}
                     gauges={gauges}

@@ -355,6 +355,25 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
         const velocidadeMinutoA = secondsEfetivoA > 0 ? (metrosProduzidosA / (secondsEfetivoA / 60)) : 0;
         const velocidadeMinutoB = secondsEfetivoB > 0 ? (metrosProduzidosB / (secondsEfetivoB / 60)) : 0;
 
+        // Produtividade / Ritmo por hora
+        const totalWorkedHoursA = totalWorkedA > 0 ? (totalWorkedA / 3600) : 0;
+        const ratePerHourA = (totalWorkedHoursA >= 0.16 && statsShiftA.pecasProduzidas > 0)
+            ? Math.round(statsShiftA.pecasProduzidas / totalWorkedHoursA)
+            : 0;
+        const ratePerHourStrA = ratePerHourA > 0 ? `${ratePerHourA.toLocaleString('pt-BR')} pçs/h` : '0 pçs/h';
+        const cycleTimeSecondsA = (statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0)
+            ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas)
+            : 0;
+
+        const totalWorkedHoursB = totalWorkedB > 0 ? (totalWorkedB / 3600) : 0;
+        const ratePerHourB = (totalWorkedHoursB >= 0.16 && statsShiftB.pecasProduzidas > 0)
+            ? Math.round(statsShiftB.pecasProduzidas / totalWorkedHoursB)
+            : 0;
+        const ratePerHourStrB = ratePerHourB > 0 ? `${ratePerHourB.toLocaleString('pt-BR')} pçs/h` : '0 pçs/h';
+        const cycleTimeSecondsB = (statsShiftB.pecasProduzidas > 0 && secondsEfetivoB > 0)
+            ? Math.round(secondsEfetivoB / statsShiftB.pecasProduzidas)
+            : 0;
+
         // Soma total das peças
         const totalPecasProduzidas = statsShiftA.pecasProduzidas + statsShiftB.pecasProduzidas;
 
@@ -375,6 +394,9 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                 percentEfetivo: percentEfetivoA.toFixed(1).replace('.', ','),
                 metrosProduzidos: metrosProduzidosA,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsA)),
+                cycleTimeSeconds: cycleTimeSecondsA,
+                ratePerHour: ratePerHourA,
+                ratePerHourStr: ratePerHourStrA,
                 velocidadeStr: `${velocidadeMinutoA.toFixed(1).replace('.', ',')} metros/ minuto`
             },
             turnoB: {
@@ -384,6 +406,9 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                 percentEfetivo: percentEfetivoB.toFixed(1).replace('.', ','),
                 metrosProduzidos: metrosProduzidosB,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsB)),
+                cycleTimeSeconds: cycleTimeSecondsB,
+                ratePerHour: ratePerHourB,
+                ratePerHourStr: ratePerHourStrB,
                 velocidadeStr: `${velocidadeMinutoB.toFixed(1).replace('.', ',')} metros/ minuto`
             }
         };
@@ -1635,13 +1660,30 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                     </div>
                                     <span className="text-sm font-black text-slate-950">{statsShiftA.pecasProduzidas * statsShiftA.tamanhoPeca} metros</span>
                                 </div>
-                                {/* Tempo por Peça */}
-                                <div className="flex items-center justify-between py-2.5">
+                                {/* Ritmo de Produção */}
+                                <div className="flex items-center justify-between py-2.5 bg-blue-50/40 px-1 rounded">
                                     <div className="flex items-center gap-2">
-                                        <ClockIcon className="h-4 w-4 text-slate-400" />
-                                        <span className="text-sm font-extrabold text-slate-700">Tempo por peça (médio)</span>
+                                        <span className="text-sm leading-none">🚀</span>
+                                        <span className="text-sm font-black text-blue-900 uppercase tracking-tight">Ritmo de Produção</span>
                                     </div>
-                                    <span className="text-sm font-black text-slate-950">{calculatedData.turnoA.tempoPorPecaStr}</span>
+                                    <span className="text-sm font-black text-blue-950 font-mono">
+                                        {calculatedData.turnoA.ratePerHourStr}
+                                    </span>
+                                </div>
+                                {/* Tempo por Peça (Ciclo) */}
+                                <div className="flex items-center justify-between py-2.5 bg-amber-50/40 px-1 rounded">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm leading-none">⚡</span>
+                                        <span className="text-sm font-black text-amber-900 uppercase tracking-tight">Tempo por peça (Ciclo)</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 font-mono text-sm font-black text-amber-950">
+                                        <span>{calculatedData.turnoA.cycleTimeSeconds > 0 ? `${calculatedData.turnoA.cycleTimeSeconds} s/pç` : calculatedData.turnoA.tempoPorPecaStr}</span>
+                                        {calculatedData.turnoA.cycleTimeSeconds > 0 && (
+                                            <span className="text-xs font-semibold text-slate-500 font-sans">
+                                                ({calculatedData.turnoA.tempoPorPecaStr})
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 {/* Velocidade */}
                                 <div className="flex items-center justify-between py-2.5">
@@ -1754,13 +1796,30 @@ const ReportsMalha: React.FC<ReportsMalhaProps> = ({ stock, setPage }) => {
                                     </div>
                                     <span className="text-sm font-black text-slate-950">{statsShiftB.pecasProduzidas * statsShiftB.tamanhoPeca} metros</span>
                                 </div>
-                                {/* Tempo por Peça */}
-                                <div className="flex items-center justify-between py-2.5">
+                                {/* Ritmo de Produção */}
+                                <div className="flex items-center justify-between py-2.5 bg-blue-50/40 px-1 rounded">
                                     <div className="flex items-center gap-2">
-                                        <ClockIcon className="h-4 w-4 text-slate-400" />
-                                        <span className="text-sm font-extrabold text-slate-700">Tempo por peça (médio)</span>
+                                        <span className="text-sm leading-none">🚀</span>
+                                        <span className="text-sm font-black text-blue-900 uppercase tracking-tight">Ritmo de Produção</span>
                                     </div>
-                                    <span className="text-sm font-black text-slate-950">{calculatedData.turnoB.tempoPorPecaStr}</span>
+                                    <span className="text-sm font-black text-blue-950 font-mono">
+                                        {calculatedData.turnoB.ratePerHourStr}
+                                    </span>
+                                </div>
+                                {/* Tempo por Peça (Ciclo) */}
+                                <div className="flex items-center justify-between py-2.5 bg-amber-50/40 px-1 rounded">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm leading-none">⚡</span>
+                                        <span className="text-sm font-black text-amber-900 uppercase tracking-tight">Tempo por peça (Ciclo)</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 font-mono text-sm font-black text-amber-950">
+                                        <span>{calculatedData.turnoB.cycleTimeSeconds > 0 ? `${calculatedData.turnoB.cycleTimeSeconds} s/pç` : calculatedData.turnoB.tempoPorPecaStr}</span>
+                                        {calculatedData.turnoB.cycleTimeSeconds > 0 && (
+                                            <span className="text-xs font-semibold text-slate-500 font-sans">
+                                                ({calculatedData.turnoB.tempoPorPecaStr})
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 {/* Velocidade */}
                                 <div className="flex items-center justify-between py-2.5">

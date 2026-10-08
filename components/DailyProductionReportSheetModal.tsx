@@ -16,6 +16,17 @@ export interface DailyProductionReportSheetModalProps {
     productionOrders?: ProductionOrderData[];
     initialProduced?: number;
     initialOperator?: string;
+    initialDayStats?: {
+        effectiveFormatted?: string;
+        downtimeFormatted?: string;
+        effectiveMs?: number;
+        downtimeMs?: number;
+        ratePerHour?: number;
+        rateUnit?: string;
+        speedValue?: number;
+        speedFormatted?: string;
+        speedUnit?: string;
+    };
     shiftConfig?: any;
     stock?: StockItem[];
     gauges?: StockGauge[];
@@ -106,6 +117,66 @@ const RulerIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
     </svg>
 );
 
+const getLocalDateString = (val: any): string => {
+    if (!val) return '';
+    if (typeof val === 'string') {
+        const raw = val.trim();
+        // Se já for formato YYYY-MM-DD puro (sem hora)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            return raw;
+        }
+        // Se for formato DD/MM/YYYY
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+            const parts = raw.split('/');
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+    }
+    try {
+        const dt = new Date(val);
+        if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    } catch {
+        return String(val).split('T')[0] || '';
+    }
+};
+
+const parseTimeToSeconds = (val?: string | number): number => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') {
+        return val > 100000 ? Math.round(val / 1000) : Math.round(val);
+    }
+    const s = String(val).trim();
+    if (!s) return 0;
+    // Formato "2h42:08", "2h42", "2h 42min" ou "7h31"
+    if (s.includes('h')) {
+        const parts = s.split('h');
+        const h = parseInt(parts[0], 10) || 0;
+        const rest = parts[1] || '';
+        if (rest.includes(':')) {
+            const [mStr, secStr] = rest.split(':');
+            const m = parseInt(mStr, 10) || 0;
+            const sec = parseInt(secStr, 10) || 0;
+            return h * 3600 + m * 60 + sec;
+        } else if (rest.includes('min')) {
+            const m = parseInt(rest.replace('min', ''), 10) || 0;
+            return h * 3600 + m * 60;
+        } else {
+            const m = parseInt(rest, 10) || 0;
+            return h * 3600 + m * 60;
+        }
+    }
+    // Formato "02:42:08" ou "21:02"
+    if (s.includes(':')) {
+        const parts = s.split(':').map(Number);
+        if (parts.length === 3) return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+        if (parts.length === 2) return (parts[0] || 0) * 60 + (parts[1] || 0);
+    }
+    return 0;
+};
+
 export const DailyProductionReportSheetModal: React.FC<DailyProductionReportSheetModalProps> = ({
     isOpen,
     onClose,
@@ -116,6 +187,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     productionOrders = [],
     initialProduced,
     initialOperator,
+    initialDayStats,
     shiftConfig,
     stock = [],
     gauges = [],
@@ -129,6 +201,31 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         if (raw.toLowerCase().includes('treliça') || raw.toLowerCase().includes('trelica')) return 'Treliça 1';
         return raw;
     }, [initialMachine, op]);
+
+    // Deduplicação defensiva de relatórios de turno para evitar duplicação ou contagem dupla
+    const cleanShiftReports = useMemo(() => {
+        const map = new Map<string, ShiftReport>();
+        (shiftReports || []).forEach(r => {
+            const d = getLocalDateString(r.date || r.shiftStartTime || r.shiftEndTime) || '';
+            const m = (r.machine || '').toLowerCase().trim();
+            const opName = (r.operator || '').toLowerCase().trim();
+            const s = (r.shift || '').toLowerCase().trim();
+            const ord = String(r.productionOrderId || r.orderNumber || '').trim();
+            const key = `${m}_${ord}_${d}_${s}_${opName}`;
+            
+            if (!map.has(key)) {
+                map.set(key, r);
+            } else {
+                const existing = map.get(key)!;
+                const existQ = Number(existing.totalProducedQuantity || existing.totalProducedWeight || 0);
+                const newQ = Number(r.totalProducedQuantity || r.totalProducedWeight || 0);
+                if (newQ > existQ) {
+                    map.set(key, r);
+                }
+            }
+        });
+        return Array.from(map.values());
+    }, [shiftReports]);
 
     const isTrefila = useMemo(() => {
         const m = (machine || '').toLowerCase();
@@ -527,32 +624,6 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return isTrelicaMach ? 12 : 6;
     };
 
-    const getLocalDateString = (val: any): string => {
-        if (!val) return '';
-        if (typeof val === 'string') {
-            const raw = val.trim();
-            // Se já for formato YYYY-MM-DD puro (sem hora)
-            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-                return raw;
-            }
-            // Se for formato DD/MM/YYYY
-            if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-                const parts = raw.split('/');
-                return `${parts[2]}-${parts[1]}-${parts[0]}`;
-            }
-        }
-        try {
-            const dt = new Date(val);
-            if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
-            const y = dt.getFullYear();
-            const m = String(dt.getMonth() + 1).padStart(2, '0');
-            const d = String(dt.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        } catch {
-            return String(val).split('T')[0] || '';
-        }
-    };
-
     const matchesDate = (val: any, target: string): boolean => {
         if (!val || !target) return false;
         const targetClean = String(target).trim();
@@ -686,10 +757,23 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     ): ProductionUpdateRow[] => {
         const dayMap = new Map<string, number>();
 
-        // 1. Dos Shift Reports
+        // 1. Dos Shift Reports (Deduplicados)
+        const repMap = new Map<string, ShiftReport>();
         (reports || []).forEach(r => {
             const isThisOp = r.productionOrderId === targetOp.id || r.orderNumber === targetOp.orderNumber;
             if (!isThisOp) return;
+            const d = getLocalDateString(r.date || r.shiftStartTime || r.shiftEndTime) || '';
+            const key = `${d}_${(r.shift || '').toLowerCase().trim()}_${(r.operator || '').toLowerCase().trim()}`;
+            if (!repMap.has(key)) {
+                repMap.set(key, r);
+            } else {
+                const ex = repMap.get(key)!;
+                if ((Number(r.totalProducedQuantity || 0)) > (Number(ex.totalProducedQuantity || 0))) {
+                    repMap.set(key, r);
+                }
+            }
+        });
+        repMap.forEach(r => {
             const d = getLocalDateString(r.date || r.shiftStartTime || r.shiftEndTime);
             const q = Number(r.totalProducedQuantity || 0);
             if (d && q > 0) {
@@ -697,7 +781,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         });
 
-        // 2. Dos Operator Logs
+        // 2. Dos Operator Logs (Ground truth fiel de medidores de máquina)
         (targetOp.operatorLogs || []).forEach((l: any) => {
             const s = getLocalDateString(l.startTime);
             const e = getLocalDateString(l.endTime);
@@ -712,10 +796,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
 
             if (diff > 0) {
-                const current = dayMap.get(d) || 0;
-                if (current === 0 || diff > current) {
-                    dayMap.set(d, diff);
-                }
+                dayMap.set(d, diff);
             }
         });
 
@@ -728,6 +809,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 dayMap.set(d, q);
             }
         });
+
+        // 4. Se initialProduced estiver definido para a data de corte/selecionada, fixar o valor exato do card
+        if (initialProduced && initialProduced > 0 && upToDateStr) {
+            dayMap.set(upToDateStr, initialProduced);
+        }
 
         const sortedDates = [...dayMap.keys()].filter(d => !upToDateStr || d <= upToDateStr).sort();
 
@@ -1398,8 +1484,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const targetQ = op.quantityToProduce || op.targetQuantity || (isTrefila ? 10000 : 4500);
         const defaultSize = resolvePieceSize(op, prodDesc);
 
-        // 1. Relatórios de Turno desta OP nesta data específica
-        const dayShiftReports = shiftReports.filter(r => {
+        // 1. Relatórios de Turno desta OP nesta data específica (deduplicados)
+        const dayShiftReports = cleanShiftReports.filter(r => {
             const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
             if (!isThisOp) return false;
             return matchesDate(r.date, selectedDate) || 
@@ -1453,9 +1539,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
         // 3. Sincronizar com initialProduced calculado pelo PCP (garante paridade exata)
         if (initialProduced !== undefined && initialProduced > 0) {
-            if (piecesA === 0 || piecesA < initialProduced) {
-                piecesA = initialProduced;
-            }
+            piecesA = initialProduced;
         }
 
         // Para Trefila, sincronizar com peso produzido
@@ -1734,8 +1818,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 }
             });
 
-            // Se o primeiro evento ocorreu após o início do turno (atraso >= 1 min e <= 8 horas)
-            if (earliestActivityMin < Infinity && earliestActivityMin > schedMin && (earliestActivityMin - schedMin) <= 480) {
+            // Apenas registra atraso de início se NÃO houver paradas reais já registradas pela máquina/operador
+            if (stopsListA.length === 0 && earliestActivityMin < Infinity && earliestActivityMin > schedMin && (earliestActivityMin - schedMin) <= 480) {
                 const hasStartStop = stopsListA.some(s => s.inicio === schedStartA);
                 if (!hasStartStop) {
                     stopsListA.unshift({
@@ -1750,7 +1834,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
         const updates = isTrefila
             ? generateTrefilaProductionUpdates(op, stock, selectedDate)
-            : generateProductionUpdatesHistory(op, shiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate);
+            : generateProductionUpdatesHistory(op, cleanShiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate);
 
         // Se for Trefila e piecesA for 0, somar do updates do dia selecionado
         if (isTrefila && piecesA === 0) {
@@ -1982,7 +2066,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const theoreticalUnitWeight = getTheoreticalWeightPerPiece(currentDesc, currentSize);
                 const autoHistory = isTrefila
                     ? generateTrefilaProductionUpdates(op, stock, targetDate)
-                    : generateProductionUpdatesHistory(op, shiftReports, theoreticalUnitWeight, targetDate);
+                    : generateProductionUpdatesHistory(op, cleanShiftReports, theoreticalUnitWeight, targetDate);
 
                 const hasValidDbUpdates = (dbReport.production_updates && dbReport.production_updates.length > 0) &&
                     (!isTrefila || dbReport.production_updates.some((u: any) => Boolean(u.lote) || Number(u.kgEntrada) > 0 || Number(u.saida) > 0 || Number(u.peso) > 0));
@@ -2356,10 +2440,32 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const netDurationB = calculateShiftNetDuration(statsShiftB.horarioTurnoPrevisto, shiftCfg.noLunch);
         const totalWorkedB = timeToSeconds(statsShiftB.horasTrabalhadas) || netDurationB.totalSeconds;
 
-        const secondsParadoA = Math.min(rawSecondsParadoA, totalWorkedA);
-        const percentParadoA = totalWorkedA > 0 ? (secondsParadoA / totalWorkedA) * 100 : 0;
-        const secondsEfetivoA = Math.max(0, totalWorkedA - secondsParadoA);
-        const percentEfetivoA = totalWorkedA > 0 ? (secondsEfetivoA / totalWorkedA) * 100 : 0;
+        // Priorizar dados operacionais fiéis vindos do PCP (initialDayStats)
+        const statsEffectiveSecsA = initialDayStats?.effectiveMs 
+            ? Math.round(initialDayStats.effectiveMs / 1000) 
+            : parseTimeToSeconds(initialDayStats?.effectiveFormatted);
+
+        const statsDowntimeSecsA = initialDayStats?.downtimeMs 
+            ? Math.round(initialDayStats.downtimeMs / 1000) 
+            : parseTimeToSeconds(initialDayStats?.downtimeFormatted);
+
+        // Tempo Parado (Turno A)
+        const secondsParadoA = (statsDowntimeSecsA > 0) 
+            ? statsDowntimeSecsA 
+            : Math.min(rawSecondsParadoA, totalWorkedA);
+
+        // Tempo Efetivo (Turno A)
+        const secondsEfetivoA = (statsEffectiveSecsA > 0) 
+            ? statsEffectiveSecsA 
+            : Math.max(0, totalWorkedA - secondsParadoA);
+
+        // Tempo total do turno decorrido / contabilizado
+        const totalElapsedA = (statsEffectiveSecsA > 0)
+            ? Math.max(secondsEfetivoA + secondsParadoA, 1)
+            : totalWorkedA;
+
+        const percentParadoA = totalElapsedA > 0 ? (secondsParadoA / totalElapsedA) * 100 : 0;
+        const percentEfetivoA = totalElapsedA > 0 ? (secondsEfetivoA / totalElapsedA) * 100 : 0;
 
         const secondsParadoB = Math.min(rawSecondsParadoB, totalWorkedB);
         const percentParadoB = totalWorkedB > 0 ? (secondsParadoB / totalWorkedB) * 100 : 0;
@@ -2388,6 +2494,52 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const velocidadeMinutoA = secondsEfetivoA > 0 ? (metrosProduzidosA / (secondsEfetivoA / 60)) : 0;
         const velocidadeMinutoB = secondsEfetivoB > 0 ? (metrosProduzidosB / (secondsEfetivoB / 60)) : 0;
 
+        // Produtividade / Ritmo por hora
+        const totalWorkedHoursA = totalElapsedA > 0 ? (totalElapsedA / 3600) : (totalWorkedA / 3600);
+        const ratePerHourA = (initialDayStats?.ratePerHour && initialDayStats.ratePerHour > 0)
+            ? initialDayStats.ratePerHour
+            : ((totalWorkedHoursA >= 0.16 && statsShiftA.pecasProduzidas > 0)
+                ? Math.round(statsShiftA.pecasProduzidas / totalWorkedHoursA)
+                : 0);
+        const rateUnitA = initialDayStats?.rateUnit || (isTrefila ? 'kg/h' : 'pçs/h');
+        const ratePerHourStrA = ratePerHourA > 0 ? `${ratePerHourA.toLocaleString('pt-BR')} ${rateUnitA}` : `0 ${rateUnitA}`;
+
+        const cycleTimeSecondsA = (initialDayStats?.speedUnit === 's/pç' && initialDayStats?.speedValue && initialDayStats.speedValue > 0)
+            ? Math.round(initialDayStats.speedValue)
+            : ((!isTrefila && statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0)
+                ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas)
+                : 0);
+
+        let velocidadeStrA = '';
+        if (isTrefila) {
+            const mPerSec = (initialDayStats?.speedUnit === 'm/s' && initialDayStats?.speedFormatted) 
+                ? initialDayStats.speedFormatted 
+                : (secondsEfetivoA > 0 ? (metrosProduzidosA / secondsEfetivoA).toFixed(1).replace('.', ',') : '0,0');
+            velocidadeStrA = `${mPerSec} m/s`;
+        } else if (isMalha) {
+            const secPerPc = (initialDayStats?.speedUnit === 's/pç' && initialDayStats?.speedFormatted)
+                ? initialDayStats.speedFormatted
+                : (statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0 ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas) : 0);
+            velocidadeStrA = `${secPerPc} s/pç`;
+        } else {
+            // Treliça
+            const mPerMin = (initialDayStats?.speedUnit === 'm/min' && initialDayStats?.speedFormatted)
+                ? initialDayStats.speedFormatted
+                : (velocidadeMinutoA > 0 ? velocidadeMinutoA.toFixed(1).replace('.', ',') : '0,0');
+            velocidadeStrA = `${mPerMin} metros/ minuto`;
+        }
+
+        const totalWorkedHoursB = totalWorkedB > 0 ? (totalWorkedB / 3600) : 0;
+        const ratePerHourB = (totalWorkedHoursB >= 0.16 && statsShiftB.pecasProduzidas > 0)
+            ? Math.round(statsShiftB.pecasProduzidas / totalWorkedHoursB)
+            : 0;
+        const rateUnitB = isTrefila ? 'kg/h' : 'pçs/h';
+        const ratePerHourStrB = ratePerHourB > 0 ? `${ratePerHourB.toLocaleString('pt-BR')} ${rateUnitB}` : `0 ${rateUnitB}`;
+
+        const cycleTimeSecondsB = (!isTrefila && statsShiftB.pecasProduzidas > 0 && secondsEfetivoB > 0)
+            ? Math.round(secondsEfetivoB / statsShiftB.pecasProduzidas)
+            : 0;
+
         const totalPecasProduzidas = hasSecondShift
             ? (statsShiftA.pecasProduzidas + statsShiftB.pecasProduzidas)
             : statsShiftA.pecasProduzidas;
@@ -2408,7 +2560,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 percentEfetivo: percentEfetivoA.toFixed(1).replace('.', ','),
                 metrosProduzidos: metrosProduzidosA,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsA)),
-                velocidadeStr: `${velocidadeMinutoA.toFixed(1).replace('.', ',')} metros/ minuto`
+                cycleTimeSeconds: cycleTimeSecondsA,
+                ratePerHour: ratePerHourA,
+                rateUnit: rateUnitA,
+                ratePerHourStr: ratePerHourStrA,
+                velocidadeStr: velocidadeStrA
             },
             turnoB: {
                 tempoParadoStr: secondsToTime(secondsParadoB),
@@ -2417,10 +2573,14 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 percentEfetivo: percentEfetivoB.toFixed(1).replace('.', ','),
                 metrosProduzidos: metrosProduzidosB,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsB)),
+                cycleTimeSeconds: cycleTimeSecondsB,
+                ratePerHour: ratePerHourB,
+                rateUnit: rateUnitB,
+                ratePerHourStr: ratePerHourStrB,
                 velocidadeStr: `${velocidadeMinutoB.toFixed(1).replace('.', ',')} metros/ minuto`
             }
         };
-    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift, isTrefila, op.targetBitola]);
+    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift, isTrefila, op.targetBitola, initialDayStats]);
 
     // AÇÃO 1: IMPRESSÃO LIMPA EM FOLHA A4
     const handlePrint = () => {
@@ -3448,16 +3608,33 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <RulerIcon className="h-4 w-4 text-slate-400" />
                                             <span className="text-sm font-extrabold text-slate-700">Quantidade de metros produzidos</span>
                                         </div>
-                                        <span className="text-sm font-black text-slate-950">{calculatedData.turnoA.metrosProduzidos} metros</span>
+                                        <span className="text-sm font-black text-slate-950">{calculatedData.turnoA.metrosProduzidos.toLocaleString('pt-BR')} metros</span>
                                     </div>
-                                    {/* Tempo por Peça (Apenas para máquinas com peças/treliças) */}
+                                    {/* Ritmo de Produção Real */}
+                                    <div className="flex items-center justify-between py-2.5 bg-blue-50/40 px-1 rounded">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm leading-none">🚀</span>
+                                            <span className="text-sm font-black text-blue-900 uppercase tracking-tight">Ritmo de Produção</span>
+                                        </div>
+                                        <span className="text-sm font-black text-blue-950 font-mono">
+                                            {calculatedData.turnoA.ratePerHourStr}
+                                        </span>
+                                    </div>
+                                    {/* Tempo por Peça (Ciclo) */}
                                     {!isTrefila && (
-                                        <div className="flex items-center justify-between py-2.5">
+                                        <div className="flex items-center justify-between py-2.5 bg-amber-50/40 px-1 rounded">
                                             <div className="flex items-center gap-2">
-                                                <ClockIcon className="h-4 w-4 text-slate-400" />
-                                                <span className="text-sm font-extrabold text-slate-700">Tempo por peça (médio)</span>
+                                                <span className="text-sm leading-none">⚡</span>
+                                                <span className="text-sm font-black text-amber-900 uppercase tracking-tight">Tempo por peça (Ciclo)</span>
                                             </div>
-                                            <span className="text-sm font-black text-slate-950">{calculatedData.turnoA.tempoPorPecaStr}</span>
+                                            <div className="flex items-center gap-1.5 font-mono text-sm font-black text-amber-950">
+                                                <span>{calculatedData.turnoA.cycleTimeSeconds > 0 ? `${calculatedData.turnoA.cycleTimeSeconds} s/pç` : calculatedData.turnoA.tempoPorPecaStr}</span>
+                                                {calculatedData.turnoA.cycleTimeSeconds > 0 && (
+                                                    <span className="text-xs font-semibold text-slate-500 font-sans">
+                                                        ({calculatedData.turnoA.tempoPorPecaStr})
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                     {/* Velocidade */}
@@ -3595,16 +3772,33 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <RulerIcon className="h-4 w-4 text-slate-400" />
                                             <span className="text-sm font-extrabold text-slate-700">Quantidade de metros produzidos</span>
                                         </div>
-                                        <span className="text-sm font-black text-slate-950">{calculatedData.turnoB.metrosProduzidos} metros</span>
+                                        <span className="text-sm font-black text-slate-950">{calculatedData.turnoB.metrosProduzidos.toLocaleString('pt-BR')} metros</span>
                                     </div>
-                                    {/* Tempo por Peça (Apenas para máquinas com peças/treliças) */}
+                                    {/* Ritmo de Produção Real */}
+                                    <div className="flex items-center justify-between py-2.5 bg-blue-50/40 px-1 rounded">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm leading-none">🚀</span>
+                                            <span className="text-sm font-black text-blue-900 uppercase tracking-tight">Ritmo de Produção</span>
+                                        </div>
+                                        <span className="text-sm font-black text-blue-950 font-mono">
+                                            {calculatedData.turnoB.ratePerHourStr}
+                                        </span>
+                                    </div>
+                                    {/* Tempo por Peça (Ciclo) */}
                                     {!isTrefila && (
-                                        <div className="flex items-center justify-between py-2.5">
+                                        <div className="flex items-center justify-between py-2.5 bg-amber-50/40 px-1 rounded">
                                             <div className="flex items-center gap-2">
-                                                <ClockIcon className="h-4 w-4 text-slate-400" />
-                                                <span className="text-sm font-extrabold text-slate-700">Tempo por peça (médio)</span>
+                                                <span className="text-sm leading-none">⚡</span>
+                                                <span className="text-sm font-black text-amber-900 uppercase tracking-tight">Tempo por peça (Ciclo)</span>
                                             </div>
-                                            <span className="text-sm font-black text-slate-950">{calculatedData.turnoB.tempoPorPecaStr}</span>
+                                            <div className="flex items-center gap-1.5 font-mono text-sm font-black text-amber-950">
+                                                <span>{calculatedData.turnoB.cycleTimeSeconds > 0 ? `${calculatedData.turnoB.cycleTimeSeconds} s/pç` : calculatedData.turnoB.tempoPorPecaStr}</span>
+                                                {calculatedData.turnoB.cycleTimeSeconds > 0 && (
+                                                    <span className="text-xs font-semibold text-slate-500 font-sans">
+                                                        ({calculatedData.turnoB.tempoPorPecaStr})
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                     {/* Velocidade */}
