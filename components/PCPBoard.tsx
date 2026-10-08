@@ -257,6 +257,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const isViewer = currentUser?.role === 'viewer' || (currentUser?.role !== 'admin' && currentUser?.role !== 'gestor' && currentUser?.username?.toLowerCase() !== 'admin' && currentUser?.username?.toLowerCase() !== 'gestor' && !currentUser?.username?.toLowerCase().includes('matheusmiranda'));
     const isGestor = !isViewer;
 
+    // Identifica se o usuário possui parametrização específica de máquinas no cadastro (ex: Compras com TR 1, TL 1, TL 2, ML 1)
+    const hasCustomMachines = Boolean(
+        currentUser?.allowedMachines && 
+        Array.isArray(currentUser.allowedMachines) && 
+        currentUser.allowedMachines.length > 0 && 
+        currentUser.allowedMachines.length < MACHINES.length
+    );
+
+    // Quando for perfil Somente PCP (viewer) ou usuário com máquinas selecionadas/restritas pelo gestor:
+    // A barra de seleção superior de máquinas é ocultada e o quadro exibe exatamente as máquinas atribuídas
+    const isPcpRestrictedAccess = Boolean(isViewer || hasCustomMachines);
+
     // Estado de cabeçalho minimizado/expandido (persistido)
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(() => {
         return localStorage.getItem('pcp_header_collapsed') === 'true';
@@ -438,16 +450,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (!userAllowed || !Array.isArray(userAllowed) || userAllowed.length === 0) {
             return MACHINES;
         }
-        const filtered = MACHINES.filter(m => userAllowed.includes(m.name));
+        const filtered = MACHINES.filter(m => {
+            return userAllowed.includes(m.name) ||
+                   (m.name === 'Trefila 1' && (userAllowed.includes('TR 1') || userAllowed.includes('trefila1'))) ||
+                   (m.name === 'Trefila 2' && (userAllowed.includes('TR 2') || userAllowed.includes('trefila2'))) ||
+                   (m.name === 'Treliça 1' && (userAllowed.includes('TL 1') || userAllowed.includes('trelica1'))) ||
+                   (m.name === 'Treliça 2' && (userAllowed.includes('TL 2') || userAllowed.includes('trelica2'))) ||
+                   (m.name === 'Malha 1' && (userAllowed.includes('ML 1') || userAllowed.includes('malha1')));
+        });
         return filtered.length > 0 ? filtered : MACHINES;
     }, [currentUser?.allowedMachines]);
 
-    // Filtro de máquinas visíveis (com persistência no localStorage filtrado pelas permitidas)
+    // Filtro de máquinas visíveis (com persistência no localStorage apenas para acesso normal)
     const [selectedMachinesFilter, setSelectedMachinesFilter] = useState<string[]>(() => {
-        const userAllowed = currentUser?.allowedMachines;
-        const allowedNames = (userAllowed && Array.isArray(userAllowed) && userAllowed.length > 0)
-            ? MACHINES.filter(m => userAllowed.includes(m.name)).map(m => m.name)
-            : MACHINES.map(m => m.name);
+        const allowedNames = availableMachines.map(m => m.name);
+        if (isPcpRestrictedAccess) {
+            return allowedNames;
+        }
         try {
             const saved = localStorage.getItem('pcp_selected_machines_filter');
             if (saved) {
@@ -461,21 +480,27 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return allowedNames;
     });
 
-    // Sincronizar filtro quando availableMachines mudar
+    // Sincronizar filtro quando availableMachines ou permissão mudar
     useEffect(() => {
         const allowedNames = availableMachines.map(m => m.name);
+        if (isPcpRestrictedAccess) {
+            setSelectedMachinesFilter(allowedNames);
+            return;
+        }
         setSelectedMachinesFilter(prev => {
             const valid = prev.filter(m => allowedNames.includes(m));
             return valid.length > 0 ? valid : allowedNames;
         });
-    }, [availableMachines]);
+    }, [availableMachines, isPcpRestrictedAccess]);
 
-    // Salvar filtro de máquinas sempre que alterado
+    // Salvar filtro de máquinas apenas no acesso normal (evita interferência no perfil visualizador/restrito)
     useEffect(() => {
-        try {
-            localStorage.setItem('pcp_selected_machines_filter', JSON.stringify(selectedMachinesFilter));
-        } catch {}
-    }, [selectedMachinesFilter]);
+        if (!isPcpRestrictedAccess) {
+            try {
+                localStorage.setItem('pcp_selected_machines_filter', JSON.stringify(selectedMachinesFilter));
+            } catch {}
+        }
+    }, [selectedMachinesFilter, isPcpRestrictedAccess]);
 
     // Relógio em tempo real para os cronômetros das máquinas e paradas (atualiza a cada 1 segundo)
     const [liveNow, setLiveNow] = useState<Date>(new Date());
@@ -4851,57 +4876,59 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             </button>
                         </div>
 
-                        {/* Seletor de Máquinas */}
-                        <div className="flex items-center gap-1 bg-blue-950/70 p-1 rounded-xl border border-blue-400/30 overflow-hidden shadow-inner">
-                            {/* Botão Todas as Máquinas */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSelectedMachinesFilter(availableMachines.map(m => m.name));
-                                }}
-                                className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${
-                                    selectedMachinesFilter.length === availableMachines.length
-                                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
-                                        : 'text-blue-300 hover:text-white hover:bg-blue-800/50 border border-transparent'
-                                }`}
-                                title="Exibir todas as máquinas permitidas no quadro PCP"
-                            >
-                                Todas
-                            </button>
+                        {/* Seletor de Máquinas (Oculto em acesso restrito / Somente PCP, exibido em acesso normal) */}
+                        {!isPcpRestrictedAccess && (
+                            <div className="flex items-center gap-1 bg-blue-950/70 p-1 rounded-xl border border-blue-400/30 overflow-hidden shadow-inner">
+                                {/* Botão Todas as Máquinas */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedMachinesFilter(availableMachines.map(m => m.name));
+                                    }}
+                                    className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${
+                                        selectedMachinesFilter.length === availableMachines.length
+                                            ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
+                                            : 'text-blue-300 hover:text-white hover:bg-blue-800/50 border border-transparent'
+                                    }`}
+                                    title="Exibir todas as máquinas permitidas no quadro PCP"
+                                >
+                                    Todas
+                                </button>
 
-                            {availableMachines.map(mach => {
-                                const isSelected = selectedMachinesFilter.includes(mach.name);
-                                const isAllSelected = selectedMachinesFilter.length === availableMachines.length;
-                                
-                                return (
-                                    <button
-                                        key={mach.name}
-                                        type="button"
-                                        onClick={() => {
-                                            if (isAllSelected) {
-                                                setSelectedMachinesFilter([mach.name]);
-                                            } else if (isSelected) {
-                                                if (selectedMachinesFilter.length > 1) {
-                                                    setSelectedMachinesFilter(prev => prev.filter(m => m !== mach.name));
+                                {availableMachines.map(mach => {
+                                    const isSelected = selectedMachinesFilter.includes(mach.name);
+                                    const isAllSelected = selectedMachinesFilter.length === availableMachines.length;
+                                    
+                                    return (
+                                        <button
+                                            key={mach.name}
+                                            type="button"
+                                            onClick={() => {
+                                                if (isAllSelected) {
+                                                    setSelectedMachinesFilter([mach.name]);
+                                                } else if (isSelected) {
+                                                    if (selectedMachinesFilter.length > 1) {
+                                                        setSelectedMachinesFilter(prev => prev.filter(m => m !== mach.name));
+                                                    } else {
+                                                        setSelectedMachinesFilter(availableMachines.map(m => m.name));
+                                                    }
                                                 } else {
-                                                    setSelectedMachinesFilter(availableMachines.map(m => m.name));
+                                                    setSelectedMachinesFilter(prev => [...prev, mach.name]);
                                                 }
-                                            } else {
-                                                setSelectedMachinesFilter(prev => [...prev, mach.name]);
-                                            }
-                                        }}
-                                        className={`px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap border ${
-                                            isSelected 
-                                                ? 'bg-white text-blue-950 border-white shadow-sm font-black' 
-                                                : 'text-blue-300 hover:text-white hover:bg-blue-800/40 border-transparent'
-                                        }`}
-                                        title={`Filtrar ${mach.name} (clique para alternar)`}
-                                    >
-                                        {mach.name.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                                            }}
+                                            className={`px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap border ${
+                                                isSelected 
+                                                    ? 'bg-white text-blue-950 border-white shadow-sm font-black' 
+                                                    : 'text-blue-300 hover:text-white hover:bg-blue-800/40 border-transparent'
+                                            }`}
+                                            title={`Filtrar ${mach.name} (clique para alternar)`}
+                                        >
+                                            {mach.name.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         {/* Botão Tela Cheia / Foco Total */}
                         <button
