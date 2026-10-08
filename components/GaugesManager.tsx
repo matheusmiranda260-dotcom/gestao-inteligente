@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { StockGauge, MaterialType } from '../types';
 import { MaterialOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges, DefaultAmarrilGauges } from '../types';
 import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon, SearchIcon } from './icons';
+import { supabase } from '../supabaseClient';
 
 interface GaugesManagerProps {
     gauges: StockGauge[];
@@ -77,6 +78,49 @@ const removeTrelicaFromCache = (code?: string, modelo?: string, tamanho?: string
         localStorage.setItem('cached_trelica_models', JSON.stringify(list));
     } catch (err) {
         console.warn('Erro ao remover do cache de treliças:', err);
+    }
+};
+
+const syncTrelicaModelToSupabase = async (modelData: any) => {
+    try {
+        const payload = {
+            cod: modelData.cod || String(Date.now()),
+            modelo: modelData.modelo,
+            tamanho: modelData.tamanho || '12',
+            superior: modelData.superior || '5,6',
+            inferior: modelData.inferior || '3,2',
+            senozoide: modelData.senozoide || '3,2',
+            peso_final: modelData.peso_final || modelData.pesoFinal || '5,502',
+            peso_superior: modelData.peso_superior || modelData.pesoSuperior || '',
+            peso_inferior: modelData.peso_inferior || modelData.pesoInferior || '',
+            peso_senozoide: modelData.peso_senozoide || modelData.pesoSenozoide || ''
+        };
+
+        const { data: existing } = await supabase
+            .from('trelica_models')
+            .select('id')
+            .or(`cod.eq."${payload.cod}",and(modelo.eq."${payload.modelo}",tamanho.eq."${payload.tamanho}")`)
+            .limit(1);
+
+        if (existing && existing.length > 0) {
+            await supabase.from('trelica_models').update(payload).eq('id', existing[0].id);
+        } else {
+            await supabase.from('trelica_models').insert([payload]);
+        }
+    } catch (err) {
+        console.warn('Erro ao sincronizar trelica no Supabase trelica_models:', err);
+    }
+};
+
+const removeTrelicaFromSupabase = async (code?: string, modelo?: string, tamanho?: string) => {
+    try {
+        if (code) {
+            await supabase.from('trelica_models').delete().eq('cod', code);
+        } else if (modelo && tamanho) {
+            await supabase.from('trelica_models').delete().eq('modelo', modelo).eq('tamanho', tamanho);
+        }
+    } catch (err) {
+        console.warn('Erro ao remover do Supabase trelica_models:', err);
     }
 };
 
@@ -342,7 +386,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
 
             if (existingTrelica) {
                 onUpdate(existingTrelica.id, newTrelica);
-                syncTrelicaModelToCache({
+                const syncData = {
                     cod: code,
                     modelo: modelo,
                     tamanho: tamanho,
@@ -357,7 +401,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                     pesoSuperior: calculated?.pesoSuperior || '',
                     pesoInferior: calculated?.pesoInferior || '',
                     pesoSenozoide: calculated?.pesoSenozoide || ''
-                });
+                };
+                syncTrelicaModelToCache(syncData);
+                syncTrelicaModelToSupabase(syncData);
                 setTrModelo('');
                 setTrSuperior('5,6');
                 setTrInferior('3,2');
@@ -369,7 +415,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
 
             onAdd(newTrelica);
 
-            syncTrelicaModelToCache({
+            const syncData = {
                 cod: code,
                 modelo: modelo,
                 tamanho: tamanho,
@@ -384,7 +430,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                 pesoSuperior: calculated?.pesoSuperior || '',
                 pesoInferior: calculated?.pesoInferior || '',
                 pesoSenozoide: calculated?.pesoSenozoide || ''
-            });
+            };
+            syncTrelicaModelToCache(syncData);
+            syncTrelicaModelToSupabase(syncData);
 
             setTrModelo('');
             setTrSuperior('5,6');
@@ -1682,6 +1730,7 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                         onDelete(g.id);
                                                                         if (isItemTrelica) {
                                                                             removeTrelicaFromCache(g.productCode, g.description, g.tamanho);
+                                                                            removeTrelicaFromSupabase(g.productCode, g.description, g.tamanho);
                                                                         }
                                                                     }
                                                                 }}

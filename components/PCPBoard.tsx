@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftReport, MachineType, Bitola, DowntimeConfig, Employee, PcpShiftConfig, PcpHoliday, TrelicaSpoolStand } from '../types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, DefaultMalhaGauges } from '../types';
-import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
+import { DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
 import { 
     fetchPcpShiftConfig, 
@@ -374,40 +374,37 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             const saved = localStorage.getItem('cached_trelica_models');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return buildMergedTrelicaModels([], gauges, parsed);
+                }
             }
         } catch (e) {}
-        return DEFAULT_TRELICA_MODELS;
+        return buildMergedTrelicaModels([], gauges, DEFAULT_TRELICA_MODELS);
     });
 
     useEffect(() => {
         const loadModels = async () => {
             try {
+                let cached: any[] = [];
                 const saved = localStorage.getItem('cached_trelica_models');
                 if (saved) {
                     try {
                         const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed) && parsed.length > 0) setTrelicaModels(parsed);
+                        if (Array.isArray(parsed) && parsed.length > 0) cached = parsed;
                     } catch (e) {}
                 }
                 const { data, error } = await supabase.from('trelica_models').select('*');
-                if (data && data.length > 0) {
-                    const mapped = data.map(m => ({
-                        ...m,
-                        pesoFinal: m.peso_final,
-                        pesoSuperior: m.peso_superior,
-                        pesoSenozoide: m.peso_senozoide,
-                        pesoInferior: m.peso_inferior
-                    }));
-                    setTrelicaModels(mapped);
-                    localStorage.setItem('cached_trelica_models', JSON.stringify(mapped));
-                }
+                const merged = buildMergedTrelicaModels(data || [], gauges, cached);
+                setTrelicaModels(merged);
+                localStorage.setItem('cached_trelica_models', JSON.stringify(merged));
             } catch (err) {
                 console.error("Failed to load models", err);
+                const merged = buildMergedTrelicaModels([], gauges, []);
+                setTrelicaModels(merged);
             }
         };
         loadModels();
-    }, []);
+    }, [gauges]);
 
 
     const handleToggleFullscreen = () => {
@@ -1782,7 +1779,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // Modelo de Treliça Selecionado
     const selectedTrelicaModel = useMemo(() => {
         return trelicaModels.find(m => m.cod === selectedTrelicaCod) || trelicaModels[0];
-    }, [selectedTrelicaCod]);
+    }, [selectedTrelicaCod, trelicaModels]);
 
     const [trelicaQuantity, setTrelicaQuantity] = useState<number>(3500);
     const [isTrelicaGhostOrder, setIsTrelicaGhostOrder] = useState<boolean>(false);
@@ -3249,7 +3246,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 allSenozoideRight: trelicaSenozoideRightLots,
             };
 
-            const unitPieceWeight = parseFloat(selectedTrelicaModel.pesoFinal.replace(',', '.')) || 0;
+            const unitPieceWeight = parseFloat(String(selectedTrelicaModel.pesoFinal || selectedTrelicaModel.peso_final || '0').replace(',', '.')) || 0;
 
             orderData.productCode = selectedTrelicaModel.cod;
             orderData.productDescription = selectedTrelicaModel.modelo;

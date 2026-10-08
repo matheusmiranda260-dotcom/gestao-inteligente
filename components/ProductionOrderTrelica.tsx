@@ -5,8 +5,8 @@ import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, Chec
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
-import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
-export { trelicaModels, DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
+import { DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels } from '../utils/trelicaModelsData';
+export { trelicaModels, DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
 
 const getWeightPerMeter = (d: string) => {
@@ -192,40 +192,37 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             const saved = localStorage.getItem('cached_trelica_models');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return buildMergedTrelicaModels([], gauges, parsed);
+                }
             }
         } catch (e) {}
-        return DEFAULT_TRELICA_MODELS;
+        return buildMergedTrelicaModels([], gauges, DEFAULT_TRELICA_MODELS);
     });
 
     useEffect(() => {
         const loadModels = async () => {
             try {
+                let cached: any[] = [];
                 const saved = localStorage.getItem('cached_trelica_models');
                 if (saved) {
                     try {
                         const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed) && parsed.length > 0) setAvailableModels(parsed);
+                        if (Array.isArray(parsed) && parsed.length > 0) cached = parsed;
                     } catch (e) {}
                 }
                 const { data, error } = await supabase.from('trelica_models').select('*');
-                if (data && data.length > 0) {
-                    const mapped = data.map(m => ({
-                        ...m,
-                        pesoFinal: m.peso_final,
-                        pesoSuperior: m.peso_superior,
-                        pesoSenozoide: m.peso_senozoide,
-                        pesoInferior: m.peso_inferior
-                    }));
-                    setAvailableModels(mapped);
-                    localStorage.setItem('cached_trelica_models', JSON.stringify(mapped));
-                }
+                const mapped = buildMergedTrelicaModels(data || [], gauges, cached);
+                setAvailableModels(mapped);
+                localStorage.setItem('cached_trelica_models', JSON.stringify(mapped));
             } catch (err) {
                 console.error("Failed to load models", err);
+                const mapped = buildMergedTrelicaModels([], gauges, []);
+                setAvailableModels(mapped);
             }
         };
         loadModels();
-    }, []);
+    }, [gauges]);
 
     const [orderNumber, setOrderNumber] = useState('');
     const [selectedMachine, setSelectedMachine] = useState<MachineType>('Treliça 1');
