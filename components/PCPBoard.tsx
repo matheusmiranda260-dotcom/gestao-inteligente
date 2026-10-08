@@ -262,6 +262,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return localStorage.getItem('pcp_header_collapsed') === 'true';
     });
 
+    // Limpeza de chaves legadas de relatório diário no localStorage que causavam divergência entre computadores
+    useEffect(() => {
+        try {
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('daily_report_')) {
+                    keysToRemove.push(k);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch {}
+    }, []);
+
     // Zoom inteligente: Ativo em Tela Cheia ou no Modo Visualizador (sem barras laterais) para máxima visibilidade
     const isLargeZoom = Boolean(isPcpFullscreen || isViewer);
     const isFullscreenZoom = Boolean(isPcpFullscreen);
@@ -3671,21 +3685,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
         const unit = isTrelica || isMalha ? 'pçs' : 'kg';
 
-        // 0. Ficha de Produção Diária salva (se houver alteração explícita salva na folha diária ou ajuste manual)
+        // 0. Ficha de Produção Diária (não lê do localStorage para evitar divergência entre computadores)
         let dailyReportPieces: number | null = null;
         let dailyReportOp: string = '';
-        try {
-            const rawDaily = localStorage.getItem(`daily_report_${machName}_${dateStr}`);
-            if (rawDaily) {
-                const parsed = JSON.parse(rawDaily);
-                const qA = Number(parsed.stats_shift_a?.pecasProduzidas);
-                const qB = Number(parsed.stats_shift_b?.pecasProduzidas);
-                if (!isNaN(qA) && qA >= 0) {
-                    dailyReportPieces = qA + (!isNaN(qB) && qB > 0 ? qB : 0);
-                    dailyReportOp = parsed.operator_shift_a || '';
-                }
-            }
-        } catch {}
 
         // 1. Relatórios de Turno desta OP nesta data específica (ou hoje/fim de semana)
         const matchingReports = (shiftReports || []).filter(r => {
@@ -3697,48 +3699,63 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const reportsDayQty = matchingReports.reduce((acc, r) => acc + (isTrefila ? (Number(r.totalProducedWeight) || 0) : (Number(r.totalProducedQuantity) || 0)), 0);
         const reportOperators = [...new Set(matchingReports.map(r => r.operator).filter(Boolean))].map(formatShortName).join(', ');
 
+        // Extração defensiva de coleções suportando camelCase e snake_case do Supabase
+        const rawLots: any[] = op.processedLots || (op as any).processed_lots || [];
+        const rawPackages: any[] = op.weighedPackages || (op as any).weighed_packages || [];
+        const rawLogs: any[] = op.operatorLogs || (op as any).operator_logs || [];
+
         // 2. Lotes processados e PESADOS finalizados nesta data (Trefila)
-        const dayLotsWeight = (op.processedLots || []).reduce((acc: number, l: any) => {
-            if (l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight))) return acc;
-            const lotDate = getIsoDateStr(l.endTime || l.startTime);
+        const dayLotsWeight = rawLots.reduce((acc: number, l: any) => {
+            const w = l.finalWeight !== undefined && l.finalWeight !== null 
+                ? Number(l.finalWeight) 
+                : (l.final_weight !== undefined && l.final_weight !== null ? Number(l.final_weight) : null);
+            if (w === null || isNaN(w)) return acc;
+            const rawTime = l.endTime || l.end_time || l.startTime || l.start_time || l.weighedAt || l.timestamp;
+            const lotDate = getIsoDateStr(rawTime);
             if (lotDate === dateStr || (isEvaluatingActiveMonday && (lotDate === saturdayStr || lotDate === sundayStr || lotDate === todayStr))) {
-                return acc + Number(l.finalWeight);
+                return acc + w;
             }
             return acc;
         }, 0);
 
         // 3. Pacotes pesados nesta data (Treliça)
-        const dayPackagesQty = (op.weighedPackages || []).reduce((acc: number, p: any) => {
-            if (!p.timestamp) return acc;
-            const pkgDate = getIsoDateStr(p.timestamp);
+        const dayPackagesQty = rawPackages.reduce((acc: number, p: any) => {
+            const rawTime = p.timestamp || p.createdAt || p.weighedAt;
+            if (!rawTime) return acc;
+            const pkgDate = getIsoDateStr(rawTime);
             if (pkgDate === dateStr || (isEvaluatingActiveMonday && (pkgDate === saturdayStr || pkgDate === sundayStr || pkgDate === todayStr))) {
-                return acc + (Number(p.quantity) || 200);
+                const q = Number(p.quantity) || 200;
+                return acc + q;
             }
             return acc;
         }, 0);
 
         // 4. Logs de operador desta data
-        const dayLogs = (op.operatorLogs || []).filter(l => {
-            const s = getIsoDateStr(l.startTime);
-            const e = getIsoDateStr(l.endTime);
+        const dayLogs = rawLogs.filter(l => {
+            const s = getIsoDateStr(l.startTime || l.start_time);
+            const e = getIsoDateStr(l.endTime || l.end_time);
             return s === dateStr || e === dateStr || (isEvaluatingActiveMonday && (s === saturdayStr || s === sundayStr || s === todayStr || e === saturdayStr || e === sundayStr || e === todayStr));
         });
         const logOperators = dayLogs.map(l => formatShortName(l.operator)).filter(Boolean)[0] || '';
 
         // Total acumulado real da OP
         const totalOverall = isTrefila 
-            ? (Number(op.actualProducedWeight) || Number(op.totalProducedWeight) || 0) 
-            : (Number(op.actualProducedQuantity) || 0);
+            ? (Number(op.actualProducedWeight || (op as any).actual_produced_weight || op.totalProducedWeight || (op as any).total_produced_weight) || 0) 
+            : (Number(op.actualProducedQuantity || (op as any).actual_produced_quantity || (op as any).current_quantity || (op as any).total_overall) || 0);
 
         // Produção isolada dos logs desta data específica
         const dayLogsPcs = dayLogs.reduce((acc: number, l: any) => {
-            if (!l.endTime) {
-                if (l.startQuantity !== undefined) {
-                    return acc + Math.max(0, totalOverall - Number(l.startQuantity));
+            const sQty = l.startQuantity !== undefined ? Number(l.startQuantity) : (l.start_quantity !== undefined ? Number(l.start_quantity) : undefined);
+            const eQty = l.endQuantity !== undefined ? Number(l.endQuantity) : (l.end_quantity !== undefined ? Number(l.end_quantity) : undefined);
+            const hasEnd = Boolean(l.endTime || l.end_time);
+
+            if (!hasEnd) {
+                if (sQty !== undefined) {
+                    return acc + Math.max(0, totalOverall - sQty);
                 }
                 return acc;
-            } else if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
-                return acc + Math.max(0, Number(l.endQuantity) - Number(l.startQuantity));
+            } else if (eQty !== undefined && sQty !== undefined) {
+                return acc + Math.max(0, eQty - sQty);
             }
             return acc;
         }, 0);
@@ -3748,10 +3765,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (isTrefila) {
             todayProduced = dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty;
         } else {
-            const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
+            const openLog = rawLogs.find((l: any) => !l.endTime && !l.end_time);
+            const sQty = openLog ? (openLog.startQuantity !== undefined ? Number(openLog.startQuantity) : (openLog.start_quantity !== undefined ? Number(openLog.start_quantity) : undefined)) : undefined;
             let liveShiftPcs = 0;
-            if (openLog && openLog.startQuantity !== undefined) {
-                liveShiftPcs = Math.max(0, totalOverall - Number(openLog.startQuantity));
+            if (openLog && sQty !== undefined) {
+                liveShiftPcs = Math.max(0, totalOverall - sQty);
             }
             todayProduced = Math.max(dayPackagesQty + reportsDayQty, dayLogsPcs, liveShiftPcs);
         }
@@ -3761,9 +3779,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         let status: 'live' | 'closed' | 'planned' | 'idle' = 'idle';
 
         if (isToday) {
-            const isLive = op.status === 'in_progress' || op.status === 'Em Produção';
             const liveOperator = getMachineOperator(machName);
-            const openLog = (op.operatorLogs || []).find((l: any) => !l.endTime);
+            const openLog = rawLogs.find((l: any) => {
+                const hasEnd = Boolean(l.endTime || l.end_time);
+                if (hasEnd) return false;
+                const opName = (l.operator || '').toLowerCase();
+                return opName && opName !== 'ghost_order_flag' && opName !== 'gestor' && opName !== 'gestor pcp';
+            });
+
+            // Máquina só é 'live' se houver operador ativo ou turno iniciado na máquina hoje!
+            const isLive = Boolean(liveOperator) && (op.status === 'in_progress' || op.status === 'Em Produção' || op.status === 'running');
 
             if (isLive) {
                 status = 'live';
@@ -3772,16 +3797,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             } else if (dailyReportPieces !== null && dailyReportPieces >= 0) {
                 status = 'closed';
                 produced = dailyReportPieces;
-                operatorName = dailyReportOp || reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
+                operatorName = dailyReportOp || reportOperators || logOperators || 'Turno Encerrado';
             } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
                 status = 'closed';
                 produced = todayProduced;
-                operatorName = reportOperators || logOperators || (openLog?.operator ? formatShortName(openLog.operator) : '') || 'Turno Encerrado';
+                operatorName = reportOperators || logOperators || 'Turno Encerrado';
             } else {
                 status = 'idle';
                 produced = 0;
                 if (isHoliday) {
                     operatorName = holidayName;
+                } else {
+                    operatorName = 'Turno Encerrado';
                 }
             }
         } else if (isPast) {
@@ -3793,18 +3820,30 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 status = 'closed';
                 produced = reportsDayQty;
                 operatorName = reportOperators || logOperators || 'Encerrado';
-            } else if (isTrefila && dayLotsWeight > 0) {
-                status = 'closed';
-                produced = dayLotsWeight;
-                operatorName = reportOperators || logOperators || 'Encerrado';
-            } else if (!isTrefila && dayPackagesQty > 0) {
-                status = 'closed';
-                produced = dayPackagesQty;
-                operatorName = reportOperators || logOperators || 'Encerrado';
-            } else if (dayLogsPcs > 0) {
-                status = 'closed';
-                produced = dayLogsPcs;
-                operatorName = logOperators || 'Encerrado';
+            } else if (isTrefila) {
+                // Na Trefila: a produção real é EXCLUSIVAMENTE a soma dos lotes pesados no dia ou relatórios de turno.
+                // JAMAIS usar dayLogsPcs na Trefila para não herdar o peso total histórico acumulado da ordem.
+                const trefilaVal = Math.max(dayLotsWeight, reportsDayQty);
+                if (trefilaVal > 0) {
+                    status = 'closed';
+                    produced = trefilaVal;
+                    operatorName = reportOperators || logOperators || 'Encerrado';
+                } else {
+                    status = 'closed';
+                    produced = 0;
+                    operatorName = logOperators || 'Sem Produção';
+                }
+            } else {
+                const pastVal = Math.max(dayPackagesQty, dayLogsPcs);
+                if (pastVal > 0) {
+                    status = 'closed';
+                    produced = pastVal;
+                    operatorName = reportOperators || logOperators || 'Encerrado';
+                } else {
+                    status = 'closed';
+                    produced = 0;
+                    operatorName = logOperators || 'Sem Produção';
+                }
             }
             if (produced === 0 && isHoliday) {
                 operatorName = holidayName;
@@ -5940,7 +5979,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     ? (isDayStopExceeded
                                                                                         ? 'bg-rose-50 border-2 border-rose-600 text-rose-950 shadow-md ring-2 ring-rose-400 animate-pulse'
                                                                                         : 'bg-amber-50 border-2 border-amber-500 text-amber-950 shadow-md ring-2 ring-amber-400 animate-pulse')
-                                                                                    : 'bg-gradient-to-br from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] border-2 border-blue-800 text-blue-950 shadow-md ring-2 ring-blue-500/80 hover:border-blue-900'
+                                                                                    : dayStats.status === 'live'
+                                                                                        ? 'bg-gradient-to-br from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] border-2 border-blue-800 text-blue-950 shadow-md ring-2 ring-blue-500/80 hover:border-blue-900'
+                                                                                        : dayStats.produced > 0
+                                                                                            ? 'bg-emerald-50/85 border-2 border-emerald-400 text-emerald-950 shadow-xs hover:border-emerald-500 hover:bg-emerald-100/70'
+                                                                                            : 'bg-[#FEFCE8]/90 border-2 border-dashed border-amber-300/90 text-amber-950 shadow-2xs hover:bg-[#FEF9C3] hover:border-amber-400'
                                                                                 : dayStats.isPast
                                                                                     ? hasRealPastProd
                                                                                         ? 'bg-emerald-50/85 border-2 border-emerald-400 text-emerald-950 shadow-xs hover:border-emerald-500 hover:bg-emerald-100/70'
@@ -6081,7 +6124,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                             ) : (
                                                                                 <div className="flex flex-col items-center justify-center min-w-0 flex-1 overflow-hidden h-full">
                                                                                     {/* Engrenagens Animadas e Status "Em Produção" */}
-                                                                                    {dayStats.isToday && !isDayCardStopped && (dayStats.isProducingNow || op.isCurrentlyRunning || dayStats.status === 'live') && (
+                                                                                    {dayStats.isToday && !isDayCardStopped && dayStats.status === 'live' && (
                                                                                         <div className={`flex items-center gap-1.5 select-none ${isLargeZoom ? 'mb-1' : 'mb-0.5'}`}>
                                                                                             {/* Par de Engrenagens Intertravadas Girando */}
                                                                                             <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-6 h-5' : 'w-4 h-3.5'}`} title="Máquina em Produção Ativa">
@@ -6214,7 +6257,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                                     className={`flex flex-col justify-center ${isFullscreenZoom ? 'gap-0.5 px-2 py-0.5 min-w-[115px] sm:min-w-[130px] lg:min-w-[140px]' : isLargeZoom ? 'gap-0.5 px-1.5 py-0.5 min-w-[105px] sm:min-w-[120px]' : 'gap-0.5 px-1.5 py-0.5 min-w-[85px] sm:min-w-[95px]'} rounded-xl border shrink-0 select-none pointer-events-none transition-all h-full max-h-full overflow-hidden shadow-xs ${
                                                                                         dayStats.isMachineStoppedNow
                                                                                             ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30 text-amber-900'
-                                                                                            : dayStats.isToday
+                                                                                            : (dayStats.isToday && dayStats.status === 'live')
                                                                                                 ? 'bg-white/95 border-2 border-blue-400 shadow-xs ring-1 ring-blue-300/60 text-blue-950'
                                                                                                 : 'bg-emerald-50/60 border border-emerald-200/60 text-emerald-700/80 shadow-2xs'
                                                                                     }`}

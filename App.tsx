@@ -65,9 +65,19 @@ const App: React.FC = () => {
     const [rawProductionOrders, setRawProductionOrders] = useState<ProductionOrderData[]>([]);
     const productionOrders = useMemo(() => {
         return rawProductionOrders.map(o => {
-            const ghostLog = o.operatorLogs?.find(log => log.operator === 'GHOST_ORDER_FLAG');
+            const rawO = o as any;
+            const opLogs = o.operatorLogs || rawO.operator_logs || [];
+            const procLots = o.processedLots || rawO.processed_lots || [];
+            const weighPkgs = o.weighedPackages || rawO.weighed_packages || [];
+            const ghostLog = opLogs.find((log: any) => log.operator === 'GHOST_ORDER_FLAG');
             return {
                 ...o,
+                operatorLogs: opLogs,
+                processedLots: procLots,
+                weighedPackages: weighPkgs,
+                actualProducedWeight: o.actualProducedWeight ?? rawO.actual_produced_weight ?? rawO.total_produced_weight,
+                actualProducedQuantity: o.actualProducedQuantity ?? rawO.actual_produced_quantity ?? rawO.current_quantity ?? rawO.total_overall,
+                orderNumber: o.orderNumber ?? rawO.order_number ?? rawO.op_number,
                 isGhostOrder: !!ghostLog,
                 inputBitola: ghostLog?.action || ''
             };
