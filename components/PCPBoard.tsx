@@ -231,6 +231,8 @@ export const getIsoDateStrGlobal = (iso?: string | null): string => {
     }
 };
 
+export const getIsoDateStr = getIsoDateStrGlobal;
+
 export const PCPBoard: React.FC<PCPBoardProps> = ({
     setPage,
     productionOrders,
@@ -635,7 +637,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         // 2. Verificar se a máquina está em 'Final de Turno' (ou seja, turno encerrado)
         const events = (liveOp.downtimeEvents || []) as any[];
         const openDowntime = [...events].reverse().find(e => !e.resumeTime);
+        const todayStr = formatDateString(liveNow);
+
         if (openDowntime) {
+            const dtDateStr = getIsoDateStr(openDowntime.stopTime);
+            // Se a parada aberta for de um dia anterior, esse turno encerrou no dia anterior
+            if (dtDateStr && dtDateStr < todayStr) {
+                return null;
+            }
             const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             if (rNorm.includes('final de turno') || rNorm.includes('turno encerrado') || rNorm.includes('turno')) {
                 // Turno foi finalizado/encerrado nesta máquina
@@ -658,6 +667,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return null;
         }
 
+        // Se o log aberto iniciou em data anterior a hoje, esse turno pertence ao dia anterior
+        const logDateStr = getIsoDateStr(openLog.startTime);
+        if (logDateStr && logDateStr < todayStr) {
+            return null;
+        }
+
         // Se há log aberto mas é apenas pendente de checkin ou gerado pelo sistema
         if (openLog.pendingOperatorCheckin || (openLog.operator && openLog.operator.toUpperCase().includes('SISTEMA'))) {
             return null;
@@ -670,6 +685,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 return null;
             }
         }
+
+        // Se o horário atual é anterior ao início oficial do turno programado (ex: operador logou às 05:36 e turno inicia às 07:00 ou 07:45)
+        const earlyToleranceMs = 10 * 60 * 1000;
+        const isBeforeShiftStart = liveNow.getTime() < (shiftEval.shiftStartMs - earlyToleranceMs);
 
         const activeOpName = openLog.operator;
 
@@ -699,11 +718,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         let isStopped = false;
         let isPrep = false;
         if (openDowntime) {
-            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-            isPrep = rNorm.includes('aguardando inicio') || rNorm.includes('setup') || rNorm === 'preparacao' || rNorm.startsWith('preparacao') || rNorm.includes('troca de rolo / preparacao') || rNorm.includes('setup + preparacao');
-            isStopped = !isPrep;
+            const dtDateStr = getIsoDateStr(openDowntime.stopTime);
+            if (!dtDateStr || dtDateStr >= todayStr) {
+                const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                isPrep = rNorm.includes('aguardando inicio') || rNorm.includes('setup') || rNorm === 'preparacao' || rNorm.startsWith('preparacao') || rNorm.includes('troca de rolo / preparacao') || rNorm.includes('setup + preparacao');
+                isStopped = !isPrep;
+            }
         }
-        const isProducing = !isStopped && !isPrep;
+        const isProducing = !isStopped && !isPrep && (!isBeforeShiftStart || Boolean(openLog.managerAuthorized));
 
         let status: 'operating' | 'online' | 'offline';
         let statusLabel: string;
@@ -711,6 +733,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (isProducing) {
             status = 'operating';
             statusLabel = 'Em Produção';
+        } else if (isBeforeShiftStart && !openLog.managerAuthorized) {
+            status = isOnlineInApp ? 'online' : 'offline';
+            statusLabel = `Aguardando Turno (${shiftEval.workStart})`;
         } else if (isOnlineInApp) {
             status = 'online';
             statusLabel = isPrep ? 'Preparação' : isStopped ? 'Parada (Online)' : 'Online';
@@ -723,7 +748,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // Último registro hoje (log de operador, produção, parada, relatório ou atividade)
         let lastTimestampMs = 0;
-        const todayStr = formatDateString(new Date());
 
         (liveOp.operatorLogs || []).forEach((l: any) => {
             if (l.startTime) {
@@ -3583,16 +3607,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         let statusLabel = '';
         let statusColor = '';
 
+        const todayStr = formatDateString(liveNow);
+        const dtDateStr = openDowntime?.stopTime ? getIsoDateStr(openDowntime.stopTime) : '';
+        const isPastDayDowntime = Boolean(dtDateStr && dtDateStr < todayStr);
+
         if (openDowntime) {
             downtimeReason = openDowntime.reason || 'Parada';
             const stopMs = openDowntime.stopTime ? new Date(openDowntime.stopTime).getTime() : 0;
             downtimeDurationMs = stopMs > 0 ? Math.max(0, liveNow.getTime() - stopMs) : 0;
 
             const rNorm = downtimeReason.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-            isOffline = rNorm.includes('final de turno') || rNorm.includes('turno');
+            isOffline = rNorm.includes('final de turno') || rNorm.includes('turno') || isPastDayDowntime;
             
             if (isOffline) {
-                statusLabel = `Desligada: ${downtimeReason}`;
+                statusLabel = isPastDayDowntime ? 'Desligada: Turno Encerrado' : `Desligada: ${downtimeReason}`;
                 statusColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
             } else if (rNorm.includes('aguardando inicio') || rNorm.includes('setup') || rNorm === 'preparacao' || rNorm.startsWith('preparacao') || rNorm.includes('troca de rolo / preparacao') || rNorm.includes('setup + preparacao')) {
                 isPrep = true;
@@ -3625,6 +3653,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             statusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
         }
 
+        // Se a máquina não possui operador ativo com turno aberto hoje, seu estado oficial é Desligada
+        if (isLive) {
+            const machName = op.scheduledMachine || (op.machine as string);
+            const activeOperator = machName ? getMachineOperator(machName) : null;
+            if (!activeOperator) {
+                isOffline = true;
+                isStopped = false;
+                isPrep = false;
+                statusLabel = 'Desligada: Turno Encerrado';
+                statusColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
+            }
+        }
+
         return { 
             target, 
             produced, 
@@ -3642,18 +3683,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             statusLabel, 
             statusColor 
         };
-    };
-
-    // Helper para extrair a data YYYY-MM-DD em horário local a partir de string ISO
-    const getIsoDateStr = (iso?: string | null): string => {
-        if (!iso) return '';
-        try {
-            const d = new Date(iso);
-            if (isNaN(d.getTime())) return String(iso).split('T')[0];
-            return formatDateString(d);
-        } catch {
-            return String(iso).split('T')[0];
-        }
     };
 
     // Helper para formatar tempos em cartões:
@@ -3787,7 +3816,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (isTrefila) {
             todayProduced = dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty;
         } else {
-            const openLog = rawLogs.find((l: any) => !l.endTime && !l.end_time);
+            // SÓ computa liveShiftPcs se o log aberto tiver sido iniciado estritamente no dia avaliado (dateStr)!
+            const openLog = rawLogs.find((l: any) => 
+                !l.endTime && !l.end_time && 
+                getIsoDateStr(l.startTime || l.start_time) === dateStr
+            );
             const sQty = openLog ? (openLog.startQuantity !== undefined ? Number(openLog.startQuantity) : (openLog.start_quantity !== undefined ? Number(openLog.start_quantity) : undefined)) : undefined;
             let liveShiftPcs = 0;
             if (openLog && sQty !== undefined) {
@@ -3799,9 +3832,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         let produced = 0;
         let operatorName = '';
         let status: 'live' | 'closed' | 'planned' | 'idle' = 'idle';
+        const liveOperator = isToday ? getMachineOperator(machName) : null;
 
         if (isToday) {
-            const liveOperator = getMachineOperator(machName);
             const openLog = rawLogs.find((l: any) => {
                 const hasEnd = Boolean(l.endTime || l.end_time);
                 if (hasEnd) return false;
@@ -3905,9 +3938,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // 1. Detectar se a máquina está em Parada ou Produzindo AGORA (ao vivo hoje)
         const events = (op.downtimeEvents || []) as any[];
-        const activeOpenStop = isToday ? [...events].reverse().find((e: any) => {
+        const activeOpenStop = (isToday && Boolean(liveOperator)) ? [...events].reverse().find((e: any) => {
             if (e.resumeTime) return false;
             if (!e.stopTime) return false;
+            const stopDateStr = getIsoDateStr(e.stopTime);
+            if (stopDateStr !== dateStr) return false; // SÓ considera parada se foi gerada HOJE!
             const rNorm = (e.reason || '').toLowerCase().trim();
             if ((rNorm.includes('final de turno') || rNorm.includes('fim de turno')) && (!e.durationMin || e.durationMin === 0)) {
                 return false;
@@ -3916,7 +3951,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }) : null;
 
         const liveMachStatus = machineLiveStatus.find(m => m.machine === machName);
-        const isMachineStoppedNow = isToday && (
+        const isMachineStoppedNow = isToday && Boolean(liveOperator) && (
             Boolean(activeOpenStop) || 
             (liveMachStatus && (liveMachStatus.state === 'stopped' || liveMachStatus.state === 'prep'))
         );
@@ -5959,7 +5994,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 const hasRealPastProd = dayStats.isPast && dayStats.produced > 0;
                                                                 const isIdlePast = dayStats.isPast && dayStats.produced === 0;
 
-                                                                const isDayCardStopped = dayStats.isToday && (
+                                                                const activeMachOp = getMachineOperator(mach.name);
+                                                                const isDayCardStopped = dayStats.isToday && Boolean(activeMachOp) && !prog.isOffline && (
                                                                     (prog.isLive && (prog.isStopped || prog.isPrep)) ||
                                                                     dayStats.isMachineStoppedNow ||
                                                                     Boolean(liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep'))

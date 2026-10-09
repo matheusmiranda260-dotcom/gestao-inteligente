@@ -1709,12 +1709,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }, [currentOperatorLog]);
 
     const currentMachineStatus = useMemo(() => {
+        if (!isAnyActiveShift) {
+            return 'Desligada';
+        }
+
         const events = activeOrder?.downtimeEvents || [];
         // CRITICAL: Always pick the LATEST open event
         const openEvent = [...events].reverse().find(e => !e.resumeTime);
 
         if (!openEvent) {
-            return isAnyActiveShift ? 'Produzindo' : 'Ocioso';
+            return 'Produzindo';
         }
 
         const normalize = (s: string) => s ? s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
@@ -1725,8 +1729,6 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return 'Preparacao';
         }
 
-        // Se é final de turno, está desligada. Caso contrário, se não há turno ativo mas há um evento, 
-        // deixamos cair no retorno 'Parada' ou 'Preparacao' acima para ser mais informativo.
         if (normReason === normalize('Final de Turno') || normReason.includes('turno')) {
             return 'Desligada';
         }

@@ -2295,7 +2295,7 @@ const App: React.FC = () => {
     const endOperatorShift = async (
         orderId: string, 
         finalQuantity?: number, 
-        options?: { autoClosed?: boolean; observation?: string; isOvertime?: boolean; managerAuthorized?: string }
+        options?: { autoClosed?: boolean; observation?: string; isOvertime?: boolean; managerAuthorized?: string; customEndTime?: string }
     ) => {
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
@@ -2308,7 +2308,7 @@ const App: React.FC = () => {
             return;
         }
 
-        const now = new Date().toISOString();
+        const now = options?.customEndTime || new Date().toISOString();
 
         const logsToReport: OperatorLog[] = [];
         // Close ALL open logs for this order to avoid ghost shifts on the dashboard
@@ -2383,16 +2383,17 @@ const App: React.FC = () => {
         }
     };
 
-    // Watchdog Central de Auto-Encerramento de Turnos
+    // Watchdog Central de Auto-Encerramento de Turnos e Auto-Saneamento Retroativo
     // Monitora todas as máquinas e ordens em andamento da fábrica periodicamente.
-    // Se o expediente já encerrou (incluindo o tempo de tolerância),
-    // finaliza automaticamente o turno para não deixar a máquina como "Em Produção" com operador órfão.
+    // 1. Saneia retroativamente qualquer turno de operador ou parada de dia anterior que tenha ficado órfão (ex: app fechado à noite).
+    // 2. Encerra automaticamente turnos vencidos no dia de hoje se o expediente acabou e a tolerância expirou.
     const autoCloseInProgressRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         const checkAutoEndShifts = async () => {
             if (!productionOrders || productionOrders.length === 0) return;
             const now = new Date();
+            const todayStr = now.toLocaleDateString('sv-SE');
 
             const activeOrders = productionOrders.filter(o => 
                 (o.status === 'in_progress' || o.status === 'Em Produção')
@@ -2402,7 +2403,7 @@ const App: React.FC = () => {
                 const machName = order.scheduledMachine || order.machine;
                 if (!machName) continue;
 
-                // Verificar se há operadores com log em aberto
+                // 1. Verificar se há operadores com log em aberto
                 const openLogs = (order.operatorLogs || []).filter(l => 
                     !l.endTime && 
                     l.operator && 
@@ -2414,18 +2415,101 @@ const App: React.FC = () => {
                     !l.operator.toUpperCase().includes('SISTEMA')
                 );
 
+                // 1.1 SANEAMENTO RETROATIVO: Se há log aberto de um DIA ANTERIOR (ex: ontem que não foi fechado porque fecharam o navegador)
+                const pastDayLog = openLogs.find(l => {
+                    if (!l.startTime) return false;
+                    const logDate = new Date(l.startTime).toLocaleDateString('sv-SE');
+                    return logDate < todayStr;
+                });
+
+                if (pastDayLog) {
+                    const logDateStr = new Date(pastDayLog.startTime).toLocaleDateString('sv-SE');
+                    const lockKey = `retro_${order.id}_${logDateStr}`;
+                    if (!autoCloseInProgressRef.current.has(lockKey)) {
+                        autoCloseInProgressRef.current.add(lockKey);
+                        
+                        const machCfg = resolveMachineShiftConfig(machName, pcpShiftConfig);
+                        const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
+                        const retroEndDate = new Date(pastDayLog.startTime);
+                        retroEndDate.setHours(!isNaN(endH) ? endH : 17, !isNaN(endM) ? endM : 33, 0, 0);
+                        const retroEndIso = retroEndDate.toISOString();
+
+                        console.log(`[Watchdog] Encerrando retroativamente turno de dia anterior para ${machName} (OP #${order.orderNumber}, data: ${logDateStr})`);
+
+                        const finalQty = order.actualProducedQuantity || 0;
+                        try {
+                            await endOperatorShift(order.id, finalQty, {
+                                autoClosed: true,
+                                customEndTime: retroEndIso,
+                                observation: `Encerramento automático retroativo pelo sistema (fim do expediente em ${logDateStr} às ${machCfg.workEnd || '17:33'}). Quantidade registrada: ${finalQty}.`
+                            });
+                        } catch (err) {
+                            console.error(`Erro ao auto-encerrar retroativo ${machName}:`, err);
+                            autoCloseInProgressRef.current.delete(lockKey);
+                        }
+                    }
+                    continue;
+                }
+
+                // 2. SANEAMENTO RETROATIVO DE PARADAS: Fechar paradas órfãs de dias anteriores (ex: Treliça 2 parou ontem em setup e app foi fechado)
+                const openDowntimes = (order.downtimeEvents || []).filter(e => !e.resumeTime && e.stopTime);
+                const pastDayDowntime = openDowntimes.find(e => {
+                    const stopDate = new Date(e.stopTime).toLocaleDateString('sv-SE');
+                    return stopDate < todayStr;
+                });
+
+                if (pastDayDowntime) {
+                    const dtDateStr = new Date(pastDayDowntime.stopTime).toLocaleDateString('sv-SE');
+                    const lockKey = `retro_dt_${order.id}_${dtDateStr}`;
+                    if (!autoCloseInProgressRef.current.has(lockKey)) {
+                        autoCloseInProgressRef.current.add(lockKey);
+
+                        const machCfg = resolveMachineShiftConfig(machName, pcpShiftConfig);
+                        const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
+                        const retroEndDate = new Date(pastDayDowntime.stopTime);
+                        retroEndDate.setHours(!isNaN(endH) ? endH : 17, !isNaN(endM) ? endM : 33, 0, 0);
+                        const retroEndIso = retroEndDate.toISOString();
+
+                        console.log(`[Watchdog] Fechando parada órfã de dia anterior para ${machName} (OP #${order.orderNumber}, motivo: ${pastDayDowntime.reason}, data: ${dtDateStr})`);
+
+                        const updatedEvents = (order.downtimeEvents || []).map(e => 
+                            !e.resumeTime && new Date(e.stopTime).toLocaleDateString('sv-SE') < todayStr
+                                ? { ...e, resumeTime: retroEndIso }
+                                : e
+                        );
+                        
+                        const hasShiftEnd = updatedEvents.some(e => e.reason === 'Final de Turno' && !e.resumeTime);
+                        if (!hasShiftEnd) {
+                            updatedEvents.push({
+                                stopTime: retroEndIso,
+                                resumeTime: null,
+                                reason: 'Final de Turno',
+                                justification: 'Encerramento automático pelo sistema (fim de expediente)'
+                            });
+                        }
+
+                        try {
+                            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', order.id, { downtimeEvents: updatedEvents });
+                            setProductionOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
+                        } catch (err) {
+                            console.error(`Erro ao fechar parada órfã ${machName}:`, err);
+                            autoCloseInProgressRef.current.delete(lockKey);
+                        }
+                    }
+                    continue;
+                }
+
                 if (openLogs.length === 0) continue;
 
-                // Avaliar a jornada atual da máquina
+                // 3. Avaliar a jornada atual da máquina no dia de HOJE
                 const shiftEval = checkMachineShiftStatus(machName, pcpShiftConfig, now);
 
                 // Se a máquina possui autoEndShift ativo e o horário do turno encerrou + tolerância esgotada
                 if (shiftEval.autoEndShift && shiftEval.isOvertime && !shiftEval.inShiftWindow && !shiftEval.isAutoEndCountdown) {
-                    // Verificar se há autorização de hora extra concedida por gestor
                     const hasManagerOvertime = openLogs.some(l => Boolean(l.managerAuthorized));
                     if (hasManagerOvertime) continue;
 
-                    const lockKey = `${order.id}_${now.toLocaleDateString('sv-SE')}_${shiftEval.shiftName}`;
+                    const lockKey = `${order.id}_${todayStr}_${shiftEval.shiftName}`;
                     if (autoCloseInProgressRef.current.has(lockKey)) continue;
 
                     autoCloseInProgressRef.current.add(lockKey);
