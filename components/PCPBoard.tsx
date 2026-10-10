@@ -634,26 +634,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return null;
         }
 
-        // 2. Verificar se a máquina está em 'Final de Turno' (ou seja, turno encerrado)
-        const events = (liveOp.downtimeEvents || []) as any[];
-        const openDowntime = [...events].reverse().find(e => !e.resumeTime);
-        const todayStr = formatDateString(liveNow);
-
-        if (openDowntime) {
-            const dtDateStr = getIsoDateStr(openDowntime.stopTime);
-            // Se a parada aberta for de um dia anterior, esse turno encerrou no dia anterior
-            if (dtDateStr && dtDateStr < todayStr) {
-                return null;
-            }
-            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            if (rNorm.includes('final de turno') || rNorm.includes('turno encerrado') || rNorm.includes('turno')) {
-                // Turno foi finalizado/encerrado nesta máquina
-                return null;
-            }
-        }
-
-        // 3. Verificar se há log com operador que assumiu/iniciou o turno (sem endTime)
+        // 2. Verificar se há log com operador que assumiu/iniciou o turno (sem endTime)
         const logs = (liveOp.operatorLogs || []) as any[];
+        const todayStr = formatDateString(liveNow);
         const openLog = [...logs].reverse().find(l => 
             !l.endTime && 
             l.operator && 
@@ -671,6 +654,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const logDateStr = getIsoDateStr(openLog.startTime);
         if (logDateStr && logDateStr < todayStr) {
             return null;
+        }
+
+        // 3. Verificar se após o início do turno houve encerramento ('Final de Turno') no dia de HOJE
+        const events = (liveOp.downtimeEvents || []) as any[];
+        const openDowntime = [...events].reverse().find(e => !e.resumeTime);
+
+        if (openDowntime) {
+            const dtDateStr = getIsoDateStr(openDowntime.stopTime);
+            const rNorm = (openDowntime.reason || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const isShiftEndReason = rNorm.includes('final de turno') || rNorm.includes('turno encerrado');
+            if (isShiftEndReason && dtDateStr === todayStr) {
+                const stopMs = new Date(openDowntime.stopTime).getTime();
+                const startMs = new Date(openLog.startTime).getTime();
+                if (stopMs >= startMs) {
+                    return null;
+                }
+            }
         }
 
         // Se há log aberto mas é apenas pendente de checkin ou gerado pelo sistema
@@ -5579,20 +5579,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                         // Identificar se a máquina está pausada agora (Parada, Preparação, Fim de Turno, Desligada ou sem operador)
                                                         const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
                                                         const activeOpOperator = getMachineOperator(mach.name);
-                                                        const openStopEvent = [...(op.downtimeEvents || [])].reverse().find((e: any) => !e.resumeTime);
+                                                        const openStopEvent = [...(op.downtimeEvents || [])].reverse().find((e: any) => 
+                                                            !e.resumeTime && (activeOpOperator ? (e.reason !== 'Final de Turno' && !e.reason?.toLowerCase().includes('turno')) : true)
+                                                        );
 
                                                         const isTrefilaPausedNow = Boolean(
                                                             openStopEvent || 
                                                             prog.isStopped || 
                                                             prog.isPrep || 
-                                                            prog.isOffline || 
+                                                            (prog.isOffline && !activeOpOperator) || 
                                                             !activeOpOperator || 
                                                             (liveMach && liveMach.state !== 'producing')
                                                         );
 
                                                         const pauseReason = openStopEvent?.reason 
                                                             || prog.downtimeReason 
-                                                            || (prog.isOffline ? 'Final de Turno' : '') 
+                                                            || (prog.isOffline && !activeOpOperator ? 'Final de Turno' : '') 
                                                             || (liveMach?.reason || '') 
                                                             || (!activeOpOperator ? 'Sem Operador Ativo' : 'Parada');
 

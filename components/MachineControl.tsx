@@ -1730,7 +1730,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
 
         if (normReason === normalize('Final de Turno') || normReason.includes('turno')) {
-            return 'Desligada';
+            // Se há turno ativo agora, um evento residual de 'Final de Turno' não desliga nem pausa a máquina
+            return 'Produzindo';
         }
 
         return 'Parada';
@@ -1757,7 +1758,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     const initialWeight = lotInfo?.initialQuantity || activeOrder.totalWeight || 0;
                     const totalDurationSeconds = initialWeight > 0 ? (initialWeight / massPerSecond) : 0;
 
-                    const openEvent = [...(activeOrder?.downtimeEvents || [])].reverse().find(e => !e.resumeTime);
+                    const openEvent = [...(activeOrder?.downtimeEvents || [])].reverse().find(e => 
+                        !e.resumeTime && (isAnyActiveShift ? (e.reason !== 'Final de Turno' && !e.reason?.toLowerCase().includes('turno')) : true)
+                    );
                     const isMachineCurrentlyPaused = Boolean(
                         openEvent || 
                         currentMachineStatus !== 'Produzindo' || 
@@ -1765,7 +1768,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     );
 
                     isPaused = isMachineCurrentlyPaused;
-                    pauseReason = openEvent?.reason || (currentMachineStatus !== 'Produzindo' ? currentMachineStatus : 'Turno Encerrado');
+                    pauseReason = openEvent?.reason || (currentMachineStatus !== 'Produzindo' ? currentMachineStatus : '');
 
                     // Calculate downtime specifically for this lot
                     let lotDowntimeMs = 0;

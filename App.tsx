@@ -2451,11 +2451,31 @@ const App: React.FC = () => {
                     continue;
                 }
 
-                // 2. SANEAMENTO RETROATIVO DE PARADAS: Fechar paradas órfãs de dias anteriores (ex: Treliça 2 parou ontem em setup e app foi fechado)
+                // 2. LIMPEZA DE PARADA 'Final de Turno' RESIDUAL EM TURNOS ATIVOS HOJE
+                if (openLogs.length > 0) {
+                    const hasStaleShiftEnd = (order.downtimeEvents || []).some(e => !e.resumeTime && (e.reason === 'Final de Turno' || e.reason?.toLowerCase().includes('turno')));
+                    if (hasStaleShiftEnd) {
+                        const activeLog = openLogs[0];
+                        const resumeIso = activeLog.startTime || now.toISOString();
+                        const cleanedEvents = (order.downtimeEvents || []).map(e =>
+                            !e.resumeTime && (e.reason === 'Final de Turno' || e.reason?.toLowerCase().includes('turno'))
+                                ? { ...e, resumeTime: resumeIso }
+                                : e
+                        );
+                        try {
+                            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', order.id, { downtimeEvents: cleanedEvents });
+                            setProductionOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
+                        } catch (err) {
+                            console.error(`Erro ao limpar Final de Turno residual para ${machName}:`, err);
+                        }
+                    }
+                }
+
+                // 3. SANEAMENTO RETROATIVO DE PARADAS: Fechar paradas órfãs de dias anteriores (ex: Treliça 2 parou ontem em setup e app foi fechado)
                 const openDowntimes = (order.downtimeEvents || []).filter(e => !e.resumeTime && e.stopTime);
                 const pastDayDowntime = openDowntimes.find(e => {
                     const stopDate = new Date(e.stopTime).toLocaleDateString('sv-SE');
-                    return stopDate < todayStr;
+                    return stopDate < todayStr && e.reason !== 'Final de Turno';
                 });
 
                 if (pastDayDowntime) {
@@ -2478,14 +2498,17 @@ const App: React.FC = () => {
                                 : e
                         );
                         
-                        const hasShiftEnd = updatedEvents.some(e => e.reason === 'Final de Turno' && !e.resumeTime);
-                        if (!hasShiftEnd) {
-                            updatedEvents.push({
-                                stopTime: retroEndIso,
-                                resumeTime: null,
-                                reason: 'Final de Turno',
-                                justification: 'Encerramento automático pelo sistema (fim de expediente)'
-                            });
+                        // Só adiciona marcador de final de turno se NÃO houver operador ativo hoje
+                        if (openLogs.length === 0) {
+                            const hasShiftEnd = updatedEvents.some(e => e.reason === 'Final de Turno');
+                            if (!hasShiftEnd) {
+                                updatedEvents.push({
+                                    stopTime: retroEndIso,
+                                    resumeTime: retroEndIso,
+                                    reason: 'Final de Turno',
+                                    justification: 'Encerramento automático pelo sistema (fim de expediente)'
+                                });
+                            }
                         }
 
                         try {
