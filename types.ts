@@ -980,6 +980,7 @@ export interface PcpShiftConfig {
     requireManagerAuthForOvertime?: boolean;
     machineConfigs?: Record<string, MachineShiftConfig>;
     updatedAt?: string;
+    holidays?: PcpHoliday[];
 }
 
 export interface PcpHoliday {

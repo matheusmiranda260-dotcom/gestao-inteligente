@@ -1504,8 +1504,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const sStart = r.shiftStartTime ? new Date(r.shiftStartTime) : null;
             const hour = sStart && !isNaN(sStart.getTime()) ? sStart.getHours() : -1;
             
-            // Turno B apenas se explicitamente marcado ou se o turno iniciou após as 15h (sem ser A)
-            const isTurnoB = shiftName.includes('b') || shiftName.includes('2') || (hour >= 15 && !shiftName.includes('a'));
+            // Turno B apenas se a máquina estiver configurada para 2 turnos E explicitamente marcado ou se o turno iniciou após as 15h (sem ser A)
+            const isTurnoB = shiftCfg.shiftCount === 2 && (shiftName.includes('b') || shiftName.includes('2') || (hour >= 15 && !shiftName.includes('a')));
 
             if (!isTurnoB) {
                 if (!opA && r.operator) opA = r.operator;
@@ -1666,8 +1666,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 motivo: `${reasonStr.toUpperCase()}${justStr.toUpperCase()}`
             };
 
-            // Se não há Turno B confirmado (sem operador e sem produção no Turno B) ou se ocorreu até o fim da tarde (ex: 18h), pertence ao Turno A
-            const belongsToTurnoB = hasTurnoBReport && startH >= 17;
+            // Pertence ao Turno B apenas se a máquina operar em 2 turnos e houver Turno B confirmado
+            const belongsToTurnoB = shiftCfg.shiftCount === 2 && hasTurnoBReport && startH >= 17;
             const targetList = !belongsToTurnoB ? stopsListA : stopsListB;
 
             // Prevenção de duplicidade por mesmo horário de início (ex: múltiplos cliques no mesmo minuto como 07:52)
@@ -1711,7 +1711,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     ? `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
                     : startTimeStr;
 
-                const isTurnoB = hasTurnoBReport && (r.shift?.toLowerCase().includes('b') || startH >= 17);
+                const isTurnoB = shiftCfg.shiftCount === 2 && hasTurnoBReport && (r.shift?.toLowerCase().includes('b') || startH >= 17);
                 const targetList = isTurnoB ? stopsListB : stopsListA;
 
                 const isDupe = targetList.some(s => s.inicio === startTimeStr && s.motivo === (e.reason || '').toUpperCase());
@@ -1731,7 +1731,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const isDupe = stopsListA.some(item => item.motivo.includes(sReason)) || stopsListB.some(item => item.motivo.includes(sReason));
                 if (!isDupe) {
                     const startH = r.shiftStartTime ? new Date(r.shiftStartTime).getHours() : 7;
-                    const isTurnoB = hasTurnoBReport && (r.shift?.toLowerCase().includes('b') || startH >= 17);
+                    const isTurnoB = shiftCfg.shiftCount === 2 && hasTurnoBReport && (r.shift?.toLowerCase().includes('b') || startH >= 17);
                     const targetList = isTurnoB ? stopsListB : stopsListA;
                     targetList.push({
                         id: `auto-shift-stop-closed-${rIdx}-${sIdx}`,
@@ -1753,8 +1753,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const hasRealTurnoB = resolvedCfg.shiftCount === 2 && (hasTurnoBReport || piecesB > 0 || stopsListB.length > 0 || Boolean(opB));
         const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
 
-        const schedStartA = resolvedCfg.workStart || (isTrelica ? '05:00' : '07:45');
-        const schedEndA = resolvedCfg.workEnd || (isTrelica ? '14:48' : '17:33');
+        const schedStartA = resolvedCfg.workStart || '07:45';
+        const schedEndA = resolvedCfg.workEnd || '17:33';
         const shiftScheduleStrA = `${schedStartA} às ${schedEndA}`;
 
         const schedStartB = resolvedCfg.shift2Start || (isTrelica ? '14:48' : '14:00');
@@ -2017,7 +2017,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 mergedStopsB.sort((a, b) => timeToSeconds(a.inicio) - timeToSeconds(b.inicio));
                 setStopsShiftB(mergedStopsB);
                 const isTrelica = machine.toLowerCase().includes('treli') || machine.toLowerCase().includes('trelica');
-                const defaultSchedA = isTrelica ? '05:00 às 14:48' : '07:45 às 17:33';
+                const defaultSchedA = (shiftCfg.workStart && shiftCfg.workEnd)
+                    ? `${shiftCfg.workStart} às ${shiftCfg.workEnd}`
+                    : '07:45 às 17:33';
 
                 const rawStatsA = dbReport.stats_shift_a || {};
                 const horarioTurnoA = (rawStatsA.horarioTurnoPrevisto && rawStatsA.horarioTurnoPrevisto.includes('às'))
@@ -2133,7 +2135,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     (dbReport.stops_shift_b && dbReport.stops_shift_b.length > 0) || 
                     Number(rawStatsB.pecasProduzidas || 0) > 0 || 
                     hasHoursB;
-                setHasSecondShift(hasTurnoBFromDb ? true : (shiftCfg.shiftCount === 2));
+                setHasSecondShift(shiftCfg.shiftCount === 2 ? hasTurnoBFromDb : false);
 
                 isLoadedRef.current = true;
                 setSaveStatus('saved');

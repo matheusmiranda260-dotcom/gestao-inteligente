@@ -602,11 +602,23 @@ export const fetchPcpHolidays = async (): Promise<PcpHoliday[]> => {
 
         if (error) {
             console.warn('Erro ao buscar pcp_holidays:', error);
+            try {
+                const raw = localStorage.getItem('pcp_holidays');
+                if (raw) return JSON.parse(raw);
+            } catch (_) {}
             return [];
         }
-        return (data || []).map(item => mapToCamelCase(item)) as PcpHoliday[];
+        const mapped = (data || []).map(item => mapToCamelCase(item)) as PcpHoliday[];
+        try {
+            localStorage.setItem('pcp_holidays', JSON.stringify(mapped));
+        } catch (_) {}
+        return mapped;
     } catch (err) {
         console.warn('Exceção ao buscar pcp_holidays:', err);
+        try {
+            const raw = localStorage.getItem('pcp_holidays');
+            if (raw) return JSON.parse(raw);
+        } catch (_) {}
         return [];
     }
 };
@@ -628,7 +640,13 @@ export const addPcpHoliday = async (holiday: { date: string; description: string
             console.error('Erro ao adicionar pcp_holiday:', error);
             throw error;
         }
-        return mapToCamelCase(data) as PcpHoliday;
+        const added = mapToCamelCase(data) as PcpHoliday;
+        try {
+            const raw = localStorage.getItem('pcp_holidays');
+            const list = raw ? JSON.parse(raw) : [];
+            localStorage.setItem('pcp_holidays', JSON.stringify([...list, added]));
+        } catch (_) {}
+        return added;
     } catch (err) {
         console.error('Exceção ao adicionar pcp_holiday:', err);
         throw err;
@@ -647,6 +665,13 @@ export const deletePcpHoliday = async (id: string): Promise<boolean> => {
             console.error('Erro ao excluir pcp_holiday:', error);
             throw error;
         }
+        try {
+            const raw = localStorage.getItem('pcp_holidays');
+            if (raw) {
+                const list = JSON.parse(raw);
+                localStorage.setItem('pcp_holidays', JSON.stringify(list.filter((h: any) => h.id !== id)));
+            }
+        } catch (_) {}
         return true;
     } catch (err) {
         console.error('Exceção ao excluir pcp_holiday:', err);

@@ -610,7 +610,7 @@ const ProductionOrderReport: React.FC<ProductionOrderReportProps> = ({ reportDat
                         {/* Header */}
                         <div className="border-2 border-black mb-1 p-2 text-center">
                             <h1 className="text-xl font-bold uppercase">Controle de Produção Diária - Setor Laminação</h1>
-                            <h2 className="text-lg font-bold uppercase">Desbobinadeira 1 (Projetos Novos)</h2>
+                            <h2 className="text-lg font-bold uppercase">Desbobinadeira 1</h2>
                         </div>
 
                         {/* Order Info Table */}

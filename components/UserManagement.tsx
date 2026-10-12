@@ -27,7 +27,6 @@ const permissionCategories = [
         permissions: [
             { page: 'pcpBoard', label: '📊 Quadro PCP (Dashboard Planejamento Semanal)' },
             { page: 'productionDashboard', label: '📈 Dashboard Geral de Produção' },
-            { page: 'desbobinadeiraDashboard', label: '🌀 Dashboard Desbobinadeira' },
         ]
     },
     {

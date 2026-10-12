@@ -1,13 +1,13 @@
-import { MachineShiftConfig, PcpShiftConfig } from '../types';
+import { MachineShiftConfig, PcpShiftConfig, PcpHoliday } from '../types';
 
 export const DEFAULT_GLOBAL_SHIFT_CONFIG: PcpShiftConfig = {
     id: 'default',
-    workStart: '07:00',
+    workStart: '07:45',
     lunchStart: '12:00',
     lunchEnd: '13:00',
-    workEnd: '17:00',
+    workEnd: '17:33',
     workDays: [1, 2, 3, 4, 5],
-    noLunch: false,
+    noLunch: true,
     autoStartShift: false, // Maquinas NUNCA devem ligar ou iniciar turno sozinhas
     autoEndShift: true,
     autoEndTimeoutMin: 5,
@@ -15,6 +15,17 @@ export const DEFAULT_GLOBAL_SHIFT_CONFIG: PcpShiftConfig = {
 };
 
 export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
+    'Trefila': {
+        workStart: '07:45',
+        workEnd: '17:33',
+        noLunch: true,
+        shiftCount: 1,
+        workDays: [1, 2, 3, 4, 5],
+        autoStartShift: false,
+        autoEndShift: true,
+        autoEndTimeoutMin: 5,
+        requireManagerAuthForOvertime: true
+    },
     'Trefila 1': {
         workStart: '07:45',
         workEnd: '17:33',
@@ -27,6 +38,17 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         requireManagerAuthForOvertime: true
     },
     'Trefila 2': {
+        workStart: '07:45',
+        workEnd: '17:33',
+        noLunch: true,
+        shiftCount: 1,
+        workDays: [1, 2, 3, 4, 5],
+        autoStartShift: false,
+        autoEndShift: true,
+        autoEndTimeoutMin: 5,
+        requireManagerAuthForOvertime: true
+    },
+    'Treliça': {
         workStart: '07:45',
         workEnd: '17:33',
         noLunch: true,
@@ -59,6 +81,17 @@ export const DEFAULT_MACHINE_SHIFTS: Record<string, MachineShiftConfig> = {
         autoEndTimeoutMin: 5,
         requireManagerAuthForOvertime: true
     },
+    'Malha': {
+        workStart: '06:20',
+        workEnd: '17:33',
+        noLunch: true,
+        shiftCount: 1,
+        workDays: [1, 2, 3, 4, 5],
+        autoStartShift: false,
+        autoEndShift: true,
+        autoEndTimeoutMin: 5,
+        requireManagerAuthForOvertime: true
+    },
     'Malha 1': {
         workStart: '06:20',
         workEnd: '17:33',
@@ -82,8 +115,32 @@ export const resolveMachineShiftConfig = (
     globalConfig?: PcpShiftConfig | null
 ): MachineShiftConfig => {
     const rawMachName = (machineName || '').trim();
-    const custom = globalConfig?.machineConfigs?.[rawMachName];
-    const defaultForMach = DEFAULT_MACHINE_SHIFTS[rawMachName];
+    const norm = (s: string) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const rawNorm = norm(rawMachName);
+
+    // 1. Busca exata ou por prefixo em machineConfigs (ex: 'Treliça' casa com 'Treliça 1')
+    let custom = globalConfig?.machineConfigs?.[rawMachName];
+    if (!custom && rawMachName && globalConfig?.machineConfigs) {
+        const matchedKey = Object.keys(globalConfig.machineConfigs).find(k => {
+            const kNorm = norm(k);
+            return kNorm === rawNorm || kNorm.startsWith(rawNorm) || rawNorm.startsWith(kNorm);
+        });
+        if (matchedKey) {
+            custom = globalConfig.machineConfigs[matchedKey];
+        }
+    }
+
+    // 2. Busca exata ou por prefixo nos defaults de máquina
+    let defaultForMach = DEFAULT_MACHINE_SHIFTS[rawMachName];
+    if (!defaultForMach && rawMachName) {
+        const matchedDefaultKey = Object.keys(DEFAULT_MACHINE_SHIFTS).find(k => {
+            const kNorm = norm(k);
+            return kNorm === rawNorm || kNorm.startsWith(rawNorm) || rawNorm.startsWith(kNorm);
+        });
+        if (matchedDefaultKey) {
+            defaultForMach = DEFAULT_MACHINE_SHIFTS[matchedDefaultKey];
+        }
+    }
 
     if (custom && custom.workStart && custom.workEnd) {
         const resolvedShiftCount = custom.shiftCount !== undefined 
@@ -113,9 +170,9 @@ export const resolveMachineShiftConfig = (
 
     // Fallback para o globalConfig ou default da fábrica
     return {
-        workStart: globalConfig?.workStart || '07:00',
-        workEnd: globalConfig?.workEnd || '17:00',
-        noLunch: globalConfig?.noLunch || false,
+        workStart: globalConfig?.workStart || '07:45',
+        workEnd: globalConfig?.workEnd || '17:33',
+        noLunch: globalConfig?.noLunch ?? true,
         lunchStart: globalConfig?.lunchStart || '12:00',
         lunchEnd: globalConfig?.lunchEnd || '13:00',
         workDays: globalConfig?.workDays || [1, 2, 3, 4, 5],
@@ -129,6 +186,9 @@ export const resolveMachineShiftConfig = (
 
 export interface MachineShiftEvaluation {
     inShiftWindow: boolean;
+    isEarlyStart: boolean;
+    isHoliday?: boolean;
+    holidayName?: string;
     isOvertime: boolean;
     isAutoEndCountdown: boolean;
     remainingCountdownSeconds: number;
@@ -147,33 +207,72 @@ export interface MachineShiftEvaluation {
     isWorkDay: boolean;
 }
 
+export const getCachedPcpHolidays = (): { date: string; description?: string }[] => {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const raw = localStorage.getItem('pcp_holidays');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    return parsed
+                        .map((h: any) => typeof h === 'string' ? { date: h } : { date: h.date, description: h.description })
+                        .filter(h => Boolean(h.date));
+                }
+            }
+        }
+    } catch (_) {}
+    return [];
+};
+
 const parseHourMin = (timeStr: any) => {
-    if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return { h: 7, m: 0 };
+    if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return { h: 7, m: 45 };
     const parts = timeStr.split(':');
     return { h: parseInt(parts[0], 10) || 0, m: parseInt(parts[1], 10) || 0 };
 };
 
 /**
- * Avalia em tempo real a situação do turno para uma máquina.
+ * Avalia em tempo real a situação do turno para uma máquina, considerando dias úteis, horários e feriados cadastrados.
  */
 export const checkMachineShiftStatus = (
     machineName: string,
     globalConfig?: PcpShiftConfig | null,
-    refDate: Date = new Date()
+    refDate: Date = new Date(),
+    holidaysList?: (PcpHoliday | string)[]
 ): MachineShiftEvaluation => {
     const config = resolveMachineShiftConfig(machineName, globalConfig);
+
+    // Formatar data local de referência no formato 'YYYY-MM-DD'
+    const y = refDate.getFullYear();
+    const m = String(refDate.getMonth() + 1).padStart(2, '0');
+    const d = String(refDate.getDate()).padStart(2, '0');
+    const todayDateStr = `${y}-${m}-${d}`;
+
+    // Resolver feriados disponíveis (parâmetro direto > embutido em globalConfig > cache no localStorage)
+    let allHolidays: { date: string; description?: string }[] = [];
+    if (Array.isArray(holidaysList) && holidaysList.length > 0) {
+        allHolidays = holidaysList.map(h => typeof h === 'string' ? { date: h } : { date: h.date, description: h.description });
+    } else if (Array.isArray(globalConfig?.holidays) && globalConfig.holidays.length > 0) {
+        allHolidays = globalConfig.holidays.map(h => typeof h === 'string' ? { date: h } : { date: h.date, description: h.description });
+    } else {
+        allHolidays = getCachedPcpHolidays();
+    }
+
+    const matchedHoliday = allHolidays.find(h => h.date === todayDateStr);
+    const isHoliday = Boolean(matchedHoliday);
+    const holidayName = matchedHoliday?.description || '';
+
     const dayOfWeek = refDate.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
     const workDays = config.workDays || [1, 2, 3, 4, 5];
-    const isWorkDay = workDays.includes(dayOfWeek);
+    const isRegularWorkDay = workDays.includes(dayOfWeek);
 
     const nowMs = refDate.getTime();
     const currentH = refDate.getHours();
     const currentM = refDate.getMinutes();
     const currentVal = currentH + currentM / 60;
 
-    let activeShiftName = 'Turno Padrão';
-    let sStartStr = config.workStart || '07:00';
-    let sEndStr = config.workEnd || '17:00';
+    let activeShiftName = config.shiftCount === 1 ? '1º Turno (Único)' : 'Turno Padrão';
+    let sStartStr = config.workStart || '07:45';
+    let sEndStr = config.workEnd || '17:33';
 
     if (config.shiftCount === 2 && config.shift2Start && config.shift2End) {
         const s1 = parseHourMin(config.workStart);
@@ -181,8 +280,8 @@ export const checkMachineShiftStatus = (
         const s1Val = s1.h + s1.m / 60;
         const s2Val = s2.h + s2.m / 60;
 
-        // Se estamos antes da metade ou antes do Turno 2
-        if (currentVal < s2Val && currentVal >= (s1Val - 1)) {
+        // Se estamos dentro ou logo antes do Turno 1
+        if (currentVal >= (s1Val - 1) && currentVal < s2Val) {
             activeShiftName = 'Turno A';
             sStartStr = config.workStart;
             sEndStr = config.workEnd;
@@ -216,13 +315,68 @@ export const checkMachineShiftStatus = (
     const autoTimeoutMin = config.autoEndTimeoutMin || 5;
     const autoTimeoutMs = autoTimeoutMin * 60 * 1000;
 
+    // Se HOJE for FERIADO cadastrado (ex: Nossa Senhora Aparecida 12/10)
+    if (isHoliday) {
+        const fDesc = holidayName || 'Feriado / Folga';
+        return {
+            inShiftWindow: false,
+            isEarlyStart: false,
+            isHoliday: true,
+            holidayName: fDesc,
+            isOvertime: true,
+            isAutoEndCountdown: false,
+            remainingCountdownSeconds: 0,
+            shiftName: `${fDesc} (Feriado)`,
+            shiftLabel: 'Feriado / Folga Oficial',
+            workStart: sStartStr,
+            workEnd: sEndStr,
+            shiftStartMs: startMs,
+            shiftEndMs: endMs,
+            autoStartShift: false,
+            autoEndShift: config.autoEndShift !== false,
+            autoEndTimeoutMin: autoTimeoutMin,
+            requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
+            progressPercent: 0,
+            statusText: fDesc,
+            isWorkDay: false
+        };
+    }
+
+    // Se HOJE NÃO for dia de trabalho programado da máquina (ex: Sábado ou Domingo)
+    if (!isRegularWorkDay) {
+        return {
+            inShiftWindow: false,
+            isEarlyStart: false,
+            isHoliday: false,
+            holidayName: '',
+            isOvertime: true,
+            isAutoEndCountdown: false,
+            remainingCountdownSeconds: 0,
+            shiftName: 'Fim de Semana / Folga',
+            shiftLabel: 'Sem Expediente Programado',
+            workStart: sStartStr,
+            workEnd: sEndStr,
+            shiftStartMs: startMs,
+            shiftEndMs: endMs,
+            autoStartShift: false,
+            autoEndShift: config.autoEndShift !== false,
+            autoEndTimeoutMin: autoTimeoutMin,
+            requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
+            progressPercent: 0,
+            statusText: 'Folga / Fim de Semana',
+            isWorkDay: false
+        };
+    }
+
     // Tolerância de 10 min de antecedência para iniciar turno
     const earlyToleranceMs = 10 * 60 * 1000;
     const isWithinHours = nowMs >= (startMs - earlyToleranceMs) && nowMs <= endMs;
-    const inShiftWindow = isWorkDay && isWithinHours;
+    const inShiftWindow = isWithinHours;
+
+    // Início antes do horário permitido (ex: chegou às 06:00 ou 07:00 quando o turno inicia às 07:45)
+    const isEarlyStart = nowMs < (startMs - earlyToleranceMs);
 
     // Hora extra ocorre estritamente APÓS o horário final de expediente programado
-    // Se o horário atual é anterior ao início do turno (ex: madrugada / manhã cedo), NÃO é hora extra!
     let isOvertime = false;
     let isAutoEndCountdown = false;
     let remainingCountdownSeconds = 0;
@@ -262,6 +416,9 @@ export const checkMachineShiftStatus = (
 
     return {
         inShiftWindow,
+        isEarlyStart,
+        isHoliday: false,
+        holidayName: '',
         isOvertime,
         isAutoEndCountdown,
         remainingCountdownSeconds,
@@ -273,10 +430,10 @@ export const checkMachineShiftStatus = (
         shiftEndMs: endMs,
         autoStartShift: Boolean(config.autoStartShift),
         autoEndShift: config.autoEndShift !== false,
-        autoEndTimeoutMin: autoTimeoutMin,
+        autoEndTimeoutMin,
         requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
         progressPercent,
         statusText,
-        isWorkDay
+        isWorkDay: true
     };
 };

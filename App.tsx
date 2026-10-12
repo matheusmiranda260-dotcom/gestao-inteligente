@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig } from './types';
+import type { Page, User, Employee, StockItem, ConferenceData, ProductionOrderData, TransferRecord, Bitola, MaterialType, MachineType, PartsRequest, ShiftReport, ProductionRecord, TransferredLotInfo, ProcessedLot, DowntimeEvent, OperatorLog, TrelicaSelectedLots, WeighedPackage, FinishedProductItem, Ponta, PontaItem, FinishedGoodsTransferRecord, TransferredFinishedGoodInfo, KaizenProblem, Meeting, MeetingItem, MeetingCategory, StockMovement, DowntimeConfig, UserAccessLog, ProductionSchedule, PcpShiftConfig, PcpHoliday } from './types';
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, CA60BitolaOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges, DefaultAmarrilGauges } from './types';
 import Login from './components/Login';
 import MainMenu from './components/MainMenu';
@@ -8,8 +8,6 @@ import MachineControl from './components/MachineControl';
 import ProductionOrder from './components/ProductionOrder';
 import ProductionOrderTrelica from './components/ProductionOrderTrelica';
 import ProductionOrderMalha from './components/ProductionOrderMalha';
-import ProductionOrderDesbobinadeira from './components/ProductionOrderDesbobinadeira';
-import DesbobinadeiraDashboard from './components/DesbobinadeiraDashboard';
 import Reports from './components/Reports';
 import UserManagement from './components/UserManagement';
 import Notification from './components/Notification';
@@ -41,7 +39,7 @@ import DowntimeConfigManager from './components/DowntimeConfigManager';
 import { supabase } from './supabaseClient';
 import type { StockGauge, StickyNote } from './types';
 
-import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption, fetchPcpShiftConfig } from './services/supabaseService';
+import { fetchTable, insertItem, updateItem, deleteItem, deleteItemByColumn, updateItemByColumn, mapToCamelCase, fetchByColumn, deductTrelicaSpoolStandConsumption, fetchPcpShiftConfig, fetchPcpHolidays } from './services/supabaseService';
 import { DEFAULT_GLOBAL_SHIFT_CONFIG, DEFAULT_MACHINE_SHIFTS, checkMachineShiftStatus, resolveMachineShiftConfig } from './services/shiftConfigService';
 import { useAllRealtimeSubscriptions } from './hooks/useSupabaseRealtime';
 import { getDeviceId, getDeviceInfo, getFocusStatus, getPageFriendlyName } from './utils/deviceTracker';
@@ -111,6 +109,14 @@ const App: React.FC = () => {
             ...DEFAULT_GLOBAL_SHIFT_CONFIG,
             machineConfigs: { ...DEFAULT_MACHINE_SHIFTS }
         };
+    });
+
+    const [pcpHolidays, setPcpHolidays] = useState<PcpHoliday[]>(() => {
+        try {
+            const raw = localStorage.getItem('pcp_holidays');
+            if (raw) return JSON.parse(raw);
+        } catch (_) {}
+        return [];
     });
 
     const [pendingKaizenCount, setPendingKaizenCount] = useState(0);
@@ -248,9 +254,15 @@ const App: React.FC = () => {
                 setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Treliça')));
                 setMalhaProduction(fetchedProductionRecords.filter(r => r.machine.toLowerCase().startsWith('malha')));
 
-                const dbShift = await fetchPcpShiftConfig();
+                const [dbShift, dbHolidays] = await Promise.all([
+                    fetchPcpShiftConfig(),
+                    fetchPcpHolidays()
+                ]);
                 if (dbShift) {
                     setPcpShiftConfig(dbShift);
+                }
+                if (dbHolidays && dbHolidays.length > 0) {
+                    setPcpHolidays(dbHolidays);
                 }
 
             } catch (error) {
@@ -327,6 +339,20 @@ const App: React.FC = () => {
     }), []);
 
     useAllRealtimeSubscriptions(realtimeSetters, !!currentUser || page === 'productionDashboard' || page === 'pcpBoard');
+
+    useEffect(() => {
+        const channel = supabase
+            .channel('app_pcp_holidays_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pcp_holidays' }, async () => {
+                const list = await fetchPcpHolidays();
+                setPcpHolidays(list);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
     useEffect(() => {
         // Load stored user from localStorage if exists
@@ -2080,12 +2106,16 @@ const App: React.FC = () => {
             // Preserva o horário de início oficial do turno agendado!
             updatedLogs = (order.operatorLogs || []).map((log, idx) => {
                 if (idx === openCheckinLogIndex) {
+                    const isOt = options?.isOvertime !== undefined ? options.isOvertime : log.isOvertime;
+                    const mgrAuth = options?.managerAuthorized || log.managerAuthorized;
                     return {
                         ...log,
                         operator: currentUser.username,
                         pendingOperatorCheckin: false,
-                        isOvertime: options?.isOvertime !== undefined ? options.isOvertime : log.isOvertime,
-                        managerAuthorized: options?.managerAuthorized || log.managerAuthorized
+                        isOvertime: isOt,
+                        is_overtime: isOt,
+                        managerAuthorized: mgrAuth,
+                        manager_authorized: mgrAuth
                     };
                 }
                 return log;
@@ -2099,13 +2129,17 @@ const App: React.FC = () => {
                 return log;
             });
 
+            const isOt = Boolean(options?.isOvertime);
+            const mgrAuth = options?.managerAuthorized;
             updatedLogs = [...newLogs, {
                 operator: currentUser.username,
                 startTime: now,
                 endTime: null,
                 startQuantity: order.actualProducedQuantity || 0,
-                isOvertime: Boolean(options?.isOvertime),
-                managerAuthorized: options?.managerAuthorized
+                isOvertime: isOt,
+                is_overtime: isOt,
+                managerAuthorized: mgrAuth,
+                manager_authorized: mgrAuth
             }];
         }
 
@@ -2525,11 +2559,18 @@ const App: React.FC = () => {
                 if (openLogs.length === 0) continue;
 
                 // 3. Avaliar a jornada atual da máquina no dia de HOJE
-                const shiftEval = checkMachineShiftStatus(machName, pcpShiftConfig, now);
+                const shiftEval = checkMachineShiftStatus(machName, pcpShiftConfig, now, pcpHolidays);
 
                 // Se a máquina possui autoEndShift ativo e o horário do turno encerrou + tolerância esgotada
                 if (shiftEval.autoEndShift && shiftEval.isOvertime && !shiftEval.inShiftWindow && !shiftEval.isAutoEndCountdown) {
-                    const hasManagerOvertime = openLogs.some(l => Boolean(l.managerAuthorized));
+                    const hasManagerOvertime = openLogs.some(l => 
+                        Boolean(
+                            l.managerAuthorized || 
+                            (l as any).manager_authorized || 
+                            l.isOvertime || 
+                            (l as any).is_overtime
+                        )
+                    );
                     if (hasManagerOvertime) continue;
 
                     const lockKey = `${order.id}_${todayStr}_${shiftEval.shiftName}`;
@@ -2556,7 +2597,7 @@ const App: React.FC = () => {
         checkAutoEndShifts();
         const watchdogTimer = setInterval(checkAutoEndShifts, 10000);
         return () => clearInterval(watchdogTimer);
-    }, [productionOrders, pcpShiftConfig]);
+    }, [productionOrders, pcpShiftConfig, pcpHolidays]);
 
     const logDowntime = async (orderId: string, reason: string) => {
         const now = new Date().toISOString();
@@ -3580,7 +3621,8 @@ const App: React.FC = () => {
             updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
             pauseProductionOrder, addLotToOrder, downtimeConfigs,
             updateProductionOrder, onUpdateReport: handleUpdateShiftReport,
-            pcpShiftConfig
+            pcpShiftConfig,
+            holidays: pcpHolidays
         };
 
         switch (page) {
@@ -3614,17 +3656,9 @@ const App: React.FC = () => {
             case 'malhaCompleted': return <MachineControl machineType="Malha" {...mcProps} initialView="completed" initialModal={null} />;
             case 'malhaReports': return <MachineControl machineType="Malha" {...mcProps} initialView="dashboard" initialModal="reports" />;
 
-            case 'desbobinadeiraDashboard': return <DesbobinadeiraDashboard productionOrders={productionOrders} />;
-            case 'desbobinadeira': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="dashboard" initialModal={null} />;
-            case 'desbobinadeiraInProgress': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="in_progress" initialModal={null} />;
-            case 'desbobinadeiraPending': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="pending" initialModal={null} />;
-            case 'desbobinadeiraCompleted': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="completed" initialModal={null} />;
-            case 'desbobinadeiraReports': return <MachineControl machineType="Desbobinadeira 1" {...mcProps} initialView="dashboard" initialModal="reports" />;
-
             case 'productionOrder': return <ProductionOrder setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderTrelica': return <ProductionOrderTrelica setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionOrderMalha': return <ProductionOrderMalha setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
-            case 'productionOrderDesbobinadeira': return <ProductionOrderDesbobinadeira setPage={setPage} stock={stock} productionOrders={productionOrders} addProductionOrder={addProductionOrder} showNotification={showNotification} updateProductionOrder={updateProductionOrder} deleteProductionOrder={deleteProductionOrder} gauges={gauges} currentUser={currentUser} />;
             case 'productionDashboard': return <ProductionDashboard setPage={setPage} productionOrders={productionOrders} stock={stock} currentUser={currentUser} downtimeConfigs={downtimeConfigs} />;
 
             case 'productionScheduling': return <ProductionScheduling schedules={productionSchedules} setSchedules={setProductionSchedules} setPage={setPage} />;
