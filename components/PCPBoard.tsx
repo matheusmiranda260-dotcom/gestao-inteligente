@@ -12062,7 +12062,7 @@ const AdjustQuantityModal: React.FC<{
         : computedActiveShiftQty;
 
     const [mode, setMode] = useState<'shift' | 'total'>(initialMode);
-    const [qty, setQty] = useState<number>(initialMode === 'shift' ? shiftBaseQty : currentTotal);
+    const [qty, setQty] = useState<number | ''>(initialMode === 'shift' ? shiftBaseQty : currentTotal);
     const [reason, setReason] = useState<string>(
         initialMode === 'shift' 
             ? 'Ajuste manual de contagem do turno (Gestor)' 
@@ -12101,25 +12101,26 @@ const AdjustQuantityModal: React.FC<{
     // Cálculos dinâmicos
     // O Gestor pode reduzir a quantidade, portanto o mínimo permitido é 0
     const minAllowedQty = 0;
+    const numericQty = qty === '' ? 0 : Number(qty);
     const originalQty = isShiftMode ? shiftBaseQty : currentTotal;
-    const isBelowMinimum = qty < minAllowedQty;
+    const isBelowMinimum = numericQty < minAllowedQty;
 
-    const shiftDelta = isShiftMode ? (qty - shiftBaseQty) : (qty - currentTotal);
+    const shiftDelta = isShiftMode ? (numericQty - shiftBaseQty) : (numericQty - currentTotal);
     const calculatedNewTotal = isShiftMode 
-        ? Math.max(0, sumLogsTotal + (qty - shiftBaseQty))
-        : qty;
+        ? Math.max(0, sumLogsTotal + (numericQty - shiftBaseQty))
+        : numericQty;
     const calculatedNewShift = isShiftMode
-        ? qty
-        : Math.max(0, shiftBaseQty + (qty - currentTotal));
+        ? numericQty
+        : Math.max(0, shiftBaseQty + (numericQty - currentTotal));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (qty < minAllowedQty) return;
+        if (numericQty < minAllowedQty) return;
         setIsSaving(true);
         try {
             await onSave(order.id, calculatedNewTotal, reason, {
                 mode,
-                shiftQty: isShiftMode ? qty : calculatedNewShift,
+                shiftQty: isShiftMode ? numericQty : calculatedNewShift,
                 operatorName,
                 dayStats: context?.dayStats
             });
@@ -12270,14 +12271,14 @@ const AdjustQuantityModal: React.FC<{
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                disabled={qty <= minAllowedQty}
-                                onClick={() => setQty(prev => Math.max(minAllowedQty, prev - (isTrefila ? 50 : 1)))}
+                                disabled={numericQty <= minAllowedQty}
+                                onClick={() => setQty(prev => Math.max(minAllowedQty, (Number(prev) || 0) - (isTrefila ? 50 : 1)))}
                                 className={`w-12 h-12 rounded-xl border text-2xl font-black flex items-center justify-center transition-all select-none ${
-                                    qty <= minAllowedQty
+                                    numericQty <= minAllowedQty
                                         ? 'bg-white/5 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
                                         : 'bg-white/5 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border-white/10 hover:border-rose-500/40 active:scale-95 cursor-pointer'
                                 }`}
-                                title={qty <= minAllowedQty ? `Mínimo permitido: ${minAllowedQty} ${unit}` : `Diminuir 1 ${unit}`}
+                                title={numericQty <= minAllowedQty ? `Mínimo permitido: ${minAllowedQty} ${unit}` : `Diminuir 1 ${unit}`}
                             >
                                 -
                             </button>
@@ -12285,18 +12286,25 @@ const AdjustQuantityModal: React.FC<{
                             <div className="relative flex-1">
                                 <input
                                     type="number"
-                                    min={minAllowedQty}
-                                    value={qty === 0 && minAllowedQty === 0 ? '' : qty}
+                                    min={0}
+                                    value={qty}
                                     onChange={(e) => {
-                                        const val = parseInt(e.target.value, 10);
-                                        setQty(isNaN(val) ? 0 : val);
+                                        const str = e.target.value;
+                                        if (str === '') {
+                                            setQty('');
+                                        } else {
+                                            const val = parseInt(str, 10);
+                                            setQty(isNaN(val) ? '' : Math.max(0, val));
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        if (qty === '') setQty(0);
                                     }}
                                     className={`w-full h-12 bg-black/50 border rounded-xl text-center text-2xl font-black font-mono tracking-wider outline-none transition-all ${
                                         isBelowMinimum
                                             ? 'border-rose-500 text-rose-300 focus:border-rose-400 ring-2 ring-rose-500/20'
                                             : 'border-white/15 text-white focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF]'
                                     }`}
-                                    required
                                     autoFocus
                                     onFocus={(e) => e.target.select()}
                                 />
@@ -12307,7 +12315,7 @@ const AdjustQuantityModal: React.FC<{
 
                             <button
                                 type="button"
-                                onClick={() => setQty(prev => prev + (isTrefila ? 50 : 1))}
+                                onClick={() => setQty(prev => (Number(prev) || 0) + (isTrefila ? 50 : 1))}
                                 className="w-12 h-12 rounded-xl bg-white/5 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/40 text-2xl font-black flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
                                 title={`Aumentar 1 ${unit}`}
                             >
