@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand, PcpShiftConfig } from '../types';
+import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand, PcpShiftConfig, PcpHoliday } from '../types';
 import { DOWNTIME_THRESHOLDS } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
@@ -3014,7 +3014,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         if (pendingResumeAfterAuth) {
                             setPendingResumeAfterAuth(false);
                             if (logResumeProduction && activeOrder) {
-                                logResumeProduction(activeOrder.id, isOverLimit ? downtimeJustification : undefined);
+                                logResumeProduction(activeOrder.id, downtimeJustification.trim() ? downtimeJustification : undefined);
                                 setDowntimeJustification('');
                                 setShowTrocaDeRoloInOtherStop(false);
                             }

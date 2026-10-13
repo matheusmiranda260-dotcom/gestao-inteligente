@@ -312,8 +312,8 @@ export const checkMachineShiftStatus = (
 
     const startMs = shiftStart.getTime();
     const endMs = shiftEnd.getTime();
-    const autoTimeoutMin = config.autoEndTimeoutMin || 5;
-    const autoTimeoutMs = autoTimeoutMin * 60 * 1000;
+    const autoEndTimeoutMin = config.autoEndTimeoutMin || 5;
+    const autoTimeoutMs = autoEndTimeoutMin * 60 * 1000;
 
     // Se HOJE for FERIADO cadastrado (ex: Nossa Senhora Aparecida 12/10)
     if (isHoliday) {
@@ -334,7 +334,7 @@ export const checkMachineShiftStatus = (
             shiftEndMs: endMs,
             autoStartShift: false,
             autoEndShift: config.autoEndShift !== false,
-            autoEndTimeoutMin: autoTimeoutMin,
+            autoEndTimeoutMin,
             requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
             progressPercent: 0,
             statusText: fDesc,
@@ -360,7 +360,7 @@ export const checkMachineShiftStatus = (
             shiftEndMs: endMs,
             autoStartShift: false,
             autoEndShift: config.autoEndShift !== false,
-            autoEndTimeoutMin: autoTimeoutMin,
+            autoEndTimeoutMin,
             requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
             progressPercent: 0,
             statusText: 'Folga / Fim de Semana',
