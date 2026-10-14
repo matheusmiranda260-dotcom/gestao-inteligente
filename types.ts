@@ -217,6 +217,9 @@ export interface ProductionOrderData {
     productCode?: string;
     productDescription?: string;
     pieceWeight?: number;
+    isPaused?: boolean;
+    pausedAt?: string;
+    pauseReason?: string;
 }
 
 export interface TransferRecord {

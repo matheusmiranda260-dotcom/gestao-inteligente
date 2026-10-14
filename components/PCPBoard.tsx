@@ -43,6 +43,8 @@ interface PCPBoardProps {
     setPage: (page: Page) => void;
     productionOrders: ProductionOrderData[];
     updateProductionOrder: (id: string, updates: Partial<ProductionOrderData>) => Promise<void>;
+    pauseProductionOrder?: (orderId: string, reason?: string) => Promise<void> | void;
+    resumeProductionOrder?: (orderId: string) => Promise<void> | void;
     stock: StockItem[];
     currentUser: User | null;
     addProductionOrder?: (order: Omit<ProductionOrderData, 'id' | 'status' | 'creationDate'>) => void;
@@ -237,6 +239,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     setPage,
     productionOrders,
     updateProductionOrder,
+    pauseProductionOrder,
+    resumeProductionOrder,
     stock,
     currentUser,
     addProductionOrder,
@@ -3462,6 +3466,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Determina se uma OP já foi iniciada na fábrica ou possui produção apontada no passado
     const hasProductionStarted = (op: ProductionOrderData): boolean => {
+        const isPaused = op.status === 'paused' || op.status === 'Pausada' || Boolean((op as any).isPaused) || Boolean(op.summary?.isPaused);
+        // Se a OP estiver pausada, permitimos que seu reagendamento/início planejado seja movido livremente (ex: para o final da fila após a outra ordem)
+        if (isPaused) {
+            return false;
+        }
+
         const st = (op.status || '').toLowerCase();
         if (st === 'in_progress' || st.includes('produção') || st.includes('producao') || st === 'completed' || st.includes('conclu')) {
             return true;
@@ -3481,7 +3491,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         return false;
     };
 
-    // Deslocar OP (+/- dias úteis) - APENAS permitido para OPs ainda não iniciadas!
+    // Deslocar OP (+/- dias úteis)
     const handleShiftOP = async (op: ProductionOrderData, daysToShift: number) => {
         if (isViewer) {
             showNotification?.('Perfil de visualização: alteração no cronograma desabilitada.', 'warning');
@@ -3508,6 +3518,118 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             showNotification?.(`OP #${op.orderNumber} movida para ${formatFriendlyDate(newStartStr)}.`, 'success');
         } catch (error) {
             console.error('Erro ao deslocar agendamento:', error);
+        }
+    };
+
+    // Pausar OP diretamente do PCP com opção de deslocar para o final da fila
+    const handlePauseOPFromPCP = async (op: ProductionOrderData) => {
+        if (isViewer) {
+            showNotification?.('Perfil de visualização: ação desabilitada.', 'warning');
+            return;
+        }
+
+        const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila');
+        const unit = isTrefila ? 'kg' : 'pçs';
+        const alreadyProduced = isTrefila 
+            ? (op.actualProducedWeight || op.totalProducedWeight || 0) 
+            : (op.actualProducedQuantity || 0);
+
+        const reason = window.prompt(
+            `⏸️ PAUSAR ORDEM #${op.orderNumber}?\n\nA produção será interrompida e o saldo já apontado (${alreadyProduced.toLocaleString('pt-BR')} ${unit}) ficará gravado intacto.\n\nA máquina ficará LIVRE para iniciar outra ordem.\n\nInforme o motivo da pausa (ou confirme abaixo):`,
+            'Interrompida para dar prioridade a outra OP'
+        );
+        if (reason === null) return; // Usuário cancelou no prompt
+
+        try {
+            if (pauseProductionOrder) {
+                await pauseProductionOrder(op.id, reason);
+            } else {
+                await updateProductionOrder(op.id, {
+                    status: 'pending',
+                    isPaused: true,
+                    pausedAt: new Date().toISOString(),
+                    pauseReason: reason,
+                    summary: {
+                        ...(op.summary || {}),
+                        isPaused: true,
+                        pausedAt: new Date().toISOString(),
+                        pauseReason: reason
+                    }
+                } as any);
+            }
+
+            // Identificar as outras ordens agendadas na mesma máquina para sugerir o posicionamento no fim da fila
+            const machName = op.scheduledMachine || (op.machine as string);
+            const otherMachOps = productionOrders.filter(o => 
+                o.id !== op.id && 
+                (o.scheduledMachine === machName || o.machine === machName) &&
+                o.status !== 'completed' && o.status !== 'Cancelada' && o.status !== 'cancelled' &&
+                o.plannedEndDate
+            );
+
+            if (otherMachOps.length > 0) {
+                const latestEnd = otherMachOps.reduce((max, cur) => {
+                    const e = cur.plannedEndDate || '';
+                    return e > max ? e : max;
+                }, '');
+
+                if (latestEnd) {
+                    const shouldPush = window.confirm(
+                        `Deseja posicionar a OP Pausada no final da fila?\n\nA máquina possui ordem agendada até ${formatFriendlyDate(latestEnd)}.\n\nAo clicar em OK, o reinício desta ordem começará no dia útil seguinte (${formatFriendlyDate(shiftWorkingDay(latestEnd, 1))}).`
+                    );
+                    if (shouldPush) {
+                        const newStart = shiftWorkingDay(latestEnd, 1);
+                        const dur = op.estimatedDurationDays || 1;
+                        const newEnd = calculateEndDateByWorkDays(newStart, dur);
+                        await updateProductionOrder(op.id, {
+                            plannedStartDate: newStart,
+                            plannedEndDate: newEnd
+                        });
+                        showNotification?.(`OP #${op.orderNumber} pausada e posicionada para ${formatFriendlyDate(newStart)}!`, 'success');
+                    }
+                }
+            }
+
+            if (drawerOP?.id === op.id) {
+                setDrawerOP(null);
+            }
+        } catch (err: any) {
+            console.error('Erro ao pausar OP no PCP:', err);
+            showNotification?.(`Erro ao pausar OP: ${err.message || err}`, 'error');
+        }
+    };
+
+    // Retomar OP pausada diretamente do PCP
+    const handleResumeOPFromPCP = async (op: ProductionOrderData) => {
+        if (isViewer) {
+            showNotification?.('Perfil de visualização: ação desabilitada.', 'warning');
+            return;
+        }
+
+        if (!confirm(`Deseja RETOMAR a OP #${op.orderNumber} agora?\n\nA máquina voltará para o status "Em Produção" mantendo todo o progresso anterior.`)) {
+            return;
+        }
+
+        try {
+            if (resumeProductionOrder) {
+                await resumeProductionOrder(op.id);
+            } else {
+                await updateProductionOrder(op.id, {
+                    status: 'in_progress',
+                    isPaused: false,
+                    summary: {
+                        ...(op.summary || {}),
+                        isPaused: false,
+                        resumedAt: new Date().toISOString()
+                    }
+                } as any);
+            }
+            if (drawerOP?.id === op.id) {
+                setDrawerOP(null);
+            }
+        } catch (err: any) {
+            console.error('Erro ao retomar OP no PCP:', err);
+            showNotification?.(`Erro ao retomar OP: ${err.message || err}`, 'error');
         }
     };
 
@@ -3592,10 +3714,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const pct = Math.min(100, Math.round((produced / target) * 100));
 
+        const isPaused = op.status === 'paused' || op.status === 'Pausada' || Boolean((op as any).isPaused) || Boolean(op.summary?.isPaused);
         const isCompleted = op.status === 'completed' || op.status === 'Finalizado' || op.status === 'Concluída';
-        // Apenas 'in_progress' significa que o operador de fato clicou em 'Iniciar' na máquina
-        const isLive = op.status === 'in_progress' || op.status === 'Em Produção';
-        const isPending = !isCompleted && !isLive;
+        // Apenas 'in_progress' sem estar pausada significa que o operador de fato clicou em 'Iniciar' na máquina
+        const isLive = !isPaused && (op.status === 'in_progress' || op.status === 'Em Produção');
+        const isPending = !isCompleted && !isLive && !isPaused;
 
         // Verificar se há evento de parada aberto na OP ativa
         const openDowntime = isLive ? (op.downtimeEvents || []).find((e: any) => !e.resumeTime) : null;
@@ -3611,7 +3734,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const dtDateStr = openDowntime?.stopTime ? getIsoDateStr(openDowntime.stopTime) : '';
         const isPastDayDowntime = Boolean(dtDateStr && dtDateStr < todayStr);
 
-        if (openDowntime) {
+        if (isPaused) {
+            statusLabel = 'Pausada (Aguardando Retomada)';
+            statusColor = 'bg-amber-500/20 text-amber-900 border-amber-400';
+        } else if (openDowntime) {
             downtimeReason = openDowntime.reason || 'Parada';
             const stopMs = openDowntime.stopTime ? new Date(openDowntime.stopTime).getTime() : 0;
             downtimeDurationMs = stopMs > 0 ? Math.max(0, liveNow.getTime() - stopMs) : 0;
@@ -3674,6 +3800,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             isCompleted, 
             isLive, 
             isPending, 
+            isPaused,
             isActive: isLive, // retrocompatibilidade
             isStopped,
             isPrep,
@@ -5672,7 +5799,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             const limitMs = thresholdMinutes * 60 * 1000;
                                             const isDowntimeOverLimit = (prog.isStopped || prog.isPrep) && prog.downtimeDurationMs > limitMs;
 
-                                            if (prog.isCompleted) {
+                                            if (prog.isPaused) {
+                                                barBg = 'bg-amber-50/95 border-2 border-amber-400 border-l-8 border-l-amber-600 text-slate-900 shadow-md';
+                                                barProgressColor = 'bg-gradient-to-r from-amber-500 to-amber-600';
+                                                barGlowRing = 'shadow-[0_4px_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-300';
+                                            } else if (prog.isCompleted) {
                                                 barBg = 'bg-white border-2 border-emerald-300 border-l-8 border-l-emerald-600 hover:border-emerald-400 text-slate-800 shadow-sm';
                                                 barProgressColor = 'bg-emerald-500';
                                             } else if (prog.isLive) {
@@ -5744,6 +5875,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                     </div>
                                                                 )}
                                                                 
+                                                                {prog.isPaused && (
+                                                                    <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-500/20 text-amber-950 rounded border border-amber-400 shadow-sm shrink-0 font-mono`}>
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                                                        ⏸️ PAUSADA
+                                                                    </span>
+                                                                )}
                                                                 {prog.isPending && (
                                                                     <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-100 text-amber-900 rounded border border-amber-300 shadow-sm shrink-0`}>
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -9981,6 +10118,42 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <PrinterIcon className="w-4 h-4 text-cyan-400" />
                                 Imprimir Ordem de Produção (Ficha A4)
                             </button>
+
+                            {/* Ações de Pausa e Retomada para Liberação de Máquina */}
+                            {!isViewer && (() => {
+                                const isOPPaused = drawerOP.status === 'paused' || drawerOP.status === 'Pausada' || Boolean((drawerOP as any).isPaused) || Boolean(drawerOP.summary?.isPaused);
+                                const isOPInProgress = !isOPPaused && (drawerOP.status === 'in_progress' || drawerOP.status === 'Em Produção');
+
+                                if (isOPInProgress) {
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePauseOPFromPCP(drawerOP)}
+                                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all uppercase tracking-wider"
+                                            title="Pausar ordem para liberar a máquina para outra OP urgente"
+                                        >
+                                            <span>⏸️</span>
+                                            <span>Pausar Ordem (Liberar Máquina)</span>
+                                        </button>
+                                    );
+                                }
+
+                                if (isOPPaused) {
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleResumeOPFromPCP(drawerOP)}
+                                            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all uppercase tracking-wider"
+                                            title="Retomar a produção desta ordem de onde parou"
+                                        >
+                                            <PlayIcon className="w-4 h-4 text-slate-950" />
+                                            <span>Retomar Ordem Pausada</span>
+                                        </button>
+                                    );
+                                }
+
+                                return null;
+                            })()}
 
                             <button
                                 onClick={() => handleGoToProduction(drawerOP)}

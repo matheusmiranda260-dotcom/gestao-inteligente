@@ -1860,38 +1860,112 @@ const App: React.FC = () => {
         }
     };
 
-    const executePauseOrder = async (orderId: string, now: string = new Date().toISOString()) => {
+    const executePauseOrder = async (orderId: string, reason?: string) => {
         const orderToPause = productionOrders.find(o => o.id === orderId);
         if (!orderToPause) return;
+        const now = new Date().toISOString();
 
-        // Close any open logs for any operator on this machine
+        // 1. Close any open logs for any operator on this machine
         const closedLogs = (orderToPause.operatorLogs || []).map(log =>
             !log.endTime ? { ...log, endTime: now, endQuantity: orderToPause.actualProducedQuantity || 0 } : log
         );
 
-        // Close any open downtime events
+        // Registro explícito da pausa nos logs
+        closedLogs.push({
+            operator: currentUser?.username || 'Sistema',
+            action: 'OP Pausada (Interrompida)',
+            startTime: now,
+            endTime: now,
+            details: {
+                reason: reason || 'Ordem pausada para liberar máquina para outra OP prioritária',
+                producedSoFar: orderToPause.actualProducedQuantity || orderToPause.actualProducedWeight || 0
+            }
+        });
+
+        // 2. Close any open downtime events
         const closedEvents = (orderToPause.downtimeEvents || []).map(event =>
             !event.resumeTime ? { ...event, resumeTime: now } : event
         );
 
-        const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
+        const updatedSummary = {
+            ...(orderToPause.summary || {}),
+            isPaused: true,
+            pausedAt: now,
+            pauseReason: reason || 'Ordem pausada para liberar máquina'
+        };
+
+        const updatePayload: any = {
             status: 'paused',
             operatorLogs: closedLogs,
             downtimeEvents: closedEvents,
-        });
+            summary: updatedSummary,
+            isPaused: true,
+            pausedAt: now,
+            pauseReason: reason || 'Ordem pausada para liberar máquina'
+        };
+
+        let updatedOrder: ProductionOrderData;
+        try {
+            // Tenta com status: 'paused'
+            updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updatePayload);
+        } catch (err: any) {
+            // Fallback seguro caso o Supabase possua constraint CHECK sem 'paused'
+            console.warn('Banco rejeitou status paused, salvando como pending com summary.isPaused = true:', err);
+            updatePayload.status = 'pending';
+            updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updatePayload);
+        }
 
         // Update local state IMMEDIATELY
-        setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatedOrder, isPaused: true } : o));
         return updatedOrder;
     };
 
-    const pauseProductionOrder = async (orderId: string) => {
+    const pauseProductionOrder = async (orderId: string, reason?: string) => {
         try {
-            await executePauseOrder(orderId);
-            showNotification('Ordem de produção arquivada (pausada).', 'success');
+            await executePauseOrder(orderId, reason);
+            showNotification('Ordem de produção pausada com sucesso. A máquina está liberada.', 'success');
         } catch (error) {
             console.error('Erro ao pausar ordem:', error);
             showNotification('Erro ao pausar ordem de produção.', 'error');
+        }
+    };
+
+    const resumeProductionOrder = async (orderId: string) => {
+        try {
+            const orderToResume = productionOrders.find(o => o.id === orderId);
+            if (!orderToResume) return;
+
+            const now = new Date().toISOString();
+            const updatedLogs = [...(orderToResume.operatorLogs || [])];
+            updatedLogs.push({
+                operator: currentUser?.username || 'Operador',
+                action: 'OP Retomada após Pausa',
+                startTime: now,
+                details: {
+                    producedSoFar: orderToResume.actualProducedQuantity || orderToResume.actualProducedWeight || 0
+                }
+            });
+
+            const updatedSummary = {
+                ...(orderToResume.summary || {}),
+                isPaused: false,
+                resumedAt: now
+            };
+
+            const updatePayload: any = {
+                status: 'in_progress',
+                operatorLogs: updatedLogs,
+                summary: updatedSummary,
+                isPaused: false,
+                lastQuantityUpdate: now
+            };
+
+            const updated = await updateItem<ProductionOrderData>('production_orders', orderId, updatePayload);
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updated, isPaused: false } : o));
+            showNotification(`Ordem #${orderToResume.orderNumber} retomada com sucesso!`, 'success');
+        } catch (error: any) {
+            console.error('Erro ao retomar ordem:', error);
+            showNotification(`Erro ao retomar ordem: ${error.message || error}`, 'error');
         }
     };
 
@@ -3619,7 +3693,7 @@ const App: React.FC = () => {
             logResumeProduction, startLotProcessing, finishLotProcessing, recordLotWeight,
             addPartsRequest, logPostProductionActivity, completeProduction, recordPackageWeight,
             updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
-            pauseProductionOrder, addLotToOrder, downtimeConfigs,
+            pauseProductionOrder, resumeProductionOrder, addLotToOrder, downtimeConfigs,
             updateProductionOrder, onUpdateReport: handleUpdateShiftReport,
             pcpShiftConfig,
             holidays: pcpHolidays
@@ -3696,6 +3770,8 @@ const App: React.FC = () => {
                 setPage={setPage} 
                 productionOrders={productionOrders} 
                 updateProductionOrder={updateProductionOrder} 
+                pauseProductionOrder={pauseProductionOrder}
+                resumeProductionOrder={resumeProductionOrder}
                 stock={stock} 
                 currentUser={currentUser} 
                 addProductionOrder={addProductionOrder} 

@@ -1066,7 +1066,8 @@ interface MachineControlProps {
     addPartsRequest?: (data: Omit<PartsRequest, 'id' | 'date' | 'operator' | 'status' | 'machine' | 'productionOrderId'>) => void;
     deleteShiftReport?: (reportId: string) => void;
     cancelProductionOrder?: (orderId: string) => void;
-    pauseProductionOrder?: (orderId: string) => void;
+    pauseProductionOrder?: (orderId: string, reason?: string) => void;
+    resumeProductionOrder?: (orderId: string) => void;
     initialView?: View;
     initialModal?: 'reports' | 'parts' | 'rings' | null;
     gauges?: StockGauge[];
@@ -1135,7 +1136,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     logDowntime, logResumeProduction, startLotProcessing, finishLotProcessing,
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
-    cancelProductionOrder, pauseProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
+    cancelProductionOrder, pauseProductionOrder, resumeProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
     downtimeConfigs = [], updateProductionOrder, onUpdateReport, pcpShiftConfig, holidays = []
 }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
@@ -4858,16 +4859,25 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </button>
                                         )}
 
-                                        {(!activeMachine.startsWith('Trefila') && !activeMachine.startsWith('Desbobinadeira')) && pauseProductionOrder && (
+                                        {pauseProductionOrder && (
                                             <button
+                                                type="button"
                                                 onClick={() => {
-                                                    if (window.confirm('Tem certeza que deseja arquivar/pausar esta ordem para iniciar outra? Seu turno atual será encerrado e a ordem voltará para a fila de pendentes.')) {
-                                                        pauseProductionOrder(orderForShift.id);
+                                                    const alreadyProduced = activeMachine.startsWith('Trefila') 
+                                                        ? `${orderForShift.actualProducedWeight || orderForShift.totalProducedWeight || 0} kg` 
+                                                        : `${orderForShift.actualProducedQuantity || 0} peças`;
+
+                                                    const reason = window.prompt(
+                                                        `⏸️ PAUSAR ORDEM #${orderForShift.orderNumber}?\n\nO apontamento atual (${alreadyProduced}) será mantido intacto.\n\nA máquina ficará LIVRE para iniciar outra ordem e esta ordem ficará guardada na fila para retomada.\n\nInforme o motivo da pausa:`,
+                                                        'Interrompida para dar prioridade a outra OP'
+                                                    );
+                                                    if (reason !== null) {
+                                                        pauseProductionOrder(orderForShift.id, reason);
                                                         setView('pending');
                                                     }
                                                 }}
                                                 className="p-3.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50/50 rounded-2xl transition active:scale-90 flex flex-col items-center gap-0.5"
-                                                title="Arquivar Ordem / Trocar de Ordem"
+                                                title="Pausar Ordem / Liberar Máquina para Outra OP"
                                             >
                                                 <ArchiveIcon className="h-7 w-7" />
                                                 <span className="text-[8px] font-black uppercase">Pausar OP</span>
@@ -4953,39 +4963,61 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {pendingOrders.map(order => (
-                                            <tr key={order.id} className={`border-b hover:bg-slate-50 ${order.status === 'paused' ? 'bg-amber-50/30' : 'bg-white'}`}>
-                                                <td className="px-6 py-4">
-                                                    {order.status === 'paused' ? (
-                                                        <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded uppercase border border-amber-200">Em Pausa</span>
-                                                    ) : (
-                                                        <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-0.5 rounded uppercase border border-slate-200">Fila</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">{new Date(order.creationDate).toLocaleDateString('pt-BR')}</td>
-                                                <td className="px-6 py-4 font-medium text-slate-900">
-                                                    {order.orderNumber}
-                                                    {order.status === 'paused' && order.actualProducedQuantity && order.actualProducedQuantity > 0 ? (
-                                                        <span className="block text-[10px] text-amber-600 mt-0.5 font-bold">Já produzido: {order.actualProducedQuantity}</span>
-                                                    ) : null}
-                                                </td>
-                                                <td className="px-6 py-4">{activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? order.targetBitola : `${order.trelicaModel} (${order.quantityToProduce} pçs)`}</td>
-                                                <td className="px-6 py-4 text-right">{order.totalWeight?.toFixed(2) || 0}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button onClick={() => {
-                                                        if (!shiftEvaluation.inShiftWindow && !isGestor && shiftEvaluation.requireManagerAuthForOvertime && !authorizedOvertimeForCurrentShift) {
-                                                            setPendingStartOrderId(order.id);
-                                                            setShowManagerAuthForOvertimeStart(true);
-                                                            return;
-                                                        }
-                                                        if(startProductionOrder) startProductionOrder(order.id);
-                                                        setView('in_progress');
-                                                    }} className={`${order.status === 'paused' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'} text-white font-bold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2 mx-auto`}>
-                                                        <PlayIcon className="h-5 w-5" /> {order.status === 'paused' ? 'Retomar' : 'Iniciar'}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {pendingOrders.map(order => {
+                                            const isOrderPaused = order.status === 'paused' || order.status === 'Pausada' || Boolean((order as any).isPaused) || Boolean(order.summary?.isPaused);
+                                            const isTrefila = activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira');
+                                            const prodQty = isTrefila 
+                                                ? (order.actualProducedWeight || order.totalProducedWeight || 0)
+                                                : (order.actualProducedQuantity || 0);
+
+                                            return (
+                                                <tr key={order.id} className={`border-b hover:bg-slate-50 ${isOrderPaused ? 'bg-amber-50/40' : 'bg-white'}`}>
+                                                    <td className="px-6 py-4">
+                                                        {isOrderPaused ? (
+                                                            <span className="bg-amber-100 text-amber-900 text-xs font-black px-2.5 py-0.5 rounded uppercase border border-amber-300 flex items-center gap-1 w-fit">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                                Pausada
+                                                            </span>
+                                                        ) : (
+                                                            <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-0.5 rounded uppercase border border-slate-200">Fila</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">{new Date(order.creationDate).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                                        <span className="font-bold">#{order.orderNumber}#</span>
+                                                        {isOrderPaused && prodQty > 0 ? (
+                                                            <span className="block text-[11px] text-amber-700 mt-0.5 font-bold">
+                                                                Saldo feito: {prodQty.toLocaleString('pt-BR')} {isTrefila ? 'kg' : 'pçs'}
+                                                            </span>
+                                                        ) : null}
+                                                    </td>
+                                                    <td className="px-6 py-4">{isTrefila ? order.targetBitola : `${order.trelicaModel} (${order.quantityToProduce} pçs)`}</td>
+                                                    <td className="px-6 py-4 text-right">{order.totalWeight?.toFixed(2) || 0}</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (!shiftEvaluation.inShiftWindow && !isGestor && shiftEvaluation.requireManagerAuthForOvertime && !authorizedOvertimeForCurrentShift) {
+                                                                    setPendingStartOrderId(order.id);
+                                                                    setShowManagerAuthForOvertimeStart(true);
+                                                                    return;
+                                                                }
+                                                                if (isOrderPaused && resumeProductionOrder) {
+                                                                    resumeProductionOrder(order.id);
+                                                                } else if (startProductionOrder) {
+                                                                    startProductionOrder(order.id);
+                                                                }
+                                                                setView('in_progress');
+                                                            }} 
+                                                            className={`${isOrderPaused ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' : 'bg-emerald-500 hover:bg-emerald-600'} text-white font-bold py-2 px-4 rounded-xl transition flex items-center justify-center gap-1.5 mx-auto shadow-sm active:scale-95`}
+                                                        >
+                                                            <PlayIcon className="h-4 w-4" /> 
+                                                            <span>{isOrderPaused ? 'Retomar' : 'Iniciar'}</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
