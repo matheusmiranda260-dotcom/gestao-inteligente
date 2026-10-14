@@ -5195,7 +5195,29 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         {/* Linhas das Máquinas */}
                         <div className="flex-1 flex flex-col relative min-h-0 bg-[#F8FAFC]">
                             {availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name)).map((mach) => {
-                                const machOps = scheduledOrders.filter(op => op.scheduledMachine === mach.name);
+                                const machOps = scheduledOrders
+                                    .filter(op => op.scheduledMachine === mach.name)
+                                    .sort((a, b) => {
+                                        // 1. Ordem Ao Vivo / Em Produção (in_progress) sempre tem prioridade máxima (trilha 0)
+                                        const aIsLive = a.status === 'in_progress' || a.status === 'Em Produção';
+                                        const bIsLive = b.status === 'in_progress' || b.status === 'Em Produção';
+                                        if (aIsLive && !bIsLive) return -1;
+                                        if (!aIsLive && bIsLive) return 1;
+
+                                        // 2. Ordens pausadas ficam depois das ativas/agendadas normais
+                                        const aIsPaused = a.status === 'paused' || a.status === 'Pausada' || Boolean((a as any).isPaused) || Boolean(a.summary?.isPaused);
+                                        const bIsPaused = b.status === 'paused' || b.status === 'Pausada' || Boolean((b as any).isPaused) || Boolean(b.summary?.isPaused);
+                                        if (!aIsPaused && bIsPaused) return -1;
+                                        if (aIsPaused && !bIsPaused) return 1;
+
+                                        // 3. Ordem cronológica por data de início planejada
+                                        const startA = a.plannedStartDate || '';
+                                        const startB = b.plannedStartDate || '';
+                                        if (startA !== startB) return startA.localeCompare(startB);
+
+                                        // 4. Desempate estável por ID (garante paridade idêntica em todos os computadores)
+                                        return (a.id || '').localeCompare(b.id || '');
+                                    });
 
                                 // Calcula trilhas verticais para OPs simultâneas ou sobrepostas na mesma máquina
                                 const getOpTrack = (op: ProductionOrderData) => {
@@ -5239,6 +5261,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                 const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
                                 const isMachineEmpty = machOps.length === 0;
+                                const effectiveMinHeight = maxTracks > 1
+                                    ? Math.max(calculatedMinHeight, maxTracks * baseTrackHeight)
+                                    : calculatedMinHeight;
 
                                 return (
                                     <div 
@@ -5249,7 +5274,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 : 'flex-1'
                                         }`}
                                         style={{
-                                            minHeight: isMachineEmpty ? '42px' : `${calculatedMinHeight}px`
+                                            minHeight: isMachineEmpty ? '42px' : `${effectiveMinHeight}px`
                                         }}
                                     >
                                         {/* Coluna da Máquina (Fundo Branco Limpo com Indicador Ita Aços) */}

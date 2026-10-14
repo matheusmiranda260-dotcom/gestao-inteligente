@@ -1860,6 +1860,39 @@ const App: React.FC = () => {
         }
     };
 
+    const shiftWorkDate = (dateStr: string, days: number): string => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return '';
+        const step = days >= 0 ? 1 : -1;
+        let count = 0;
+        while (count < Math.abs(days)) {
+            d.setDate(d.getDate() + step);
+            const dayOfWeek = d.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                count++;
+            }
+        }
+        return d.toISOString().split('T')[0];
+    };
+
+    const addWorkDays = (startDateStr: string, numDays: number): string => {
+        if (!startDateStr) return '';
+        const d = new Date(startDateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return '';
+        while (d.getDay() === 0 || d.getDay() === 6) {
+            d.setDate(d.getDate() + 1);
+        }
+        let count = 1;
+        while (count < numDays) {
+            d.setDate(d.getDate() + 1);
+            if (d.getDay() !== 0 && d.getDay() !== 6) {
+                count++;
+            }
+        }
+        return d.toISOString().split('T')[0];
+    };
+
     const executePauseOrder = async (orderId: string, reason?: string) => {
         const orderToPause = productionOrders.find(o => o.id === orderId);
         if (!orderToPause) return;
@@ -1903,6 +1936,28 @@ const App: React.FC = () => {
             pausedAt: now,
             pauseReason: reason || 'Ordem pausada para liberar máquina'
         };
+
+        // 3. Posicionar automaticamente a OP Pausada no final do calendário (após qualquer ordem agendada/ativa na mesma máquina)
+        const machName = orderToPause.scheduledMachine || (orderToPause.machine as string);
+        const otherMachOps = productionOrders.filter(o => 
+            o.id !== orderId && 
+            (o.scheduledMachine === machName || o.machine === machName) &&
+            o.status !== 'completed' && o.status !== 'Finalizado' && o.status !== 'Cancelada' && o.status !== 'cancelled' &&
+            o.plannedEndDate
+        );
+        if (otherMachOps.length > 0) {
+            const latestEnd = otherMachOps.reduce((max, cur) => {
+                const e = cur.plannedEndDate || '';
+                return e > max ? e : max;
+            }, '');
+            if (latestEnd) {
+                const newStart = shiftWorkDate(latestEnd, 1);
+                const dur = orderToPause.estimatedDurationDays || 1;
+                const newEnd = addWorkDays(newStart, dur);
+                updatePayload.plannedStartDate = newStart;
+                updatePayload.plannedEndDate = newEnd;
+            }
+        }
 
         let updatedOrder: ProductionOrderData;
         try {
@@ -2153,6 +2208,27 @@ const App: React.FC = () => {
             }
 
             await updateItem('production_orders', orderToStartData.id, updates);
+
+            // 4. Posicionar no final do calendário qualquer OP pausada nesta máquina para não sobrepor dias
+            const activeEnd = updates.plannedEndDate || orderToStartData.plannedEndDate || new Date().toISOString().split('T')[0];
+            const otherPausedOps = productionOrders.filter(o => 
+                o.id !== orderId &&
+                (o.machine === newOrderMachine || o.scheduledMachine === newOrderMachine) &&
+                (o.status === 'paused' || o.status === 'Pausada' || Boolean((o as any).isPaused) || Boolean(o.summary?.isPaused))
+            );
+            for (const pausedOp of otherPausedOps) {
+                if (activeEnd && (!pausedOp.plannedStartDate || pausedOp.plannedStartDate <= activeEnd)) {
+                    const nextStart = shiftWorkDate(activeEnd, 1);
+                    const dur = pausedOp.estimatedDurationDays || 1;
+                    const nextEnd = addWorkDays(nextStart, dur);
+                    await updateItem('production_orders', pausedOp.id, {
+                        plannedStartDate: nextStart,
+                        plannedEndDate: nextEnd
+                    });
+                    setProductionOrders(prev => prev.map(o => o.id === pausedOp.id ? { ...o, plannedStartDate: nextStart, plannedEndDate: nextEnd } : o));
+                }
+            }
+
             showNotification('Ordem de produção iniciada.', 'success');
         } catch (error) {
             showNotification('Erro ao iniciar ordem de produção.', 'error');
