@@ -3633,6 +3633,65 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
+    // Alternar modo Ordem Fantasma (Liberar / Reservar lotes no Estoque sem alterar a OP)
+    const handleToggleGhostOrder = async (op: ProductionOrderData) => {
+        if (isViewer) {
+            showNotification?.('Perfil de visualização: ação desabilitada.', 'warning');
+            return;
+        }
+
+        const isCurrentlyGhost = Boolean(op.isGhostOrder);
+        const newGhostState = !isCurrentlyGhost;
+        const confirmMsg = newGhostState
+            ? `Deseja converter a OP #${op.orderNumber} em ORDEM FANTASMA?\n\nAo confirmar, todos os lotes vinculados no estoque serão liberados para o status "Disponível". A OP continuará em produção na máquina normalmente.`
+            : `Deseja desativar o modo fantasma da OP #${op.orderNumber}?\n\nOs lotes vinculados serão reservados com o status "Em Produção - ${op.scheduledMachine || op.machine}".`;
+
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            await updateProductionOrder(op.id, { isGhostOrder: newGhostState });
+
+            // Extrair todos os lotes vinculados à OP
+            let lotIds: string[] = [];
+            if (Array.isArray(op.selectedLotIds)) {
+                lotIds = op.selectedLotIds as string[];
+            } else if (op.selectedLotIds && typeof op.selectedLotIds === 'object') {
+                lotIds = Object.values(op.selectedLotIds).flat().filter(Boolean) as string[];
+            }
+
+            if (lotIds.length > 0) {
+                const machName = op.scheduledMachine || (op.machine as string);
+                for (const lotId of lotIds) {
+                    const stockItem = stock.find(s => s.id === lotId || s.internalLot === lotId);
+                    if (stockItem) {
+                        const newStatus = newGhostState ? 'Disponível' : `Em Produção - ${machName}`;
+                        const newOrderIds = newGhostState
+                            ? (stockItem.productionOrderIds || []).filter(id => id !== op.id)
+                            : [...new Set([...(stockItem.productionOrderIds || []), op.id])];
+                        await updateItem<StockItem>('stock_items', stockItem.id, {
+                            status: newStatus,
+                            productionOrderIds: newOrderIds
+                        });
+                    }
+                }
+            }
+
+            if (drawerOP?.id === op.id) {
+                setDrawerOP(prev => prev ? { ...prev, isGhostOrder: newGhostState } : null);
+            }
+
+            showNotification?.(
+                newGhostState 
+                    ? `OP #${op.orderNumber} convertida em Ordem Fantasma! Lotes liberados no Estoque.` 
+                    : `Modo fantasma desativado para OP #${op.orderNumber}! Lotes reservados no Estoque.`,
+                'success'
+            );
+        } catch (err: any) {
+            console.error('Erro ao alternar modo fantasma da OP:', err);
+            showNotification?.(`Erro ao alternar modo fantasma: ${err.message || err}`, 'error');
+        }
+    };
+
     // Ajusta a duração da OP (+1 ou -1 dia útil) - ESTENDER / REDUZIR PRAZO
     const handleAdjustDuration = async (op: ProductionOrderData, durationDelta: number) => {
         if (isViewer) {
@@ -10179,6 +10238,29 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                 return null;
                             })()}
+
+                            {/* Alternar Ordem Fantasma (Liberar / Reservar Lotes no Estoque) */}
+                            {!isViewer && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleGhostOrder(drawerOP)}
+                                    className={`w-full font-bold rounded-xl py-2.5 text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                        drawerOP.isGhostOrder
+                                            ? 'bg-amber-950/40 text-amber-300 border border-amber-500/40 hover:bg-amber-900/50'
+                                            : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-amber-300'
+                                    }`}
+                                    title={drawerOP.isGhostOrder 
+                                        ? "Esta OP é Fantasma (lotes livres no estoque). Clique para reservar os lotes." 
+                                        : "Esta OP está reservando lotes no estoque. Clique para liberar os lotes mantendo a OP ativa."}
+                                >
+                                    <span>👻</span>
+                                    <span>
+                                        {drawerOP.isGhostOrder 
+                                            ? 'Modo Fantasma Ativo (Lotes Liberados)' 
+                                            : 'Converter em Ordem Fantasma (Liberar Lotes)'}
+                                    </span>
+                                </button>
+                            )}
 
                             <button
                                 onClick={() => handleGoToProduction(drawerOP)}
