@@ -2486,7 +2486,8 @@ const App: React.FC = () => {
         if (!order) return;
 
         // Verificar se todos os logs já estão fechados e a máquina já está em Final de Turno
-        const hasOpenLogs = (order.operatorLogs || []).some(l => !l.endTime);
+        const isLogEndedCheck = (l: any) => Boolean(l.endTime || l.end_time);
+        const hasOpenLogs = (order.operatorLogs || []).some(l => !isLogEndedCheck(l));
         const lastDtCheck = (order.downtimeEvents || []).slice(-1)[0];
         if (!hasOpenLogs && lastDtCheck && lastDtCheck.reason === 'Final de Turno' && !lastDtCheck.resumeTime) {
             return;
@@ -2497,14 +2498,17 @@ const App: React.FC = () => {
         const logsToReport: OperatorLog[] = [];
         // Close ALL open logs for this order to avoid ghost shifts on the dashboard
         const newLogs = (order.operatorLogs || []).map(log => {
-            if (!log.endTime) {
+            if (!isLogEndedCheck(log)) {
                 const closedLog: OperatorLog = {
                     ...log,
                     endTime: now,
+                    end_time: now,
                     endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0),
+                    end_quantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0),
                     autoClosed: options?.autoClosed,
-                    isOvertime: options?.isOvertime !== undefined ? options.isOvertime : log.isOvertime,
-                    managerAuthorized: options?.managerAuthorized || log.managerAuthorized
+                    auto_closed: options?.autoClosed,
+                    isOvertime: options?.isOvertime !== undefined ? options.isOvertime : (log.isOvertime || (log as any).is_overtime),
+                    managerAuthorized: options?.managerAuthorized || log.managerAuthorized || (log as any).manager_authorized
                 };
                 if (log.operator && log.operator !== 'GHOST_ORDER_FLAG') {
                     logsToReport.push(closedLog);
@@ -2587,9 +2591,10 @@ const App: React.FC = () => {
                 const machName = order.scheduledMachine || order.machine;
                 if (!machName) continue;
 
-                // 1. Verificar se há operadores com log em aberto
+                // 1. Verificar se há operadores com log em aberto (suporta camelCase e snake_case)
+                const isLogEnded = (l: any) => Boolean(l.endTime || l.end_time);
                 const openLogs = (order.operatorLogs || []).filter(l => 
-                    !l.endTime && 
+                    !isLogEnded(l) && 
                     l.operator && 
                     l.operator !== 'GHOST_ORDER_FLAG' && 
                     l.action !== 'Criada no PCP' &&
@@ -2600,35 +2605,56 @@ const App: React.FC = () => {
                 );
 
                 // 1.1 SANEAMENTO RETROATIVO: Se há log aberto de um DIA ANTERIOR (ex: ontem que não foi fechado porque fecharam o navegador)
-                const pastDayLog = openLogs.find(l => {
-                    if (!l.startTime) return false;
-                    const logDate = new Date(l.startTime).toLocaleDateString('sv-SE');
-                    return logDate < todayStr;
+                // REGRA CRÍTICA: Se a máquina possui log aberto de HOJE, NUNCA executa saneamento retroativo que feche a máquina!
+                const hasActiveLogToday = openLogs.some(l => {
+                    const rawStart = l.startTime || l.start_time;
+                    return rawStart && new Date(rawStart).toLocaleDateString('sv-SE') === todayStr;
                 });
 
+                const pastDayLog = !hasActiveLogToday ? openLogs.find(l => {
+                    const rawStart = l.startTime || l.start_time;
+                    if (!rawStart) return false;
+                    const logDate = new Date(rawStart).toLocaleDateString('sv-SE');
+                    return logDate < todayStr;
+                }) : null;
+
                 if (pastDayLog) {
-                    const logDateStr = new Date(pastDayLog.startTime).toLocaleDateString('sv-SE');
+                    const rawStart = pastDayLog.startTime || (pastDayLog as any).start_time;
+                    const logDateStr = new Date(rawStart).toLocaleDateString('sv-SE');
                     const lockKey = `retro_${order.id}_${logDateStr}`;
                     if (!autoCloseInProgressRef.current.has(lockKey)) {
                         autoCloseInProgressRef.current.add(lockKey);
                         
                         const machCfg = resolveMachineShiftConfig(machName, pcpShiftConfig);
                         const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
-                        const retroEndDate = new Date(pastDayLog.startTime);
+                        const retroEndDate = new Date(rawStart);
                         retroEndDate.setHours(!isNaN(endH) ? endH : 17, !isNaN(endM) ? endM : 33, 0, 0);
                         const retroEndIso = retroEndDate.toISOString();
 
-                        console.log(`[Watchdog] Encerrando retroativamente turno de dia anterior para ${machName} (OP #${order.orderNumber}, data: ${logDateStr})`);
+                        console.log(`[Watchdog] Saneando apenas log órfão antigo para ${machName} (OP #${order.orderNumber}, data: ${logDateStr})`);
 
-                        const finalQty = order.actualProducedQuantity || 0;
+                        // Fecha EXCLUSIVAMENTE os logs do dia anterior, sem tocar na máquina de hoje nem alterar a produção atual
+                        const updatedLogs = (order.operatorLogs || []).map((l: any) => {
+                            const lStart = l.startTime || l.start_time;
+                            if (!isLogEnded(l) && lStart && new Date(lStart).toLocaleDateString('sv-SE') < todayStr) {
+                                return {
+                                    ...l,
+                                    endTime: retroEndIso,
+                                    end_time: retroEndIso,
+                                    autoClosed: true,
+                                    auto_closed: true,
+                                    endQuantity: l.endQuantity || l.end_quantity || l.startQuantity || l.start_quantity || 0,
+                                    end_quantity: l.endQuantity || l.end_quantity || l.startQuantity || l.start_quantity || 0
+                                };
+                            }
+                            return l;
+                        });
+
                         try {
-                            await endOperatorShift(order.id, finalQty, {
-                                autoClosed: true,
-                                customEndTime: retroEndIso,
-                                observation: `Encerramento automático retroativo pelo sistema (fim do expediente em ${logDateStr} às ${machCfg.workEnd || '17:33'}). Quantidade registrada: ${finalQty}.`
-                            });
+                            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', order.id, { operatorLogs: updatedLogs });
+                            setProductionOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
                         } catch (err) {
-                            console.error(`Erro ao auto-encerrar retroativo ${machName}:`, err);
+                            console.error(`Erro ao sanear log antigo ${machName}:`, err);
                             autoCloseInProgressRef.current.delete(lockKey);
                         }
                     }
@@ -2636,14 +2662,15 @@ const App: React.FC = () => {
                 }
 
                 // 2. LIMPEZA DE PARADA 'Final de Turno' RESIDUAL EM TURNOS ATIVOS HOJE
+                const isDowntimeOpen = (e: any) => !e.resumeTime && !e.resume_time;
                 if (openLogs.length > 0) {
-                    const hasStaleShiftEnd = (order.downtimeEvents || []).some(e => !e.resumeTime && (e.reason === 'Final de Turno' || e.reason?.toLowerCase().includes('turno')));
+                    const hasStaleShiftEnd = (order.downtimeEvents || []).some(e => isDowntimeOpen(e) && (e.reason === 'Final de Turno' || e.reason?.toLowerCase().includes('turno')));
                     if (hasStaleShiftEnd) {
                         const activeLog = openLogs[0];
-                        const resumeIso = activeLog.startTime || now.toISOString();
-                        const cleanedEvents = (order.downtimeEvents || []).map(e =>
-                            !e.resumeTime && (e.reason === 'Final de Turno' || e.reason?.toLowerCase().includes('turno'))
-                                ? { ...e, resumeTime: resumeIso }
+                        const resumeIso = activeLog.startTime || (activeLog as any).start_time || now.toISOString();
+                        const cleanedEvents = (order.downtimeEvents || []).map((e: any) =>
+                            isDowntimeOpen(e) && (e.reason === 'Final de Turno' || e.reason?.toLowerCase().includes('turno'))
+                                ? { ...e, resumeTime: resumeIso, resume_time: resumeIso }
                                 : e
                         );
                         try {
@@ -2656,31 +2683,34 @@ const App: React.FC = () => {
                 }
 
                 // 3. SANEAMENTO RETROATIVO DE PARADAS: Fechar paradas órfãs de dias anteriores (ex: Treliça 2 parou ontem em setup e app foi fechado)
-                const openDowntimes = (order.downtimeEvents || []).filter(e => !e.resumeTime && e.stopTime);
+                const openDowntimes = (order.downtimeEvents || []).filter(e => isDowntimeOpen(e) && (e.stopTime || (e as any).stop_time));
                 const pastDayDowntime = openDowntimes.find(e => {
-                    const stopDate = new Date(e.stopTime).toLocaleDateString('sv-SE');
+                    const stopRaw = e.stopTime || (e as any).stop_time;
+                    const stopDate = new Date(stopRaw).toLocaleDateString('sv-SE');
                     return stopDate < todayStr && e.reason !== 'Final de Turno';
                 });
 
                 if (pastDayDowntime) {
-                    const dtDateStr = new Date(pastDayDowntime.stopTime).toLocaleDateString('sv-SE');
+                    const stopRaw = pastDayDowntime.stopTime || (pastDayDowntime as any).stop_time;
+                    const dtDateStr = new Date(stopRaw).toLocaleDateString('sv-SE');
                     const lockKey = `retro_dt_${order.id}_${dtDateStr}`;
                     if (!autoCloseInProgressRef.current.has(lockKey)) {
                         autoCloseInProgressRef.current.add(lockKey);
 
                         const machCfg = resolveMachineShiftConfig(machName, pcpShiftConfig);
                         const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
-                        const retroEndDate = new Date(pastDayDowntime.stopTime);
+                        const retroEndDate = new Date(stopRaw);
                         retroEndDate.setHours(!isNaN(endH) ? endH : 17, !isNaN(endM) ? endM : 33, 0, 0);
                         const retroEndIso = retroEndDate.toISOString();
 
                         console.log(`[Watchdog] Fechando parada órfã de dia anterior para ${machName} (OP #${order.orderNumber}, motivo: ${pastDayDowntime.reason}, data: ${dtDateStr})`);
 
-                        const updatedEvents = (order.downtimeEvents || []).map(e => 
-                            !e.resumeTime && new Date(e.stopTime).toLocaleDateString('sv-SE') < todayStr
-                                ? { ...e, resumeTime: retroEndIso }
-                                : e
-                        );
+                        const updatedEvents = (order.downtimeEvents || []).map((e: any) => {
+                            const eStop = e.stopTime || e.stop_time;
+                            return isDowntimeOpen(e) && eStop && new Date(eStop).toLocaleDateString('sv-SE') < todayStr
+                                ? { ...e, resumeTime: retroEndIso, resume_time: retroEndIso }
+                                : e;
+                        });
                         
                         // Só adiciona marcador de final de turno se NÃO houver operador ativo hoje
                         if (openLogs.length === 0) {
