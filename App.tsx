@@ -2495,16 +2495,33 @@ const App: React.FC = () => {
 
         const now = options?.customEndTime || new Date().toISOString();
 
+        // Cálculo seguro de quantidade final para evitar que encerramentos automáticos zerem a produção
+        const calculateSafeFinalQty = (o: ProductionOrderData, passedQty?: number) => {
+            const orderQty = Number(o.actualProducedQuantity) || 0;
+            const pkgQty = (o.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
+            const lotWeight = (o.processedLots || []).reduce((acc: number, l: any) => acc + (Number(l.finalWeight || l.final_weight) || 0), 0);
+            const isTr = (typeof o.machine === 'string' && o.machine.startsWith('Trefila')) || (typeof o.scheduledMachine === 'string' && o.scheduledMachine.startsWith('Trefila'));
+            const maxKnown = isTr ? (lotWeight > 0 ? lotWeight : orderQty) : Math.max(orderQty, pkgQty);
+            if (passedQty !== undefined && passedQty > 0) {
+                return Math.max(passedQty, maxKnown);
+            }
+            return maxKnown;
+        };
+
+        const safeFinalQty = calculateSafeFinalQty(order, finalQuantity);
+
         const logsToReport: OperatorLog[] = [];
         // Close ALL open logs for this order to avoid ghost shifts on the dashboard
         const newLogs = (order.operatorLogs || []).map(log => {
             if (!isLogEndedCheck(log)) {
+                const sQty = Number(log.startQuantity) || Number((log as any).start_quantity) || 0;
+                const resolvedEndQty = Math.max(safeFinalQty, sQty);
                 const closedLog: OperatorLog = {
                     ...log,
                     endTime: now,
                     end_time: now,
-                    endQuantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0),
-                    end_quantity: finalQuantity !== undefined ? finalQuantity : (order.actualProducedQuantity || 0),
+                    endQuantity: resolvedEndQty,
+                    end_quantity: resolvedEndQty,
                     autoClosed: options?.autoClosed,
                     auto_closed: options?.autoClosed,
                     isOvertime: options?.isOvertime !== undefined ? options.isOvertime : (log.isOvertime || (log as any).is_overtime),
@@ -2518,12 +2535,11 @@ const App: React.FC = () => {
             return log;
         });
 
-        const updates: Partial<ProductionOrderData> = { operatorLogs: newLogs };
-
-        if (finalQuantity !== undefined) {
-            updates.actualProducedQuantity = finalQuantity;
-            updates.lastQuantityUpdate = now;
-        }
+        const updates: Partial<ProductionOrderData> = { 
+            operatorLogs: newLogs,
+            actualProducedQuantity: Math.max(Number(order.actualProducedQuantity) || 0, safeFinalQty),
+            lastQuantityUpdate: now
+        };
 
         // Automatically stop machine and mark as Shift End (deduplicating 0-min ghost events)
         let newDowntimeEvents = [...(order.downtimeEvents || [])];
@@ -2633,18 +2649,27 @@ const App: React.FC = () => {
 
                         console.log(`[Watchdog] Saneando apenas log órfão antigo para ${machName} (OP #${order.orderNumber}, data: ${logDateStr})`);
 
-                        // Fecha EXCLUSIVAMENTE os logs do dia anterior, sem tocar na máquina de hoje nem alterar a produção atual
+                        // Fecha EXCLUSIVAMENTE os logs do dia anterior, sem tocar na máquina de hoje nem zerar a produção
                         const updatedLogs = (order.operatorLogs || []).map((l: any) => {
                             const lStart = l.startTime || l.start_time;
                             if (!isLogEnded(l) && lStart && new Date(lStart).toLocaleDateString('sv-SE') < todayStr) {
+                                const pkgPieces = (order.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
+                                const safeEndQty = Math.max(
+                                    Number(l.endQuantity) || 0,
+                                    Number(l.end_quantity) || 0,
+                                    Number(order.actualProducedQuantity) || 0,
+                                    pkgPieces,
+                                    Number(l.startQuantity) || 0,
+                                    Number(l.start_quantity) || 0
+                                );
                                 return {
                                     ...l,
                                     endTime: retroEndIso,
                                     end_time: retroEndIso,
                                     autoClosed: true,
                                     auto_closed: true,
-                                    endQuantity: l.endQuantity || l.end_quantity || l.startQuantity || l.start_quantity || 0,
-                                    end_quantity: l.endQuantity || l.end_quantity || l.startQuantity || l.start_quantity || 0
+                                    endQuantity: safeEndQty,
+                                    end_quantity: safeEndQty
                                 };
                             }
                             return l;
@@ -2760,7 +2785,8 @@ const App: React.FC = () => {
 
                     console.log(`[Watchdog de Turno] Encerrando automaticamente ${machName} (OP #${order.orderNumber}). Horário limite: ${shiftEval.workEnd}`);
 
-                    const finalQty = order.actualProducedQuantity || 0;
+                    const pkgPieces = (order.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
+                    const finalQty = Math.max(Number(order.actualProducedQuantity) || 0, pkgPieces);
                     try {
                         await endOperatorShift(order.id, finalQty, {
                             autoClosed: true,
@@ -3327,13 +3353,39 @@ const App: React.FC = () => {
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
         if (!order) return;
-        const newPackage: WeighedPackage = { ...packageData, timestamp: new Date().toISOString() };
+        const nowIso = new Date().toISOString();
+        const newPackage: WeighedPackage = { ...packageData, timestamp: nowIso };
         const newWeighedPackages = [...(order.weighedPackages || []).filter(p => p.packageNumber !== packageData.packageNumber), newPackage].sort((a, b) => a.packageNumber - b.packageNumber);
+        
+        // Acumular total de peças de todos os pacotes pesados para garantir que actualProducedQuantity nunca fique zerada
+        const totalPackagePieces = newWeighedPackages.reduce((acc, p) => acc + (Number(p.quantity) || 200), 0);
+        const prevQty = Number(order.actualProducedQuantity) || 0;
+        const updatedQty = Math.max(prevQty, totalPackagePieces);
+        const deltaPieces = Math.max(0, updatedQty - prevQty);
+
+        const updates: Partial<ProductionOrderData> = { 
+            weighedPackages: newWeighedPackages,
+            actualProducedQuantity: updatedQty,
+            lastQuantityUpdate: nowIso
+        };
+
         try {
-            const updatedOrder = await updateItem('production_orders', orderId, { weighedPackages: newWeighedPackages });
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification(`Peso do pacote #${packageData.packageNumber} registrado.`, 'success');
-        } catch (error) { showNotification('Erro ao registrar pacote.', 'error'); }
+            showNotification(`Peso do pacote #${packageData.packageNumber} registrado (${updatedQty} pçs acumuladas).`, 'success');
+
+            // Abater o consumo das bobinas nos porta-rolos da Treliça proporcional ao acréscimo
+            const machine = order.machine || order.scheduledMachine || '';
+            if (machine.startsWith('Treliça') && deltaPieces > 0) {
+                const model = order.trelicaModel || (order as any)?.trelica_model || '';
+                const tamanho = order.tamanho;
+                deductTrelicaSpoolStandConsumption(machine, model, tamanho, deltaPieces).catch(e => {
+                    console.warn('Erro ao abater nível das bobinas no pacote:', e);
+                });
+            }
+        } catch (error) { 
+            showNotification('Erro ao registrar pacote.', 'error'); 
+        }
     };
 
     const addLotToOrder = async (orderId: string, lotId: string) => {

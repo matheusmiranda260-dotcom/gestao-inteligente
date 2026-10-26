@@ -115,10 +115,10 @@ export const resolveMachineShiftConfig = (
     globalConfig?: PcpShiftConfig | null
 ): MachineShiftConfig => {
     const rawMachName = (machineName || '').trim();
-    const norm = (s: string) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const norm = (s: string) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^_+/, '').trim();
     const rawNorm = norm(rawMachName);
 
-    // 1. Busca exata ou por prefixo em machineConfigs (ex: 'Treliça' casa com 'Treliça 1')
+    // 1. Busca exata ou por prefixo em machineConfigs (suporta nomes com ou sem prefixo '_')
     let custom = globalConfig?.machineConfigs?.[rawMachName];
     if (!custom && rawMachName && globalConfig?.machineConfigs) {
         const matchedKey = Object.keys(globalConfig.machineConfigs).find(k => {
@@ -231,6 +231,54 @@ const parseHourMin = (timeStr: any) => {
 };
 
 /**
+ * Extrai componentes de data e hora garantindo fuso oficial de Brasília (America/Sao_Paulo).
+ * Isso impede que dispositivos com relógio em UTC derrubem turnos horas antes do expediente.
+ */
+export const getBrasiliaDateInfo = (refDate: Date = new Date()) => {
+    try {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        const parts = formatter.formatToParts(refDate);
+        const map: Record<string, string> = {};
+        for (const p of parts) map[p.type] = p.value;
+        const year = parseInt(map.year, 10);
+        const month = parseInt(map.month, 10);
+        const day = parseInt(map.day, 10);
+        let hour = parseInt(map.hour, 10);
+        if (hour === 24) hour = 0;
+        const minute = parseInt(map.minute, 10);
+        const second = parseInt(map.second, 10);
+        const localSpDate = new Date(year, month - 1, day, hour, minute, second);
+        const dayOfWeek = localSpDate.getDay();
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        return { year, month, day, hour, minute, second, dayOfWeek, dateStr, localSpDate };
+    } catch (_) {
+        const y = refDate.getFullYear();
+        const m = refDate.getMonth() + 1;
+        const d = refDate.getDate();
+        return {
+            year: y,
+            month: m,
+            day: d,
+            hour: refDate.getHours(),
+            minute: refDate.getMinutes(),
+            second: refDate.getSeconds(),
+            dayOfWeek: refDate.getDay(),
+            dateStr: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+            localSpDate: refDate
+        };
+    }
+};
+
+/**
  * Avalia em tempo real a situação do turno para uma máquina, considerando dias úteis, horários e feriados cadastrados.
  */
 export const checkMachineShiftStatus = (
@@ -241,11 +289,9 @@ export const checkMachineShiftStatus = (
 ): MachineShiftEvaluation => {
     const config = resolveMachineShiftConfig(machineName, globalConfig);
 
-    // Formatar data local de referência no formato 'YYYY-MM-DD'
-    const y = refDate.getFullYear();
-    const m = String(refDate.getMonth() + 1).padStart(2, '0');
-    const d = String(refDate.getDate()).padStart(2, '0');
-    const todayDateStr = `${y}-${m}-${d}`;
+    // Obter data e hora locais no fuso oficial de Brasília
+    const brDate = getBrasiliaDateInfo(refDate);
+    const todayDateStr = brDate.dateStr;
 
     // Resolver feriados disponíveis (parâmetro direto > embutido em globalConfig > cache no localStorage)
     let allHolidays: { date: string; description?: string }[] = [];
@@ -261,13 +307,12 @@ export const checkMachineShiftStatus = (
     const isHoliday = Boolean(matchedHoliday);
     const holidayName = matchedHoliday?.description || '';
 
-    const dayOfWeek = refDate.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+    const dayOfWeek = brDate.dayOfWeek; // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
     const workDays = config.workDays || [1, 2, 3, 4, 5];
     const isRegularWorkDay = workDays.includes(dayOfWeek);
 
-    const nowMs = refDate.getTime();
-    const currentH = refDate.getHours();
-    const currentM = refDate.getMinutes();
+    const currentH = brDate.hour;
+    const currentM = brDate.minute;
     const currentVal = currentH + currentM / 60;
 
     let activeShiftName = config.shiftCount === 1 ? '1º Turno (Único)' : 'Turno Padrão';
@@ -295,10 +340,10 @@ export const checkMachineShiftStatus = (
     const { h: startH, m: startM } = parseHourMin(sStartStr);
     const { h: endH, m: endM } = parseHourMin(sEndStr);
 
-    const shiftStart = new Date(refDate);
+    const shiftStart = new Date(brDate.localSpDate);
     shiftStart.setHours(startH, startM, 0, 0);
 
-    const shiftEnd = new Date(refDate);
+    const shiftEnd = new Date(brDate.localSpDate);
     shiftEnd.setHours(endH, endM, 0, 0);
 
     // Tratamento para turnos noturnos que viram a meia-noite
@@ -310,6 +355,7 @@ export const checkMachineShiftStatus = (
         }
     }
 
+    const nowMs = brDate.localSpDate.getTime();
     const startMs = shiftStart.getTime();
     const endMs = shiftEnd.getTime();
     const autoEndTimeoutMin = config.autoEndTimeoutMin || 5;
@@ -333,7 +379,7 @@ export const checkMachineShiftStatus = (
             shiftStartMs: startMs,
             shiftEndMs: endMs,
             autoStartShift: false,
-            autoEndShift: config.autoEndShift !== false,
+            autoEndShift: false, // Não auto-encerrar compulsivamente se houver operador trabalhando no feriado
             autoEndTimeoutMin,
             requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
             progressPercent: 0,
@@ -359,7 +405,7 @@ export const checkMachineShiftStatus = (
             shiftStartMs: startMs,
             shiftEndMs: endMs,
             autoStartShift: false,
-            autoEndShift: config.autoEndShift !== false,
+            autoEndShift: false, // Não auto-encerrar compulsivamente em fim de semana com produção ativa
             autoEndTimeoutMin,
             requireManagerAuthForOvertime: config.requireManagerAuthForOvertime !== false,
             progressPercent: 0,

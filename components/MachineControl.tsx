@@ -1966,7 +1966,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
     useEffect(() => {
-        if ((activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && activeOrder && !isMachineStopped && hasActiveShift && !showQuantityPrompt) {
+        if ((activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && activeOrder && hasActiveShift && !showQuantityPrompt) {
             const lastUpdate = activeOrder.lastQuantityUpdate || activeOrder.startTime;
             if (!lastUpdate) return;
 
@@ -1974,8 +1974,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
             const nowMs = now.getTime();
             const diff = nowMs - baseTime;
 
-            // Treliça: ciclo a cada 5 minutos conforme solicitação para acompanhamento contínuo dos rolos; outras máquinas: 10 min
-            const promptIntervalMs = activeMachine.startsWith('Treliça') ? 5 * 60 * 1000 : 10 * 60 * 1000;
+            // Treliça e Malha: ciclo a cada 5 minutos conforme solicitação para acompanhamento contínuo dos rolos; outras máquinas: 10 min
+            const promptIntervalMs = (activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) ? 5 * 60 * 1000 : 10 * 60 * 1000;
             const isIntervalElapsed = diff > promptIntervalMs;
             const isLastPromptElapsed = nowMs - lastPromptShownAt > promptIntervalMs;
 
@@ -1984,7 +1984,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 setLastPromptShownAt(nowMs);
             }
         }
-    }, [now, activeOrder, isMachineStopped, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt, activeMachine]);
+    }, [now, activeOrder, hasActiveShift, machineType, showQuantityPrompt, lastPromptShownAt, activeMachine]);
 
     // Reset autorização de hora extra quando o turno ou a OP mudar
     useEffect(() => {
@@ -2029,7 +2029,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 setShowAutoEndCountdownModal(false);
                 if (endOperatorShift && activeOrder && autoEndShiftTriggeredRef.current !== activeOrder.id) {
                     autoEndShiftTriggeredRef.current = activeOrder.id;
-                    const finalQty = activeOrder.actualProducedQuantity || 0;
+                    const pkgPieces = (activeOrder.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
+                    const finalQty = Math.max(Number(activeOrder.actualProducedQuantity) || 0, pkgPieces);
                     endOperatorShift(activeOrder.id, finalQty, {
                         autoClosed: true,
                         observation: `Encerramento automático pelo sistema por fim do ${shiftStatus.shiftName} (${shiftStatus.shiftLabel}). Quantidade registrada: ${finalQty}.`
@@ -3801,13 +3802,24 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         </h3>
 
-                                        {activeMachine.startsWith('Treliça') ? (
+                                        {(activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) ? (
                                             <div className="space-y-6">
                                                 <div className="relative pt-2">
                                                     <div className="flex items-end justify-between mb-3">
                                                         <div>
                                                             <div className="flex flex-col">
-                                                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-1">Peças no Turno</span>
+                                                                <div className="flex items-center justify-between gap-3 mb-1">
+                                                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">Peças no Turno</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowQuantityPrompt(true)}
+                                                                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-wider shadow-sm transition active:scale-95 flex items-center gap-1 cursor-pointer"
+                                                                        title="Lançar ou atualizar contagem de peças do turno agora"
+                                                                    >
+                                                                        <span>⚡</span>
+                                                                        <span>Lançar Peças</span>
+                                                                    </button>
+                                                                </div>
                                                                 <div className="flex items-baseline gap-3">
                                                                     <span className="text-6xl font-black text-slate-900 tracking-tighter leading-none">
                                                                         {Math.max(0, (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog?.startQuantity || 0))}
@@ -4790,16 +4802,16 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             <span>Fechar OP</span>
                                                         </button>
 
-                                                        {isMachineStopped && (
+                                                        {(activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && (
                                                             <button
                                                                 onClick={() => {
                                                                     setShowMobileActions(false);
-                                                                    setShowDowntimeModal(true);
+                                                                    setShowQuantityPrompt(true);
                                                                 }}
-                                                                className="p-3 text-amber-600 hover:bg-amber-50/50 font-bold flex items-center gap-3 transition"
+                                                                className="p-3 text-indigo-600 hover:bg-indigo-50/50 font-bold flex items-center gap-3 transition"
                                                             >
-                                                                <PauseIcon className="h-6 w-6 text-amber-500" />
-                                                                <span>Menu de Paradas</span>
+                                                                <span className="text-xl">⚡</span>
+                                                                <span>Lançar Peças</span>
                                                             </button>
                                                         )}
 
