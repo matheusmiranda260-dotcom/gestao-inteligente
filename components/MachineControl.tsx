@@ -698,34 +698,65 @@ const BitolaCheckModal: React.FC<{
 
 const QuantityPromptModal: React.FC<{
     onClose: () => void;
-    onSubmit: (quantity: number) => void;
+    onSubmit: (quantity: number, isDirectTotal?: boolean) => void;
     currentQuantity: number;
     machineName?: string;
     order?: ProductionOrderData | null;
-}> = ({ onClose, onSubmit, currentQuantity, machineName, order }) => {
-    const [quantity, setQuantity] = useState(currentQuantity);
+    shiftStartQuantity?: number;
+}> = ({ onClose, onSubmit, currentQuantity, machineName, order, shiftStartQuantity = 0 }) => {
+    // Modo: 'shift' (peças deste turno) ou 'total' (contador total acumulado da máquina/OP)
+    const [mode, setMode] = useState<'shift' | 'total'>('shift');
+    
+    // Valor inicial do turno (currentQuantity)
+    const [shiftQty, setShiftQty] = useState(currentQuantity);
+    
+    // Valor inicial do total acumulado (order.actualProducedQuantity || 0)
+    const totalOrderQty = Number(order?.actualProducedQuantity) || (shiftStartQuantity + currentQuantity);
+    const [totalQty, setTotalQty] = useState(totalOrderQty);
+    
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const isTrelica = machineName?.startsWith('Treliça');
-    const isBelowMinimum = quantity < currentQuantity;
 
-    // Calcular peso estimado do acréscimo de peças
-    const pieceDelta = Math.max(0, quantity - currentQuantity);
+    // Cálculos dinâmicos baseados no modo selecionado
+    const effectiveShiftQty = mode === 'shift' ? shiftQty : Math.max(0, totalQty - shiftStartQuantity);
+    const effectiveTotalQty = mode === 'shift' ? (shiftStartQuantity + shiftQty) : totalQty;
+    const pieceDelta = Math.max(0, effectiveShiftQty - currentQuantity);
+
     const trelicaUnitWeight = order?.totalWeight && order?.quantityToProduce 
         ? (order.totalWeight / order.quantityToProduce) 
         : (isTrelica ? 6.4 : 0);
     const estimatedWireKg = pieceDelta * trelicaUnitWeight;
 
-    const handleChange = (valStr: string) => {
+    const isBelowMinimum = mode === 'shift' 
+        ? shiftQty < currentQuantity 
+        : totalQty < totalOrderQty;
+
+    const handleShiftChange = (valStr: string) => {
         const val = parseInt(valStr, 10);
         if (isNaN(val)) {
-            setQuantity(0);
-            setErrorMsg(`A quantidade não pode ficar vazia. Mínimo: ${currentQuantity} peças.`);
+            setShiftQty(0);
+            setErrorMsg(`Informe a quantidade de peças.`);
             return;
         }
-        setQuantity(val);
+        setShiftQty(val);
         if (val < currentQuantity) {
-            setErrorMsg(`⚠️ Atenção: Você não pode informar um valor menor que ${currentQuantity} peças (já confirmadas anteriormente). Isso evita distorções no cálculo de consumo das bobinas de arame.`);
+            setErrorMsg(`⚠️ Atenção: Não é permitido informar menos que ${currentQuantity} peças (já confirmadas anteriormente neste turno).`);
+        } else {
+            setErrorMsg(null);
+        }
+    };
+
+    const handleTotalChange = (valStr: string) => {
+        const val = parseInt(valStr, 10);
+        if (isNaN(val)) {
+            setTotalQty(0);
+            setErrorMsg(`Informe a contagem total.`);
+            return;
+        }
+        setTotalQty(val);
+        if (val < totalOrderQty) {
+            setErrorMsg(`⚠️ A contagem total não pode ser menor que ${totalOrderQty} peças (valor já acumulado na ordem).`);
         } else {
             setErrorMsg(null);
         }
@@ -733,11 +764,15 @@ const QuantityPromptModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (quantity < currentQuantity) {
-            setErrorMsg(`Erro: Não é permitido registrar quantidade inferior a ${currentQuantity} peças.`);
+        if (isBelowMinimum) {
+            setErrorMsg(`Erro: Quantidade informada inferior ao mínimo registrado.`);
             return;
         }
-        onSubmit(quantity);
+        if (mode === 'total') {
+            onSubmit(totalQty, true);
+        } else {
+            onSubmit(shiftQty, false);
+        }
     };
 
     return (
@@ -760,19 +795,73 @@ const QuantityPromptModal: React.FC<{
                     </span>
                 </div>
 
-                {/* Banner Informativo */}
+                {/* Seletor de Modo: Peças do Turno vs Contador Geral da Máquina */}
+                <div className="grid grid-cols-2 gap-2 p-1 bg-black/40 border border-white/10 rounded-xl">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setMode('shift');
+                            setErrorMsg(null);
+                        }}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            mode === 'shift'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        <span>🕒</span>
+                        <span>Peças Deste Turno</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setMode('total');
+                            setErrorMsg(null);
+                        }}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            mode === 'total'
+                                ? 'bg-cyan-600 text-white shadow-md'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        <span>📟</span>
+                        <span>Contador Geral / Painel</span>
+                    </button>
+                </div>
+
+                {/* Banner Informativo contextual */}
                 <div className="bg-blue-950/40 border border-blue-500/30 p-3 rounded-xl flex items-start gap-2.5 text-xs text-blue-200">
                     <ClockIcon className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
                     <div>
-                        <div className="font-bold text-white flex items-center gap-2">
-                            <span>Último registro confirmado:</span>
-                            <span className="font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 text-xs font-black">
-                                {currentQuantity} peças
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-slate-300 mt-1">
-                            Informe a contagem total produzida no seu turno até agora. O sistema calculará o consumo exato dos rolos da máquina.
-                        </p>
+                        {mode === 'shift' ? (
+                            <>
+                                <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                                    <span>Início do seu turno:</span>
+                                    <span className="font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30 text-xs font-bold">
+                                        {shiftStartQuantity} pçs
+                                    </span>
+                                    <span>• Confirmado neste turno:</span>
+                                    <span className="font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 text-xs font-black">
+                                        {currentQuantity} pçs
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-slate-300 mt-1">
+                                    Digite apenas o que <strong>você produziu no seu turno</strong>. O sistema somará ao início da OP automaticamente.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                                    <span>Contagem total atual da OP:</span>
+                                    <span className="font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30 text-xs font-bold">
+                                        {totalOrderQty} pçs
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-slate-300 mt-1">
+                                    Digite o <strong>número total exibido no visor/contador da máquina</strong> ou no pallet. O sistema creditará a diferença ao seu turno sem duplicar!
+                                </p>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -783,7 +872,10 @@ const QuantityPromptModal: React.FC<{
                         <div>
                             <span className="font-black text-white">Quantidade Bloqueada!</span>
                             <p className="text-[11px] text-rose-300 mt-0.5">
-                                {errorMsg || `A quantidade não pode ser menor que ${currentQuantity} peças (valor já registrado). Para evitar erros no nível das bobinas, digite um valor igual ou maior.`}
+                                {errorMsg || (mode === 'shift' 
+                                    ? `A quantidade não pode ser menor que ${currentQuantity} peças (já confirmadas neste turno).`
+                                    : `A contagem geral não pode ser menor que ${totalOrderQty} peças (já acumuladas na ordem).`
+                                )}
                             </p>
                         </div>
                     </div>
@@ -793,23 +885,25 @@ const QuantityPromptModal: React.FC<{
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                            Total Produzido no Turno
+                            {mode === 'shift' ? 'Total Produzido no Seu Turno' : 'Contador Acumulado da Máquina / OP'}
                         </label>
                         <span className="text-[10px] font-mono text-slate-400">
-                            Mínimo obrigatório: <strong className="text-white">{currentQuantity} pçs</strong>
+                            Mínimo: <strong className="text-white">{mode === 'shift' ? `${currentQuantity} pçs` : `${totalOrderQty} pçs`}</strong>
                         </span>
                     </div>
 
                     <div className="relative">
                         <input
                             type="number"
-                            min={currentQuantity}
-                            value={quantity === 0 && currentQuantity === 0 ? '' : quantity}
-                            onChange={e => handleChange(e.target.value)}
+                            min={mode === 'shift' ? currentQuantity : totalOrderQty}
+                            value={mode === 'shift' ? (shiftQty === 0 && currentQuantity === 0 ? '' : shiftQty) : (totalQty === 0 ? '' : totalQty)}
+                            onChange={e => mode === 'shift' ? handleShiftChange(e.target.value) : handleTotalChange(e.target.value)}
                             className={`w-full p-5 border-2 rounded-2xl text-5xl text-center font-black transition-all outline-none bg-black/40 text-white ${
                                 isBelowMinimum
                                     ? 'border-rose-500 text-rose-300 focus:border-rose-400 ring-2 ring-rose-500/20'
-                                    : 'border-emerald-500/50 focus:border-emerald-400 ring-2 ring-emerald-500/20'
+                                    : mode === 'shift'
+                                        ? 'border-emerald-500/50 focus:border-emerald-400 ring-2 ring-emerald-500/20'
+                                        : 'border-cyan-500/50 focus:border-cyan-400 ring-2 ring-cyan-500/20'
                             }`}
                             required
                             autoFocus
@@ -821,35 +915,41 @@ const QuantityPromptModal: React.FC<{
                     </div>
                 </div>
 
-                {/* Indicador de impacto do acréscimo nos rolos */}
-                {pieceDelta > 0 && (
-                    <div className="bg-emerald-950/30 border border-emerald-500/25 p-2.5 rounded-xl flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5 text-emerald-300">
-                            <span>⚡</span>
-                            <span>Acréscimo neste reporte:</span>
-                            <strong className="font-mono font-black text-white">+{pieceDelta} pçs</strong>
-                        </div>
-                        {estimatedWireKg > 0 && (
-                            <div className="text-[11px] text-slate-300 font-mono">
-                                Consumo estimado: <strong className="text-emerald-400 font-black">~{estimatedWireKg.toFixed(1)} kg</strong>
-                            </div>
-                        )}
+                {/* Resumo do Impacto da Contagem */}
+                <div className="bg-slate-900/90 border border-white/10 p-3 rounded-xl flex flex-col gap-2 text-xs font-mono">
+                    <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Creditado a este turno:</span>
+                        <strong className="text-emerald-400 font-bold text-sm">
+                            {effectiveShiftQty} pçs {pieceDelta > 0 && <span className="text-emerald-300 font-normal text-xs">(+{pieceDelta} novas)</span>}
+                        </strong>
                     </div>
-                )}
+                    <div className="flex items-center justify-between border-t border-white/5 pt-1.5">
+                        <span className="text-slate-400">Novo Total da Ordem:</span>
+                        <strong className="text-cyan-400 font-bold text-sm">
+                            {effectiveTotalQty} pçs
+                        </strong>
+                    </div>
+                    {estimatedWireKg > 0 && (
+                        <div className="flex items-center justify-between border-t border-white/5 pt-1.5 text-[11px] text-amber-300">
+                            <span>⚡ Consumo de arame estimado:</span>
+                            <strong className="font-bold">~{estimatedWireKg.toFixed(1)} kg</strong>
+                        </div>
+                    )}
+                </div>
 
                 {/* Rodapé com Ações */}
                 <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition"
+                        className="bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition cursor-pointer"
                     >
                         Adiar / Cancelar
                     </button>
                     <button
                         type="submit"
                         disabled={isBelowMinimum}
-                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-6 rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center gap-1.5"
+                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-6 rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer"
                     >
                         <span>✓</span>
                         <span>Confirmar Produção</span>
@@ -969,10 +1069,11 @@ const ManagerActionAuthorizationModal: React.FC<{
 
 const LotSelectionModal: React.FC<{
     onClose: () => void;
-    onSelect: (lotId: string) => void;
+    onSelect: (lotIds: string[]) => void;
     stock: StockItem[];
 }> = ({ onClose, onSelect, stock }) => {
     const [search, setSearch] = useState('');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const availableStock = useMemo(() => {
         return stock.filter(item =>
@@ -980,63 +1081,176 @@ const LotSelectionModal: React.FC<{
             item.remainingQuantity > 0 &&
             (search === '' ||
                 item.internalLot.toLowerCase().includes(search.toLowerCase()) ||
-                item.supplier.toLowerCase().includes(search.toLowerCase()))
+                item.supplier.toLowerCase().includes(search.toLowerCase()) ||
+                item.bitola.toLowerCase().includes(search.toLowerCase()))
         ).sort((a, b) => a.internalLot.localeCompare(b.internalLot, undefined, { numeric: true }));
     }, [stock, search]);
 
+    const toggleLot = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleAll = () => {
+        if (selectedIds.size === availableStock.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(availableStock.map(l => l.id)));
+        }
+    };
+
+    const totalSelectedWeight = useMemo(() => {
+        return availableStock
+            .filter(item => selectedIds.has(item.id))
+            .reduce((sum, item) => sum + (Number(item.remainingQuantity || item.initialQuantity) || 0), 0);
+    }, [availableStock, selectedIds]);
+
+    const handleConfirm = () => {
+        if (selectedIds.size === 0) return;
+        onSelect(Array.from(selectedIds));
+    };
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-slate-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold text-slate-800">Selecionar Lote do Estoque</h2>
-                        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition"><XCircleIcon className="h-6 w-6 text-slate-400" /></button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-3 sm:p-4 animate-fade-in">
+            <div className="bg-[#0B1A24] border border-white/20 rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] text-white">
+                <div className="p-6 border-b border-white/10 space-y-4">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl font-black text-white">Acrescentar Lotes de Fio Máquina</h2>
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+                                    Gestor
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Selecione um ou mais lotes disponíveis em estoque para adicionar à ordem de produção.
+                            </p>
+                        </div>
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition text-slate-400 hover:text-white cursor-pointer">
+                            <XCircleIcon className="h-6 w-6" />
+                        </button>
                     </div>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Buscar por lote ou fornecedor..."
-                            className="w-full p-3 pl-10 border-2 border-slate-100 rounded-xl focus:border-indigo-500 transition outline-none"
-                            autoFocus
-                        />
-                        <ArchiveIcon className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+
+                    <div className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Buscar por número do lote, fornecedor ou bitola..."
+                                className="w-full py-2.5 pl-10 pr-4 bg-slate-900/90 border border-white/15 rounded-xl text-white placeholder-slate-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none text-sm transition"
+                                autoFocus
+                            />
+                            <ArchiveIcon className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        </div>
+                        {availableStock.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={toggleAll}
+                                className="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer shrink-0"
+                            >
+                                {selectedIds.size === availableStock.length ? 'Desmarcar Todos' : 'Marcar Todos'}
+                            </button>
+                        )}
                     </div>
                 </div>
-                <div className="flex-grow overflow-y-auto p-4">
+
+                <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
                     {availableStock.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-2">
-                            {availableStock.map(lot => (
-                                <button
-                                    key={lot.id}
-                                    onClick={() => onSelect(lot.id)}
-                                    className="flex justify-between items-center p-4 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 border border-transparent rounded-xl transition text-left group"
-                                >
-                                    <div>
-                                        <p className="font-bold text-slate-800 text-lg group-hover:text-indigo-700">{lot.internalLot}</p>
-                                        <div className="flex gap-3 mt-1">
-                                            <span className="text-xs font-bold text-slate-500 uppercase">{lot.materialType}</span>
-                                            <span className="text-xs font-bold text-indigo-600 uppercase">{lot.bitola}</span>
-                                            <span className="text-xs text-slate-400">{lot.supplier}</span>
+                        <div className="grid grid-cols-1 gap-2.5">
+                            {availableStock.map(lot => {
+                                const isSelected = selectedIds.has(lot.id);
+                                const lotWeight = Number(lot.remainingQuantity || lot.initialQuantity) || 0;
+                                return (
+                                    <div
+                                        key={lot.id}
+                                        onClick={() => toggleLot(lot.id)}
+                                        className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                                            isSelected
+                                                ? 'bg-indigo-950/50 border-indigo-500/70 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+                                                : 'bg-slate-900/60 border-white/10 hover:border-white/20 hover:bg-slate-900/80'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleLot(lot.id)}
+                                                onClick={e => e.stopPropagation()}
+                                                className="w-5 h-5 rounded border-white/20 text-indigo-600 focus:ring-indigo-500 bg-black/40 cursor-pointer"
+                                            />
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono font-black text-white text-base">
+                                                        {lot.internalLot}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                                        {lot.bitola}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                                                    <span>{lot.supplier}</span>
+                                                    {lot.heatNumber && <span>• Corrida: {lot.heatNumber}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-mono font-black text-white text-base">
+                                                {lotWeight.toLocaleString('pt-BR')} kg
+                                            </p>
+                                            <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                                Disponível
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-black text-slate-600">{lot.remainingQuantity?.toFixed(2) || '-'} kg</p>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Disponível</p>
-                                    </div>
-                                </button>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
-                        <div className="text-center py-10">
-                            <WarningIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                            <p className="text-slate-500">Nenhum lote disponível encontrado.</p>
+                        <div className="text-center py-12">
+                            <WarningIcon className="h-12 w-12 text-slate-500 mx-auto mb-2" />
+                            <p className="text-slate-400 font-bold text-sm">Nenhum lote de Fio Máquina disponível encontrado para esta bitola.</p>
+                            <p className="text-xs text-slate-500 mt-1">Verifique o estoque de matéria-prima ou filtros de busca.</p>
                         </div>
                     )}
                 </div>
-                <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                    <button onClick={onClose} className="bg-white border-2 border-slate-200 text-slate-600 font-bold py-2 px-6 rounded-xl hover:bg-slate-100 transition">FECHAR</button>
+
+                {/* Rodapé com Resumo de Seleção e Ação */}
+                <div className="p-4 bg-slate-900/90 border-t border-white/10 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3 text-xs font-mono">
+                        <span className="text-slate-400">Selecionados:</span>
+                        <strong className="text-indigo-400 font-bold text-sm">
+                            {selectedIds.size} {selectedIds.size === 1 ? 'lote' : 'lotes'}
+                        </strong>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-400">Peso a somar:</span>
+                        <strong className="text-emerald-400 font-bold text-sm">
+                            +{totalSelectedWeight.toLocaleString('pt-BR')} kg
+                        </strong>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirm}
+                            disabled={selectedIds.size === 0}
+                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-5 rounded-xl text-xs transition shadow-lg shadow-indigo-900/40 flex items-center gap-2 cursor-pointer"
+                        >
+                            <span>➕</span>
+                            <span>Adicionar {selectedIds.size > 0 ? `(${selectedIds.size}) à Ordem` : 'à Ordem'}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1330,6 +1544,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [pendingResumeAfterAuth, setPendingResumeAfterAuth] = useState(false);
     const [pendingStartOrderId, setPendingStartOrderId] = useState<string | null>(null);
     const [showManagerAuthForOvertimeExtend, setShowManagerAuthForOvertimeExtend] = useState(false);
+    const [showManagerAuthForAddLots, setShowManagerAuthForAddLots] = useState(false);
     const [authorizedOvertimeForCurrentShift, setAuthorizedOvertimeForCurrentShift] = useState(false);
     const [showAutoEndCountdownModal, setShowAutoEndCountdownModal] = useState(false);
     const [pendingStartIsOvertime, setPendingStartIsOvertime] = useState(false);
@@ -1337,6 +1552,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [trelicaValidationBlock, setTrelicaValidationBlock] = useState<TrelicaElectrodesValidation | null>(null);
     const [showTrelicaBlockModal, setShowTrelicaBlockModal] = useState<boolean>(false);
     const autoEndShiftTriggeredRef = useRef<string | null>(null);
+
+    const handleOpenAddLots = () => {
+        if (isGestor) {
+            setShowLotSelectionModal(true);
+        } else {
+            setShowManagerAuthForAddLots(true);
+        }
+    };
 
     const shiftEvaluation = useMemo(() => {
         return checkMachineShiftStatus(activeMachine, pcpShiftConfig, now, holidays);
@@ -2321,7 +2544,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
         }
     };
 
-    const handleUpdateQuantity = (shiftQuantity: number) => {
+    const handleUpdateQuantity = (quantity: number, isDirectTotal?: boolean) => {
         // Validação de Controladoria: Eletrodos com lotes cadastrados na Treliça antes de contabilizar
         if (activeMachine.startsWith('Treliça')) {
             const val = validateTrelicaElectrodesConfigured(activeMachine);
@@ -2335,8 +2558,25 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const targetOrder = pendingShiftEnd ? (productionOrders.find(o => o.id === pendingShiftEnd)) : activeOrder;
 
         if (targetOrder && updateProducedQuantity) {
-            const startQty = currentOperatorLog?.startQuantity || 0;
-            const newTotal = startQty + shiftQuantity;
+            const startQty = Number(currentOperatorLog?.startQuantity) || 0;
+            const currentTotal = Number(targetOrder.actualProducedQuantity) || 0;
+
+            let newTotal = 0;
+            if (isDirectTotal) {
+                // Operador digitou o contador total acumulado diretamente
+                newTotal = Math.max(currentTotal, quantity);
+            } else {
+                // Modo Turno com trava de segurança anti-duplicação:
+                // Se a OP já tinha início > 0 e o operador digitou um valor que já é igual ou maior que o total da ordem
+                // (e claramente muito acima do que foi feito apenas neste turno), ele digitou a contagem acumulada da máquina!
+                // NÃO SOMAR startQty por cima de quantity para não dar +70 a mais!
+                if (startQty > 0 && quantity >= currentTotal && quantity > (currentTotal - startQty + 20)) {
+                    console.log(`[Segurança Contador] Operador digitou contagem total da máquina (${quantity}) em vez do delta de turno. Ajustando total sem duplicar o início de ${startQty}.`);
+                    newTotal = quantity;
+                } else {
+                    newTotal = startQty + quantity;
+                }
+            }
 
             updateProducedQuantity(targetOrder.id, newTotal);
 
@@ -2872,6 +3112,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     onClose={() => setShowQuantityPrompt(false)}
                     onSubmit={handleUpdateQuantity}
                     currentQuantity={Math.max(0, (promptOrder.actualProducedQuantity || 0) - (currentOperatorLog?.startQuantity || 0))}
+                    shiftStartQuantity={Number(currentOperatorLog?.startQuantity) || 0}
                     machineName={activeMachine}
                     order={promptOrder}
                 />
@@ -3048,6 +3289,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     onCancel={() => setShowManagerAuthForOvertimeExtend(false)}
                 />
             )}
+            {showManagerAuthForAddLots && (
+                <ManagerActionAuthorizationModal
+                    users={users}
+                    actionDescription={`Autorização de Gestor para acrescentar novos lotes de matéria-prima e aumentar a meta a produzir da OP #${activeOrder?.orderNumber} na máquina ${activeMachine}.`}
+                    onSuccess={() => {
+                        setShowManagerAuthForAddLots(false);
+                        setShowLotSelectionModal(true);
+                    }}
+                    onCancel={() => setShowManagerAuthForAddLots(false)}
+                />
+            )}
             {showAutoEndCountdownModal && activeOrder && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[120] p-4 animate-fade-in">
                     <div className="bg-[#0B1A24] border-2 border-amber-500/60 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-xl text-white relative overflow-hidden">
@@ -3178,9 +3430,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         });
                         return filteredStock;
                     })()}
-                    onSelect={(lotId) => {
+                    onSelect={(lotIds) => {
                         if (activeOrder && addLotToOrder) {
-                            addLotToOrder(activeOrder.id, lotId);
+                            addLotToOrder(activeOrder.id, lotIds as any);
                             setShowLotSelectionModal(false);
                         }
                     }}
@@ -3585,6 +3837,32 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <span className="text-xl font-black text-slate-800">20.000 <span className="text-[10px] text-slate-300">kg</span> <span className="text-[10px] text-slate-400 ml-1">/ 10 Lts</span></span>
                                                 </div>
                                             </div>
+
+                                            {/* Acesso Rápido para Gestor Adicionar Lotes à OP (Mobile) */}
+                                            <div className="bg-gradient-to-r from-slate-900 via-[#0B1A24] to-slate-900 border-2 border-indigo-500/40 rounded-3xl p-4 shadow-xl text-white flex items-center justify-between gap-3 animate-fade-in">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-2xl shadow-inner shrink-0">
+                                                        📦
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300 block">
+                                                            Matéria-Prima da OP
+                                                        </span>
+                                                        <span className="text-sm font-black text-white font-mono">
+                                                            {waitingLots.length} lotes na fila • {(activeOrder.selectedLotIds || []).length} total
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOpenAddLots}
+                                                    className="px-3.5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-indigo-950/60 transition cursor-pointer shrink-0 border border-indigo-400/40"
+                                                    title="Acrescentar mais lotes do estoque à Ordem em Produção para aumentar a meta a produzir"
+                                                >
+                                                    <span>➕</span>
+                                                    <span>Adicionar Lotes</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : (
                                         // ORIGINAL CONTENT FOR TRELIÇA OR DESKTOP
@@ -3631,6 +3909,39 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             Horário encerrado. Finalize o turno.
                                                         </p>
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* Card de Atualização Rápida no Celular (Treliça e Malha) */}
+                                            {(activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && (
+                                                <div className="md:hidden bg-gradient-to-r from-slate-900 via-[#0B1A24] to-slate-900 border-2 border-indigo-500/50 rounded-3xl p-4 shadow-xl text-white flex items-center justify-between gap-3 animate-fade-in">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-2xl shadow-inner shrink-0">
+                                                            ⚡
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300 block">
+                                                                Peças do Seu Turno
+                                                            </span>
+                                                            <div className="flex items-baseline gap-2">
+                                                                <span className="text-3xl font-black text-white font-mono leading-none">
+                                                                    {Math.max(0, (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog?.startQuantity || 0))}
+                                                                </span>
+                                                                <span className="text-xs font-bold text-slate-300 uppercase">pçs</span>
+                                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                                    (Total OP: {activeOrder.actualProducedQuantity || 0})
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowQuantityPrompt(true)}
+                                                        className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-indigo-950/60 transition cursor-pointer shrink-0 border border-indigo-400/40"
+                                                    >
+                                                        <span>📊</span>
+                                                        <span>Lançar</span>
+                                                    </button>
                                                 </div>
                                             )}
 
@@ -3737,8 +4048,21 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </div>
                                                 <div className="hidden md:block">
                                                     <p className="text-[10px] md:text-xs text-slate-500 mb-1">Meta</p>
-                                                    <p className="text-sm md:text-base font-semibold text-slate-700">{activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? '20.000' : activeOrder.totalWeight?.toFixed(0) || 0} kg</p>
+                                                    <p className="text-sm md:text-base font-semibold text-slate-700">{activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? `${activeOrder.quantityToProduce?.toFixed(0) || activeOrder.totalWeight?.toFixed(0) || '20.000'} kg` : `${activeOrder.totalWeight?.toFixed(0) || 0} kg`}</p>
                                                 </div>
+                                                {(activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) && (
+                                                    <div className="hidden md:flex items-center justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleOpenAddLots}
+                                                            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-indigo-900/20 transition active:scale-95 flex items-center gap-2 cursor-pointer"
+                                                            title="Acrescentar mais lotes do estoque à Ordem em Produção para aumentar a meta a produzir"
+                                                        >
+                                                            <span>➕</span>
+                                                            <span>Adicionar Lotes à OP</span>
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
 
 
@@ -4277,8 +4601,20 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
 
                                             <div className={`bg-white p-6 rounded-2xl shadow-sm ${mobileTab !== 'process' ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <h3 className="text-lg font-bold text-slate-700">Fila de Lotes (Matéria-Prima)</h3>
+                                                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-slate-700">Fila de Lotes (Matéria-Prima)</h3>
+                                                        <p className="text-xs text-slate-400">Lotes de Fio Máquina reservados para processamento nesta ordem</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleOpenAddLots}
+                                                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-md shadow-indigo-900/20 transition active:scale-95 cursor-pointer"
+                                                        title="Acrescentar mais lotes do estoque à Ordem em Produção para aumentar a meta a produzir"
+                                                    >
+                                                        <span className="text-sm">➕</span>
+                                                        <span>Adicionar Lotes à OP (Gestor)</span>
+                                                    </button>
                                                 </div>
                                                 <div className="overflow-x-auto">
                                                     {waitingLots.length > 0 ? (
@@ -4773,6 +5109,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         <span className="text-[10px] font-black tracking-wider text-center leading-tight whitespace-nowrap">Menu de<br/>Paradas</span>
                                                     </button>
                                                 )}
+
+                                                {/* Botão Rápido de Atualização de Peças no Celular (Treliça e Malha) */}
+                                                {(activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha')) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowQuantityPrompt(true)}
+                                                        className="h-24 md:hidden px-3.5 rounded-3xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase flex flex-col items-center justify-center gap-1 shadow-xl shadow-indigo-950/40 active:scale-95 transition border-2 border-indigo-400/50 flex-shrink-0 cursor-pointer"
+                                                        title="Atualização Rápida de Peças do Turno"
+                                                    >
+                                                        <span className="text-xl animate-pulse">⚡</span>
+                                                        <span className="text-[10px] font-black tracking-wider text-center leading-tight whitespace-nowrap">Atualizar<br/>Peças</span>
+                                                    </button>
+                                                )}
                                                 
                                                 {/* Botão Split (Seta) Menu para Mobile da Trefila */}
                                                 <button
@@ -4812,6 +5161,19 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                             >
                                                                 <span className="text-xl">⚡</span>
                                                                 <span>Lançar Peças</span>
+                                                            </button>
+                                                        )}
+
+                                                        {(activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowMobileActions(false);
+                                                                    handleOpenAddLots();
+                                                                }}
+                                                                className="p-3 text-indigo-600 hover:bg-indigo-50/50 font-bold flex items-center gap-3 transition"
+                                                            >
+                                                                <span className="text-xl">📦</span>
+                                                                <span>Adicionar Lotes (Gestor)</span>
                                                             </button>
                                                         )}
 

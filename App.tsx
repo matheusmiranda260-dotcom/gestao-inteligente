@@ -3388,8 +3388,11 @@ const App: React.FC = () => {
         }
     };
 
-    const addLotToOrder = async (orderId: string, lotId: string) => {
-        console.log(`[Trefila] Adicionando lote ${lotId} à ordem ${orderId}`);
+    const addLotToOrder = async (orderId: string, lotIdOrIds: string | string[]) => {
+        const lotIds = Array.isArray(lotIdOrIds) ? lotIdOrIds : [lotIdOrIds];
+        if (lotIds.length === 0) return;
+
+        console.log(`[Trefila] Adicionando ${lotIds.length} lote(s) à ordem ${orderId}:`, lotIds);
         const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
         const order = fetchedOrders[0];
         if (!order) {
@@ -3397,19 +3400,46 @@ const App: React.FC = () => {
             return;
         }
 
-        const currentLots = Array.isArray(order.selectedLotIds) ? order.selectedLotIds : [];
-        if (currentLots.includes(lotId)) return;
+        const currentLots = Array.isArray(order.selectedLotIds) 
+            ? (order.selectedLotIds as any[]).map((l: any) => typeof l === 'string' ? l : (l?.lotId || l?.id)).filter(Boolean)
+            : [];
+            
+        const newUniqueLotIds = lotIds.filter(id => !currentLots.includes(id));
+        if (newUniqueLotIds.length === 0) {
+            showNotification('O(s) lote(s) selecionado(s) já constam nesta ordem.', 'error');
+            return;
+        }
+
+        // Calcular peso somado dos novos lotes a partir do estoque para aumentar meta a produzir
+        const addedWeight = newUniqueLotIds.reduce((sum, id) => {
+            const item = stock.find(s => s.id === id);
+            return sum + (Number(item?.remainingQuantity || item?.initialQuantity) || 0);
+        }, 0);
+
+        const currentTotalWeight = Number(order.totalWeight) || Number(order.quantityToProduce) || 0;
+        const newTotalWeight = currentTotalWeight + addedWeight;
+
+        const isTrefila = (typeof order.machine === 'string' && order.machine.startsWith('Trefila')) || 
+                          (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
 
         const updates: Partial<ProductionOrderData> = {
-            selectedLotIds: [...currentLots, lotId]
+            selectedLotIds: [...currentLots, ...newUniqueLotIds],
+            lastQuantityUpdate: new Date().toISOString()
         };
+
+        if (isTrefila && addedWeight > 0) {
+            updates.totalWeight = newTotalWeight;
+            updates.quantityToProduce = newTotalWeight;
+        }
 
         try {
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-            showNotification('Lote adicionado à ordem.', 'success');
+            const weightMsg = addedWeight > 0 ? ` (+${addedWeight.toLocaleString('pt-BR')} kg adicionados à meta)` : '';
+            showNotification(`${newUniqueLotIds.length} lote(s) adicionado(s) à ordem com sucesso${weightMsg}.`, 'success');
         } catch (error) {
-            showNotification('Erro ao adicionar lote.', 'error');
+            console.error('[Trefila] Erro ao adicionar lotes:', error);
+            showNotification('Erro ao adicionar lotes à ordem.', 'error');
         }
     };
 
@@ -3740,16 +3770,39 @@ const App: React.FC = () => {
 
 
     const deleteShiftReport = async (reportId: string) => {
-        if (!confirm('⚠️ Tem certeza que deseja EXCLUIR permanentemente este relatório de turno? As quantidades produzidas nele serão subtraídas da Ordem de Produção mãe.')) return;
-        try {
-            const report = shiftReports?.find(r => r.id === reportId);
-            if (!report) throw new Error("Relatório não encontrado");
+        if (!isGestorUser) {
+            showNotification('Apenas Gestores ou Administradores têm permissão para excluir relatórios de turno.', 'error');
+            return;
+        }
 
+        const report = shiftReports?.find(r => r.id === reportId);
+        if (!report) {
+            showNotification('Relatório não encontrado.', 'error');
+            return;
+        }
+
+        const confirmDelete = confirm(
+            `⚠️ EXCLUSÃO DE RELATÓRIO DE TURNO\n\n` +
+            `Operador: ${report.operator}\nMáquina: ${report.machine}\nData: ${new Date(report.date || report.shiftStartTime || '').toLocaleDateString('pt-BR')}\n` +
+            `Produção no Relatório: ${report.totalProducedQuantity || 0} pçs / ${report.totalProducedWeight || 0} kg\n\n` +
+            `Tem certeza que deseja excluir este relatório?`
+        );
+        if (!confirmDelete) return;
+
+        // Perguntar explicitamente se deseja abater da OP ou apenas apagar o relatório duplicado
+        const shouldDeduct = confirm(
+            `🔒 TRAVA DE SEGURANÇA DE PRODUÇÃO:\n\n` +
+            `Deseja também SUBTRAIR as ${report.totalProducedQuantity || 0} pçs / ${report.totalProducedWeight || 0} kg da Ordem de Produção mãe?\n\n` +
+            `• [OK] = Sim, abater as peças da OP mãe e remover o log.\n` +
+            `• [CANCELAR] = Não, MANTER a quantidade da OP mãe intacta (recomendado se for relatório duplicado ou correção de registro).`
+        );
+
+        try {
             // 1. Delete from database
             await deleteItem('shift_reports', reportId);
 
-            // 2. Subtract from parent order and adjust active shift startQuantity if present
-            if (report.productionOrderId) {
+            // 2. Subtract from parent order ONLY if explicitly requested by manager
+            if (shouldDeduct && report.productionOrderId) {
                 const parentOrder = productionOrders?.find(o => o.id === report.productionOrderId);
                 if (parentOrder) {
                     const qtyDelta = -(report.totalProducedQuantity || 0);
@@ -3764,7 +3817,6 @@ const App: React.FC = () => {
                     if (parentOrder.operatorLogs && parentOrder.operatorLogs.length > 0) {
                         orderUpdates.operatorLogs = parentOrder.operatorLogs
                             .filter(log => {
-                                // Match the operator log of this shift report to delete it
                                 const isMatch = log.operator === report.operator && log.startTime === report.shiftStartTime;
                                 return !isMatch;
                             })
@@ -3782,9 +3834,15 @@ const App: React.FC = () => {
                     await updateProductionOrder(parentOrder.id, orderUpdates);
                 }
             }
-            // Update local state for shiftReports as well, to ensure immediate update
+
+            // Update local state for shiftReports
             setShiftReports(prev => prev.filter(r => r.id !== reportId));
-            showNotification('Relatório excluído e totais da ordem recalculados!', 'success');
+            showNotification(
+                shouldDeduct 
+                    ? 'Relatório excluído e quantidades subtraídas da ordem.' 
+                    : 'Relatório excluído. As quantidades da ordem foram PRESERVADAS intactas.', 
+                'success'
+            );
         } catch (error: any) {
             console.error("Erro ao excluir relatório:", error);
             showNotification(`Erro ao excluir o relatório: ${error.message || error}`, 'error');
