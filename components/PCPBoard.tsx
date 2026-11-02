@@ -2107,15 +2107,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // OPs Agendadas para a semana atual
     const scheduledOrders = useMemo(() => {
         return productionOrders.filter(op => {
-            if (!op.plannedStartDate || !op.scheduledMachine) return false;
-            if (op.status === 'Cancelada') return false;
+            const mach = op.scheduledMachine || (op.machine as string);
+            if (!mach) return false;
+            if (op.status === 'Cancelada' || op.status === 'cancelled') return false;
 
-            const opStart = op.plannedStartDate;
-            let opEnd = op.plannedEndDate || opStart;
-            const isOpLive = op.status === 'in_progress' || op.status === 'Em Produção';
-            if (isOpLive && todayStr > opEnd) {
-                opEnd = todayStr;
+            const isOpLive = op.status === 'in_progress' || op.status === 'Em Produção' || op.status === 'running';
+
+            // Ordem ativa na máquina sempre permanece visível no cronograma
+            if (isOpLive) {
+                return true;
             }
+
+            const rawStart = op.plannedStartDate;
+            if (!rawStart) return false;
+
+            const opStart = rawStart.slice(0, 10);
+            let opEnd = (op.plannedEndDate || rawStart).slice(0, 10);
 
             return opStart <= fridayStr && opEnd >= mondayStr;
         });
@@ -4012,7 +4019,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (openLog && sQty !== undefined) {
                 liveShiftPcs = Math.max(0, totalOverall - sQty);
             }
-            todayProduced = Math.max(dayPackagesQty + reportsDayQty, dayLogsPcs, liveShiftPcs);
+            // Evita duplicação: se já existe relatório de turno gerado para a data, ele consolida os pacotes
+            const isolatedProduction = reportsDayQty > 0 
+                ? Math.max(reportsDayQty, dayPackagesQty) 
+                : dayPackagesQty;
+            todayProduced = Math.max(isolatedProduction, dayLogsPcs, liveShiftPcs);
         }
 
         let produced = 0;
@@ -5255,7 +5266,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         <div className="flex-1 flex flex-col relative min-h-0 bg-[#F8FAFC]">
                             {availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name)).map((mach) => {
                                 const machOps = scheduledOrders
-                                    .filter(op => op.scheduledMachine === mach.name)
+                                    .filter(op => op.scheduledMachine === mach.name || op.machine === mach.name)
                                     .sort((a, b) => {
                                         // 1. Ordem Ao Vivo / Em Produção (in_progress) sempre tem prioridade máxima (trilha 0)
                                         const aIsLive = a.status === 'in_progress' || a.status === 'Em Produção';

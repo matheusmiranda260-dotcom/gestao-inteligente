@@ -2237,7 +2237,13 @@ const App: React.FC = () => {
 
     const startOperatorShift = async (
         orderId: string, 
-        options?: { isOvertime?: boolean; managerAuthorized?: string; checkinOnly?: boolean }
+        options?: { 
+            isOvertime?: boolean; 
+            managerAuthorized?: string; 
+            checkinOnly?: boolean;
+            handoverFrom?: string;
+            handoverReason?: string;
+        }
     ) => {
         if (!currentUser) return;
         const now = new Date().toISOString();
@@ -2252,6 +2258,14 @@ const App: React.FC = () => {
         );
 
         let updatedLogs: OperatorLog[];
+        const isTr = (typeof order.machine === 'string' && order.machine.startsWith('Trefila')) || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
+        const currentQty = isTr 
+            ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0) 
+            : (Number(order.actualProducedQuantity) || 0);
+
+        let handoverClosedLog: OperatorLog | null = null;
+        let isHandoverAction = false;
+
         if (openCheckinLogIndex >= 0) {
             // Preserva o horário de início oficial do turno agendado!
             updatedLogs = (order.operatorLogs || []).map((log, idx) => {
@@ -2271,25 +2285,52 @@ const App: React.FC = () => {
                 return log;
             });
         } else {
-            // Fecha logs anteriores se houver
+            // Fecha logs anteriores se houver (se for outro operador, registra passagem de posto e gera relatório)
             const newLogs = (order.operatorLogs || []).map(log => {
                 if (!log.endTime) {
-                    return { ...log, endTime: now, endQuantity: order.actualProducedQuantity || 0 };
+                    const prevOp = log.operator;
+                    const isDifferentOp = prevOp && prevOp.toLowerCase() !== currentUser.username.toLowerCase();
+                    const reason = options?.handoverReason || (isDifferentOp ? 'Cobertura / Assumiu a máquina' : 'Troca de operador');
+                    const note = isDifferentOp 
+                        ? `Posto assumido por ${currentUser.username} às ${new Date(now).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (Motivo: ${reason}). Quantidade produzida no trecho: ${Math.max(0, currentQty - (Number(log.startQuantity) || 0))} ${isTr ? 'kg' : 'pçs'}.`
+                        : undefined;
+
+                    const closed: OperatorLog = { 
+                        ...log, 
+                        endTime: now, 
+                        endQuantity: currentQty,
+                        handoverTo: isDifferentOp ? currentUser.username : undefined,
+                        handoverReason: isDifferentOp ? reason : undefined,
+                        observation: note || log.observation
+                    };
+                    if (isDifferentOp) {
+                        handoverClosedLog = closed;
+                        isHandoverAction = true;
+                    }
+                    return closed;
                 }
                 return log;
             });
 
             const isOt = Boolean(options?.isOvertime);
             const mgrAuth = options?.managerAuthorized;
+            const prevOpName = options?.handoverFrom || (handoverClosedLog ? (handoverClosedLog as any).operator : undefined);
+            const newLogObs = prevOpName 
+                ? `Assumiu a máquina de ${prevOpName} às ${new Date(now).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (Motivo: ${options?.handoverReason || 'Cobertura de Operação'}). Saldo inicial: ${currentQty} ${isTr ? 'kg' : 'pçs'}.`
+                : undefined;
+
             updatedLogs = [...newLogs, {
                 operator: currentUser.username,
                 startTime: now,
                 endTime: null,
-                startQuantity: order.actualProducedQuantity || 0,
+                startQuantity: currentQty,
                 isOvertime: isOt,
                 is_overtime: isOt,
                 managerAuthorized: mgrAuth,
-                manager_authorized: mgrAuth
+                manager_authorized: mgrAuth,
+                handoverFrom: prevOpName,
+                handoverReason: prevOpName ? (options?.handoverReason || 'Cobertura de Operação') : undefined,
+                observation: newLogObs
             }];
         }
 
@@ -2357,9 +2398,26 @@ const App: React.FC = () => {
         }
 
         try {
-            await updateItem('production_orders', orderId, updates);
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+            
+            // Se houve passagem de posto, gerar relatório imediato para o trecho do operador anterior
+            if (handoverClosedLog && (handoverClosedLog as any).operator && (handoverClosedLog as any).operator !== 'GHOST_ORDER_FLAG') {
+                try {
+                    await generateShiftReport(updatedOrder, handoverClosedLog, (handoverClosedLog as any).observation);
+                } catch (e) {
+                    console.warn('Erro ao gerar relatório do operador anterior na assunção de máquina:', e);
+                }
+            }
+
             setProductionOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
-            showNotification(openCheckinLogIndex >= 0 ? 'Check-in confirmado! Turno vinculado ao seu usuário.' : 'Turno iniciado.', 'success');
+            
+            if (isHandoverAction && handoverClosedLog) {
+                showNotification(`Você assumiu a máquina de ${(handoverClosedLog as any).operator}! O trecho dele foi gravado no relatório.`, 'success');
+            } else if (openCheckinLogIndex >= 0) {
+                showNotification('Check-in confirmado! Turno vinculado ao seu usuário.', 'success');
+            } else {
+                showNotification('Turno iniciado com sucesso.', 'success');
+            }
         } catch (error) {
             showNotification('Erro ao iniciar turno.', 'error');
         }
@@ -2573,6 +2631,21 @@ const App: React.FC = () => {
         }
         updates.downtimeEvents = newDowntimeEvents;
 
+        if (options?.autoClosed) {
+            const lastLog = logsToReport[logsToReport.length - 1];
+            updates.pendingAutoCloseReview = {
+                closedAt: now,
+                closedQty: safeFinalQty,
+                operator: lastLog?.operator || 'Operador',
+                reviewed: false
+            };
+        } else if (order.pendingAutoCloseReview) {
+            updates.pendingAutoCloseReview = {
+                ...order.pendingAutoCloseReview,
+                reviewed: true
+            };
+        }
+
         try {
             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
 
@@ -2584,6 +2657,75 @@ const App: React.FC = () => {
             showNotification(options?.autoClosed ? 'Turno encerrado automaticamente pelo sistema.' : 'Turno finalizado com sucesso e registrado no PCP.', 'success');
         } catch (error) {
             showNotification('Erro ao finalizar turno.', 'error');
+        }
+    };
+
+    const reviewAutoClosedShiftQuantity = async (orderId: string, adjustedQuantity: number, operatorJustification?: string) => {
+        const fetchedOrders = await fetchByColumn<ProductionOrderData>('production_orders', 'id', orderId);
+        const order = fetchedOrders[0];
+        if (!order) return;
+
+        const isTr = (typeof order.machine === 'string' && order.machine.startsWith('Trefila')) || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
+        const oldQty = isTr 
+            ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0) 
+            : (Number(order.actualProducedQuantity) || 0);
+
+        // Atualiza o último log de operador que foi auto-fechado
+        const updatedLogs = (order.operatorLogs || []).map((l: any) => {
+            if (l.autoClosed || l.auto_closed) {
+                const note = operatorJustification || `Quantidade confirmada/retificada pelo operador após auto-encerramento: de ${oldQty} para ${adjustedQuantity} ${isTr ? 'kg' : 'pçs'}.`;
+                return {
+                    ...l,
+                    endQuantity: adjustedQuantity,
+                    end_quantity: adjustedQuantity,
+                    observation: l.observation ? `${l.observation} | ${note}` : note
+                };
+            }
+            return l;
+        });
+
+        const updates: Partial<ProductionOrderData> = {
+            operatorLogs: updatedLogs,
+            lastQuantityUpdate: new Date().toISOString(),
+            pendingAutoCloseReview: {
+                closedAt: order.pendingAutoCloseReview?.closedAt || new Date().toISOString(),
+                closedQty: adjustedQuantity,
+                operator: order.pendingAutoCloseReview?.operator,
+                reviewed: true
+            }
+        };
+
+        if (isTr) {
+            updates.actualProducedWeight = adjustedQuantity;
+            updates.totalProducedWeight = adjustedQuantity;
+        } else {
+            updates.actualProducedQuantity = adjustedQuantity;
+        }
+
+        try {
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
+
+            // Atualiza o relatório de turno correspondente mais recente
+            const latestAutoRep = (shiftReports || []).slice().reverse().find(r => 
+                (r.productionOrderId === order.id || r.orderNumber === order.orderNumber) &&
+                (r.autoClosed || (r as any).auto_closed)
+            );
+
+            if (latestAutoRep) {
+                const repUpdates: any = isTr 
+                    ? { totalProducedWeight: adjustedQuantity } 
+                    : { totalProducedQuantity: adjustedQuantity };
+                const repNote = operatorJustification || `Quantidade final retificada pelo operador: de ${oldQty} para ${adjustedQuantity} ${isTr ? 'kg' : 'pçs'}.`;
+                repUpdates.observation = latestAutoRep.observation ? `${latestAutoRep.observation} | ${repNote}` : repNote;
+                await updateItem('shift_reports', latestAutoRep.id, repUpdates);
+                setShiftReports(prev => prev.map(r => r.id === latestAutoRep.id ? { ...r, ...repUpdates } : r));
+            }
+
+            setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+            showNotification(`Quantidade do turno confirmada/atualizada para ${adjustedQuantity.toLocaleString('pt-BR')} ${isTr ? 'kg' : 'pçs'} com sucesso!`, 'success');
+        } catch (err) {
+            console.error('Erro ao retificar quantidade do auto-encerramento:', err);
+            showNotification('Erro ao salvar ajuste de quantidade.', 'error');
         }
     };
 
@@ -2767,7 +2909,8 @@ const App: React.FC = () => {
                 const shiftEval = checkMachineShiftStatus(machName, pcpShiftConfig, now, pcpHolidays);
 
                 // Se a máquina possui autoEndShift ativo e o horário do turno encerrou + tolerância esgotada
-                if (shiftEval.autoEndShift && shiftEval.isOvertime && !shiftEval.inShiftWindow && !shiftEval.isAutoEndCountdown) {
+                // REGRA CRÍTICA: Não auto-encerrar compulsoriamente se for feriado ou folga com operador trabalhando
+                if (shiftEval.autoEndShift && shiftEval.isOvertime && !shiftEval.inShiftWindow && !shiftEval.isAutoEndCountdown && !shiftEval.isHoliday && shiftEval.isWorkDay !== false) {
                     const hasManagerOvertime = openLogs.some(l => 
                         Boolean(
                             l.managerAuthorized || 
@@ -3911,6 +4054,7 @@ const App: React.FC = () => {
             updateProducedQuantity, users, deleteShiftReport, gauges, cancelProductionOrder,
             pauseProductionOrder, resumeProductionOrder, addLotToOrder, downtimeConfigs,
             updateProductionOrder, onUpdateReport: handleUpdateShiftReport,
+            reviewAutoClosedShiftQuantity,
             pcpShiftConfig,
             holidays: pcpHolidays
         };

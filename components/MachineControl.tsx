@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand, PcpShiftConfig, PcpHoliday } from '../types';
 import { DOWNTIME_THRESHOLDS } from '../types';
-import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon } from './icons';
+import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon, ArrowPathIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
 import ProductionOrderReport from './ProductionOrderReport';
@@ -1268,7 +1268,7 @@ interface MachineControlProps {
     logPostProductionActivity?: (activity: string) => void;
     updateProducedQuantity?: (orderId: string, quantity: number) => void;
     startProductionOrder?: (orderId: string) => void;
-    startOperatorShift?: (orderId: string, options?: { isOvertime?: boolean; managerAuthorized?: string; checkinOnly?: boolean }) => void | Promise<void>;
+    startOperatorShift?: (orderId: string, options?: { isOvertime?: boolean; managerAuthorized?: string; checkinOnly?: boolean; handoverFrom?: string; handoverReason?: string }) => void | Promise<void>;
     endOperatorShift?: (orderId: string, finalQuantity?: number, options?: { autoClosed?: boolean; observation?: string; isOvertime?: boolean; managerAuthorized?: string }) => void | Promise<void>;
     logDowntime?: (orderId: string, reason: string) => void;
     logResumeProduction?: (orderId: string) => void;
@@ -1289,6 +1289,7 @@ interface MachineControlProps {
     downtimeConfigs?: DowntimeConfig[];
     updateProductionOrder?: (orderId: string, updates: Partial<ProductionOrderData>) => void;
     onUpdateReport?: (reportId: string, updates: Partial<ShiftReport>) => Promise<void>;
+    reviewAutoClosedShiftQuantity?: (orderId: string, adjustedQuantity: number, operatorJustification?: string) => void | Promise<void>;
     pcpShiftConfig?: PcpShiftConfig;
     holidays?: PcpHoliday[];
 }
@@ -1351,7 +1352,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     recordLotWeight, recordPackageWeight, completeProduction, addPartsRequest,
     logPostProductionActivity, updateProducedQuantity, deleteShiftReport,
     cancelProductionOrder, pauseProductionOrder, resumeProductionOrder, addLotToOrder, initialView, initialModal, gauges = [],
-    downtimeConfigs = [], updateProductionOrder, onUpdateReport, pcpShiftConfig, holidays = []
+    downtimeConfigs = [], updateProductionOrder, onUpdateReport, reviewAutoClosedShiftQuantity, pcpShiftConfig, holidays = []
 }) => {
     const isGestor = currentUser?.role === 'admin' || currentUser?.role === 'gestor' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'gestor' || currentUser?.username?.toLowerCase().includes('matheusmiranda');
     const [activeMachine, setActiveMachine] = useState<MachineType>(() => {
@@ -1441,6 +1442,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [osSearchTerm, setOsSearchTerm] = useState('');
 
     const [editingLotId, setEditingLotId] = useState<string | null>(null);
+
+    // Estados para Passagem de Posto / Assumir Máquina (Adrian -> Gustavo)
+    const [selectedHandoverReason, setSelectedHandoverReason] = useState<string>('Almoço / Intervalo');
+    const [customHandoverReason, setCustomHandoverReason] = useState<string>('');
+    const [isHandoverSubmitting, setIsHandoverSubmitting] = useState<boolean>(false);
+
+    // Estados para Retificação / Confirmação de Quantidade pós Auto-Encerramento
+    const [showAutoCloseReviewModal, setShowAutoCloseReviewModal] = useState<boolean>(false);
+    const [autoCloseReviewQty, setAutoCloseReviewQty] = useState<number>(0);
+    const [autoCloseReviewNote, setAutoCloseReviewNote] = useState<string>('');
+    const [isSubmittingAutoCloseReview, setIsSubmittingAutoCloseReview] = useState<boolean>(false);
 
     const handlePendingWeightChange = (lotId: string, value: string) => {
         setPendingWeights(prev => new Map(prev).set(lotId, value));
@@ -1583,7 +1595,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
         };
     }, [shiftEvaluation, authorizedOvertimeForCurrentShift]);
 
-    const handleStartShift = (forceOvertime: boolean | any = false, managerAuthUser?: string) => {
+    const handleStartShift = (
+        forceOvertime: boolean | any = false, 
+        managerAuthUser?: string,
+        handoverOptions?: { fromOperator: string; reason: string }
+    ) => {
         if (!activeOrder || !startOperatorShift) return;
 
         // Validação Obrigatória de Controladoria: Eletrodos com lotes cadastrados na Treliça
@@ -1621,7 +1637,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
         } else {
             // Normal start — all events are administrative, just begin
             autoEndShiftTriggeredRef.current = null;
-            startOperatorShift(activeOrder.id, { isOvertime: isOt, managerAuthorized: mgrAuth });
+            startOperatorShift(activeOrder.id, { 
+                isOvertime: isOt, 
+                managerAuthorized: mgrAuth,
+                handoverFrom: handoverOptions?.fromOperator,
+                handoverReason: handoverOptions?.reason
+            });
         }
     };
 
@@ -2243,22 +2264,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return;
         }
 
-        // Se passou do horário de término do turno
-        if (shiftEvaluation.isOvertime && !shiftStatus.inShiftWindow) {
+        // Se a máquina possui autoEndShift ativo e NÃO for feriado nem folga oficial
+        const canAutoEnd = shiftStatus.autoEndShift && !shiftStatus.isHoliday && shiftStatus.isWorkDay !== false;
+
+        // Se passou do horário de término do turno regular
+        if (canAutoEnd && shiftEvaluation.isOvertime && !shiftStatus.inShiftWindow) {
             if (shiftStatus.isAutoEndCountdown) {
                 setShowAutoEndCountdownModal(true);
             } else {
-                // Tempo de tolerância esgotou (ex: 5 min) -> Executar auto-encerramento pelo sistema!
                 setShowAutoEndCountdownModal(false);
-                if (endOperatorShift && activeOrder && autoEndShiftTriggeredRef.current !== activeOrder.id) {
-                    autoEndShiftTriggeredRef.current = activeOrder.id;
-                    const pkgPieces = (activeOrder.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
-                    const finalQty = Math.max(Number(activeOrder.actualProducedQuantity) || 0, pkgPieces);
-                    endOperatorShift(activeOrder.id, finalQty, {
-                        autoClosed: true,
-                        observation: `Encerramento automático pelo sistema por fim do ${shiftStatus.shiftName} (${shiftStatus.shiftLabel}). Quantidade registrada: ${finalQty}.`
-                    });
-                }
             }
         } else {
             setShowAutoEndCountdownModal(false);
@@ -3006,28 +3020,72 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             </>
                         ) : (
                             <>
-                                <div className="bg-amber-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-xl">
-                                    <CogIcon className="h-12 w-12 text-amber-500 animate-spin-slow" />
+                                <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-lg">
+                                    <ArrowPathIcon className="h-10 w-10 text-indigo-600 animate-spin-slow" />
                                 </div>
-                                <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight uppercase">Máquina Ocupada</h3>
-                                <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100">
-                                    <p className="text-slate-500 text-sm leading-relaxed font-bold">
-                                        O operador <span className="text-amber-600 font-black uppercase text-base">{currentOperatorLog?.operator}</span> ainda possui um turno ativo nesta máquina.
-                                    </p>
+                                <span className="text-[10px] font-black uppercase tracking-widest bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full mb-2 inline-block">
+                                    Operador Ativo no Posto
+                                </span>
+                                <h3 className="text-2xl font-black text-slate-900 mb-1 tracking-tight uppercase">Assumir Máquina</h3>
+                                
+                                <div className="bg-slate-50 rounded-2xl p-4 mb-4 border border-slate-200 text-left space-y-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-500 font-bold">Operando agora:</span>
+                                        <span className="text-amber-700 font-black uppercase text-sm">{currentOperatorLog?.operator}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-slate-500 font-bold">Desde:</span>
+                                        <span className="text-slate-700 font-bold">
+                                            {currentOperatorLog?.startTime ? new Date(currentOperatorLog.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-slate-200 pt-1.5">
+                                        <span className="text-slate-500 font-bold">Saldo atual produzido:</span>
+                                        <span className="text-emerald-700 font-black text-sm">
+                                            {activeMachine.startsWith('Trefila') 
+                                                ? `${(Number(activeOrder.actualProducedWeight) || 0).toLocaleString('pt-BR')} kg`
+                                                : `${(Number(activeOrder.actualProducedQuantity) || 0).toLocaleString('pt-BR')} pçs`}
+                                        </span>
+                                    </div>
                                 </div>
-                                <p className="text-slate-400 mb-8 text-xs font-black uppercase tracking-widest leading-relaxed">
-                                    Se você é <span className="text-indigo-600 font-black">{currentUser?.username}</span> e vai iniciar seu turno agora,<br/>clique no botão abaixo:
-                                </p>
-                                <div className="flex flex-col gap-4">
+
+                                <div className="text-left mb-4">
+                                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
+                                        Motivo da assunção / cobertura:
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-1.5 mb-2">
+                                        {['Almoço / Intervalo', 'Apoio / Rendição', 'Troca de Posto'].map(r => (
+                                            <button
+                                                key={r}
+                                                type="button"
+                                                onClick={() => setSelectedHandoverReason(r)}
+                                                className={`py-2 px-1 text-[11px] font-bold rounded-xl border transition-all text-center ${
+                                                    selectedHandoverReason === r
+                                                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm font-black'
+                                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                                }`}
+                                            >
+                                                {r === 'Almoço / Intervalo' ? '🥪 Almoço' : r === 'Apoio / Rendição' ? '🤝 Apoio' : '🔄 Troca'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3">
                                     <button
-                                        onClick={() => handleStartShift()}
-                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 px-8 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-[0.1em] transition-all shadow-xl shadow-indigo-100 active:scale-[0.97]"
+                                        onClick={() => {
+                                            handleStartShift(false, undefined, {
+                                                fromOperator: currentOperatorLog?.operator || 'Operador',
+                                                reason: selectedHandoverReason
+                                            });
+                                        }}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-2xl uppercase text-sm flex items-center justify-center gap-3 tracking-[0.08em] transition-all shadow-xl shadow-indigo-100 active:scale-[0.97] cursor-pointer"
                                     >
-                                        <PlayIcon className="h-6 w-6" />
-                                        Assumir Turno de {currentUser?.username || 'Hoje'}
+                                        <ArrowPathIcon className="h-5 w-5" />
+                                        Assumir Máquina como {currentUser?.username}
                                     </button>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                        Ao clicar, o turno de {currentOperatorLog?.operator} será encerrado automaticamente.
+                                    <p className="text-[10px] text-slate-400 font-bold leading-tight text-center">
+                                        O trecho de <strong className="text-slate-600">{currentOperatorLog?.operator}</strong> será gravado com o saldo atual no relatório e você assumirá os próximos apontamentos.
                                     </p>
                                 </div>
                             </>
@@ -3289,16 +3347,92 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     onCancel={() => setShowManagerAuthForOvertimeExtend(false)}
                 />
             )}
-            {showManagerAuthForAddLots && (
-                <ManagerActionAuthorizationModal
-                    users={users}
-                    actionDescription={`Autorização de Gestor para acrescentar novos lotes de matéria-prima e aumentar a meta a produzir da OP #${activeOrder?.orderNumber} na máquina ${activeMachine}.`}
-                    onSuccess={() => {
-                        setShowManagerAuthForAddLots(false);
-                        setShowLotSelectionModal(true);
-                    }}
-                    onCancel={() => setShowManagerAuthForAddLots(false)}
-                />
+            {showAutoCloseReviewModal && activeOrder && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[130] p-4 animate-fade-in">
+                    <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-2xl w-full max-w-md border border-slate-200">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-xl font-bold">
+                                    ✏️
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-900 leading-tight">Retificar Peças Finais</h3>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Turno Encerrado pelo Sistema</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAutoCloseReviewModal(false)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="py-4 space-y-4">
+                            <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-900 space-y-1">
+                                <p>O sistema gravou <strong>{(activeOrder.pendingAutoCloseReview?.closedQty || 0).toLocaleString('pt-BR')} {activeMachine.startsWith('Trefila') ? 'kg' : 'pçs'}</strong> no fechamento automático.</p>
+                                <p className="text-[11px] text-amber-700">Informe abaixo o valor exato real produzido até o término daquele turno:</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase text-slate-700 mb-1.5">
+                                    Quantidade Final Real ({activeMachine.startsWith('Trefila') ? 'kg' : 'peças'}):
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={autoCloseReviewQty || ''}
+                                    onChange={(e) => setAutoCloseReviewQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                    className="w-full text-2xl font-mono font-black text-slate-900 bg-slate-50 border-2 border-slate-300 rounded-2xl px-4 py-3 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
+                                    placeholder="Ex: 920"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1">
+                                    Observação / Motivo (opcional):
+                                </label>
+                                <input
+                                    type="text"
+                                    value={autoCloseReviewNote}
+                                    onChange={(e) => setAutoCloseReviewNote(e.target.value)}
+                                    className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
+                                    placeholder="Ex: Produzi 70 peças a mais antes do fim da jornada"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2.5 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowAutoCloseReviewModal(false)}
+                                className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-xs uppercase transition cursor-pointer"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSubmittingAutoCloseReview}
+                                onClick={async () => {
+                                    if (!reviewAutoClosedShiftQuantity || !activeOrder) return;
+                                    setIsSubmittingAutoCloseReview(true);
+                                    try {
+                                        await reviewAutoClosedShiftQuantity(activeOrder.id, autoCloseReviewQty, autoCloseReviewNote.trim() || undefined);
+                                        setShowAutoCloseReviewModal(false);
+                                    } finally {
+                                        setIsSubmittingAutoCloseReview(false);
+                                    }
+                                }}
+                                className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase transition shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                            >
+                                {isSubmittingAutoCloseReview ? 'Salvando...' : 'Salvar Quantidade'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {showAutoEndCountdownModal && activeOrder && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[120] p-4 animate-fade-in">
@@ -3790,6 +3924,48 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     >
                                         Autorizar com Senha do Gestor
                                     </button>
+                                </div>
+                            )}
+                            {activeOrder?.pendingAutoCloseReview && !activeOrder.pendingAutoCloseReview.reviewed && (
+                                <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-indigo-500/15 border-2 border-amber-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md animate-fade-in">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm text-xl font-bold">
+                                            ⏰
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-2">
+                                                <span>Turno Anterior Encerrado pelo Sistema</span>
+                                                <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">Pendente de Conferência</span>
+                                            </p>
+                                            <p className="text-xs text-slate-700 font-medium mt-0.5">
+                                                O último turno de <strong>{activeOrder.pendingAutoCloseReview.operator || 'Operador'}</strong> encerrou automaticamente às <strong>{new Date(activeOrder.pendingAutoCloseReview.closedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong> com <strong>{(activeOrder.pendingAutoCloseReview.closedQty || 0).toLocaleString('pt-BR')} {activeMachine.startsWith('Trefila') ? 'kg' : 'pçs'}</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAutoCloseReviewQty(activeOrder.pendingAutoCloseReview?.closedQty || 0);
+                                                setAutoCloseReviewNote('');
+                                                setShowAutoCloseReviewModal(true);
+                                            }}
+                                            className="flex-1 sm:flex-none px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase rounded-xl transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                                        >
+                                            <span>✏️ Retificar Peças Finais</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                if (reviewAutoClosedShiftQuantity) {
+                                                    await reviewAutoClosedShiftQuantity(activeOrder.id, activeOrder.pendingAutoCloseReview?.closedQty || 0, 'Confirmado pelo operador sem alteração.');
+                                                }
+                                            }}
+                                            className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-xl transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                                        >
+                                            <span>✅ Está Correto</span>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8">

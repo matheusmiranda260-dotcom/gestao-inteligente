@@ -220,6 +220,13 @@ export interface ProductionOrderData {
     isPaused?: boolean;
     pausedAt?: string;
     pauseReason?: string;
+    pendingAutoCloseReview?: {
+        closedAt: string;
+        closedQty: number;
+        shiftReportId?: string;
+        operator?: string;
+        reviewed?: boolean;
+    };
 }
 
 export interface TransferRecord {
@@ -331,6 +338,10 @@ export interface OperatorLog {
     managerAuthorized?: string;
     autoClosed?: boolean;
     pendingOperatorCheckin?: boolean;
+    observation?: string;
+    handoverFrom?: string;
+    handoverTo?: string;
+    handoverReason?: string;
 }
 
 export interface WeighedPackage {
