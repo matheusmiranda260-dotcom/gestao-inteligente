@@ -2353,17 +2353,53 @@ const App: React.FC = () => {
             
             const diffMs = nowDate.getTime() - shiftStartDate.getTime();
             const isToday = nowDate.toDateString() === shiftStartDate.toDateString();
+            const todayDateStr = nowDate.toDateString();
             
-            // Checar se já houve algum check-in de operador hoje nesta OP
-            const hadPriorCheckinToday = (order.operatorLogs || []).some(l => {
-                if (!l.startTime) return false;
-                const d = new Date(l.startTime);
-                return d.toDateString() === nowDate.toDateString() && d.getTime() < (shiftStartDate.getTime() + 60000);
+            // 1. Checar se já houve QUALQUER check-in de operador hoje nesta OP (antes de agora)
+            const hadPriorCheckinToday = (order.operatorLogs || []).some((l: any) => {
+                const rawStart = l.startTime || l.start_time;
+                if (!rawStart || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG') return false;
+                const d = new Date(rawStart);
+                return !isNaN(d.getTime()) && d.toDateString() === todayDateStr && d.getTime() < (nowDate.getTime() - 5000);
             });
 
-            if (isToday && diffMs >= 60000 && diffMs < 12 * 3600 * 1000 && !hadPriorCheckinToday) {
+            // 2. Checar se já houve atividade/parada real da máquina hoje antes de agora
+            // (ex: operador retomou 'Final de Turno' às 07:22 ou registrou paradas às 07:32, 08:30, etc.)
+            const hadPriorMachineActivityToday = (order.downtimeEvents || []).some((ev: any) => {
+                const reasonNorm = (ev.reason || '').toLowerCase();
+                if (reasonNorm.includes('aguardando operador iniciar o turno')) return false;
+
+                const rawStop = ev.stopTime || ev.stop_time;
+                const rawResume = ev.resumeTime || ev.resume_time;
+
+                if (rawStop) {
+                    const stDate = new Date(rawStop);
+                    if (!isNaN(stDate.getTime()) && stDate.toDateString() === todayDateStr && stDate.getTime() < (nowDate.getTime() - 5000)) {
+                        return true;
+                    }
+                }
+                if (rawResume && rawResume !== now) {
+                    const resDate = new Date(rawResume);
+                    if (!isNaN(resDate.getTime()) && resDate.toDateString() === todayDateStr && resDate.getTime() < (nowDate.getTime() - 5000)) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            // 3. Checar se já houve lotes ou pacotes apontados hoje antes de agora
+            const hadPriorProductionToday = (order.processedLots || []).some((lot: any) => {
+                const t = lot.startTime || lot.start_time || lot.endTime || lot.end_time;
+                return t && new Date(t).toDateString() === todayDateStr;
+            }) || (order.weighedPackages || []).some((pkg: any) => {
+                const t = pkg.timestamp || pkg.createdAt || pkg.created_at;
+                return t && new Date(t).toDateString() === todayDateStr;
+            });
+
+            if (isToday && diffMs >= 60000 && diffMs < 12 * 3600 * 1000 && !hadPriorCheckinToday && !hadPriorMachineActivityToday && !hadPriorProductionToday && !isHandoverAction && openCheckinLogIndex < 0) {
                 const hasExistingCoverage = (order.downtimeEvents || []).some(ev => {
-                    const st = ev.stopTime ? new Date(ev.stopTime).getTime() : 0;
+                    const rawStop = ev.stopTime || (ev as any).stop_time;
+                    const st = rawStop ? new Date(rawStop).getTime() : 0;
                     return Math.abs(st - shiftStartDate.getTime()) < 3 * 60000;
                 });
                 
@@ -2782,42 +2818,62 @@ const App: React.FC = () => {
                     const lockKey = `retro_${order.id}_${logDateStr}`;
                     if (!autoCloseInProgressRef.current.has(lockKey)) {
                         autoCloseInProgressRef.current.add(lockKey);
-                        
-                        const machCfg = resolveMachineShiftConfig(machName, pcpShiftConfig);
-                        const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
-                        const retroEndDate = new Date(rawStart);
-                        retroEndDate.setHours(!isNaN(endH) ? endH : 17, !isNaN(endM) ? endM : 33, 0, 0);
-                        const retroEndIso = retroEndDate.toISOString();
-
-                        console.log(`[Watchdog] Saneando apenas log órfão antigo para ${machName} (OP #${order.orderNumber}, data: ${logDateStr})`);
-
-                        // Fecha EXCLUSIVAMENTE os logs do dia anterior, sem tocar na máquina de hoje nem zerar a produção
-                        const updatedLogs = (order.operatorLogs || []).map((l: any) => {
-                            const lStart = l.startTime || l.start_time;
-                            if (!isLogEnded(l) && lStart && new Date(lStart).toLocaleDateString('sv-SE') < todayStr) {
-                                const pkgPieces = (order.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
-                                const safeEndQty = Math.max(
-                                    Number(l.endQuantity) || 0,
-                                    Number(l.end_quantity) || 0,
-                                    Number(order.actualProducedQuantity) || 0,
-                                    pkgPieces,
-                                    Number(l.startQuantity) || 0,
-                                    Number(l.start_quantity) || 0
-                                );
-                                return {
-                                    ...l,
-                                    endTime: retroEndIso,
-                                    end_time: retroEndIso,
-                                    autoClosed: true,
-                                    auto_closed: true,
-                                    endQuantity: safeEndQty,
-                                    end_quantity: safeEndQty
-                                };
-                            }
-                            return l;
-                        });
 
                         try {
+                            // Buscar dados frescos do Supabase para evitar que uma aba antiga em cache sobrescreva logs recentes de hoje!
+                            const freshArr = await fetchByColumn<ProductionOrderData>('production_orders', 'id', order.id);
+                            const freshOrder = freshArr[0] || order;
+                            const freshLogs = freshOrder.operatorLogs || (freshOrder as any).operator_logs || [];
+
+                            const freshHasActiveToday = freshLogs.some((l: any) => {
+                                const lStart = l.startTime || l.start_time;
+                                return !isLogEnded(l) && lStart && new Date(lStart).toLocaleDateString('sv-SE') === todayStr;
+                            });
+                            const freshStillHasOpenPastLog = freshLogs.some((l: any) => {
+                                const lStart = l.startTime || l.start_time;
+                                return !isLogEnded(l) && lStart && new Date(lStart).toLocaleDateString('sv-SE') < todayStr;
+                            });
+
+                            if (freshHasActiveToday || !freshStillHasOpenPastLog) {
+                                // A aba local estava apenas desatualizada; sincronizar estado local sem sobrescrever o banco
+                                setProductionOrders(prev => prev.map(o => o.id === order.id ? freshOrder : o));
+                                continue;
+                            }
+
+                            const machCfg = resolveMachineShiftConfig(machName, pcpShiftConfig);
+                            const [endH, endM] = (machCfg.workEnd || '17:33').split(':').map(Number);
+                            const retroEndDate = new Date(rawStart);
+                            retroEndDate.setHours(!isNaN(endH) ? endH : 17, !isNaN(endM) ? endM : 33, 0, 0);
+                            const retroEndIso = retroEndDate.toISOString();
+
+                            console.log(`[Watchdog] Saneando apenas log órfão antigo para ${machName} (OP #${freshOrder.orderNumber}, data: ${logDateStr})`);
+
+                            // Fecha EXCLUSIVAMENTE os logs do dia anterior sobre a lista FRESCA do banco
+                            const updatedLogs = freshLogs.map((l: any) => {
+                                const lStart = l.startTime || l.start_time;
+                                if (!isLogEnded(l) && lStart && new Date(lStart).toLocaleDateString('sv-SE') < todayStr) {
+                                    const pkgPieces = (freshOrder.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
+                                    const safeEndQty = Math.max(
+                                        Number(l.endQuantity) || 0,
+                                        Number(l.end_quantity) || 0,
+                                        Number(freshOrder.actualProducedQuantity) || 0,
+                                        pkgPieces,
+                                        Number(l.startQuantity) || 0,
+                                        Number(l.start_quantity) || 0
+                                    );
+                                    return {
+                                        ...l,
+                                        endTime: retroEndIso,
+                                        end_time: retroEndIso,
+                                        autoClosed: true,
+                                        auto_closed: true,
+                                        endQuantity: safeEndQty,
+                                        end_quantity: safeEndQty
+                                    };
+                                }
+                                return l;
+                            });
+
                             const updatedOrder = await updateItem<ProductionOrderData>('production_orders', order.id, { operatorLogs: updatedLogs });
                             setProductionOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
                         } catch (err) {

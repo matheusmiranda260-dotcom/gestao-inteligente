@@ -4169,6 +4169,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno')) && (!e.durationMin || e.durationMin === 0) && !e.resumeTime) {
                 return;
             }
+            // Ignorar parada "Aguardando Operador Iniciar o Turno" se já houve atividade/parada real anterior no mesmo dia
+            if (reasonNorm.includes('aguardando operador') && e.resumeTime) {
+                const waitEndMs = new Date(e.resumeTime).getTime();
+                const hasEarlierEvent = events.some((other: any) => {
+                    if (other === e || !other) return false;
+                    const oReason = (other.reason || '').toLowerCase();
+                    if (oReason.includes('aguardando operador')) return false;
+                    const oStop = other.stopTime ? new Date(other.stopTime).getTime() : NaN;
+                    const oResume = other.resumeTime ? new Date(other.resumeTime).getTime() : NaN;
+                    if (!isNaN(oStop) && getIsoDateStr(other.stopTime) === dateStr && oStop < (waitEndMs - 60000)) return true;
+                    if (!isNaN(oResume) && getIsoDateStr(other.resumeTime) === dateStr && oResume < (waitEndMs - 60000)) return true;
+                    return false;
+                });
+                if (hasEarlierEvent) return;
+            }
 
             let durMs = 0;
             if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
@@ -4262,13 +4277,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 // Início real da jornada hoje:
                 // Coleta todos os carimbos de data/hora registrados hoje nesta OP ou máquina
                 const candidateStarts: number[] = [];
+                const candidateEnds: number[] = [];
                 const todayShiftStartMs = todayShiftStart.getTime();
+                const todayShiftEndMs = todayShiftEnd.getTime();
 
                 activeLogs.forEach((l: any) => {
                     if (l.startTime) {
                         const t = new Date(l.startTime).getTime();
                         if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
                             candidateStarts.push(t);
+                        }
+                    }
+                    const isAutoClosedLog = Boolean(l.autoClosed || l.auto_closed || (l.observation || '').toLowerCase().includes('encerramento automático'));
+                    if (!isAutoClosedLog && l.endTime) {
+                        const tEnd = new Date(l.endTime).getTime();
+                        if (!isNaN(tEnd) && tEnd >= todayMidnightMs && tEnd <= liveNow.getTime()) {
+                            candidateEnds.push(tEnd);
                         }
                     }
                 });
@@ -4279,6 +4303,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         const t = new Date(raw).getTime();
                         if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
                             candidateStarts.push(t);
+                            candidateEnds.push(t);
                         }
                     }
                 });
@@ -4289,15 +4314,25 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         const t = new Date(raw).getTime();
                         if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
                             candidateStarts.push(t);
+                            candidateEnds.push(t);
                         }
                     }
                 });
 
                 events.forEach((e: any) => {
+                    const rNorm = (e?.reason || '').toLowerCase();
+                    if (rNorm.includes('aguardando operador') || rNorm.includes('final de turno') || rNorm.includes('fim de turno')) return;
                     if (e.stopTime) {
                         const t = new Date(e.stopTime).getTime();
                         if (!isNaN(t) && t >= todayMidnightMs && t <= liveNow.getTime()) {
                             candidateStarts.push(t);
+                            candidateEnds.push(t);
+                        }
+                    }
+                    if (e.resumeTime) {
+                        const tRes = new Date(e.resumeTime).getTime();
+                        if (!isNaN(tRes) && tRes >= todayMidnightMs && tRes <= liveNow.getTime()) {
+                            candidateEnds.push(tRes);
                         }
                     }
                 });
@@ -4312,19 +4347,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 shiftStartMs = Math.min(shiftStartMs, liveNow.getTime());
                 shiftStartMs = Math.max(shiftStartMs, todayMidnightMs);
 
-                // Momento atual ou encerramento da jornada hoje
+                const latestActivityMs = candidateEnds.length > 0 ? Math.max(...candidateEnds) : 0;
+
+                // Momento atual ou encerramento da jornada hoje (incluindo eventual hora extra após o término programado)
                 let shiftCurrentMs = liveNow.getTime();
                 if (!hasOpenLog && !isOpCurrentlyLive && activeLogs.length > 0) {
                     // Turno já encerrado hoje
                     const logEndTimes = activeLogs
                         .map((l: any) => l.endTime ? new Date(l.endTime).getTime() : 0)
                         .filter((t: number) => t > 0);
-                    shiftCurrentMs = logEndTimes.length > 0 ? Math.max(...logEndTimes) : Math.min(liveNow.getTime(), todayShiftEnd.getTime());
+                    const baseEnd = logEndTimes.length > 0 ? Math.max(...logEndTimes) : Math.min(liveNow.getTime(), todayShiftEndMs);
+                    shiftCurrentMs = Math.max(baseEnd, latestActivityMs);
                     isProducingNow = false;
                 } else {
                     // Turno em andamento
-                    const capLimit = hasManagerAuth ? liveNow.getTime() : Math.min(liveNow.getTime(), todayShiftEnd.getTime());
-                    shiftCurrentMs = capLimit;
+                    const baseLimit = hasManagerAuth ? liveNow.getTime() : Math.min(liveNow.getTime(), todayShiftEndMs);
+                    shiftCurrentMs = Math.max(baseLimit, latestActivityMs);
                     isProducingNow = !isMachineStoppedNow;
                 }
 
@@ -4343,6 +4381,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     const reasonNorm = (e.reason || '').toLowerCase().trim();
                     if ((reasonNorm.includes('final de turno') || reasonNorm.includes('fim de turno')) && (!e.durationMin || e.durationMin === 0) && !e.resumeTime) {
                         return;
+                    }
+                    // Ignorar parada "Aguardando Operador Iniciar o Turno" se já houve atividade/parada real anterior no mesmo dia
+                    if (reasonNorm.includes('aguardando operador') && e.resumeTime) {
+                        const waitEndMs = new Date(e.resumeTime).getTime();
+                        const hasEarlierEvent = events.some((other: any) => {
+                            if (other === e || !other) return false;
+                            const oReason = (other.reason || '').toLowerCase();
+                            if (oReason.includes('aguardando operador')) return false;
+                            const oStop = other.stopTime ? new Date(other.stopTime).getTime() : NaN;
+                            const oResume = other.resumeTime ? new Date(other.resumeTime).getTime() : NaN;
+                            if (!isNaN(oStop) && oStop >= todayMidnightMs && oStop < (waitEndMs - 60000)) return true;
+                            if (!isNaN(oResume) && oResume >= todayMidnightMs && oResume < (waitEndMs - 60000)) return true;
+                            return false;
+                        });
+                        if (hasEarlierEvent) return;
                     }
 
                     const key = `stop-${e.stopTime}-${e.reason}`;

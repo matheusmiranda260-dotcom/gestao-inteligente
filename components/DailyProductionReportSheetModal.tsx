@@ -507,6 +507,220 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return { formattedStr, timeStr, totalSeconds };
     };
 
+    // Helper para cálculo de Hora Extra (início antes do horário programado ou término após o horário programado)
+    const calculateShiftOvertime = (
+        scheduleStr: string | undefined,
+        stops: StopRow[],
+        shiftType: 'A' | 'B'
+    ): {
+        earlySeconds: number;
+        lateSeconds: number;
+        totalSeconds: number;
+        formattedStr: string;
+        shortStr: string;
+        detailsStr: string;
+        actualStartStr: string;
+        actualEndStr: string;
+        schedStartSec: number;
+        schedEndSec: number;
+    } => {
+        const emptyResult = {
+            earlySeconds: 0,
+            lateSeconds: 0,
+            totalSeconds: 0,
+            formattedStr: '00:00:00',
+            shortStr: '0m',
+            detailsStr: '',
+            actualStartStr: '',
+            actualEndStr: '',
+            schedStartSec: 0,
+            schedEndSec: 0,
+        };
+
+        if (!scheduleStr || !scheduleStr.includes('às')) return emptyResult;
+        const parts = scheduleStr.split('às').map(p => p.trim());
+        if (parts.length < 2) return emptyResult;
+
+        const [startH, startM] = parts[0].split(':').map(Number);
+        const [endH, endM] = parts[1].split(':').map(Number);
+        if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return emptyResult;
+
+        const schedStartMin = startH * 60 + startM;
+        const schedEndMin = endH * 60 + endM;
+        if (schedEndMin <= schedStartMin) return emptyResult;
+
+        let earliestStartMin = Infinity;
+        let latestEndMin = -Infinity;
+
+        const formatMinToHHMM = (totalMin: number) => {
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+
+        // 1. Verificar paradas registradas na tabela do turno
+        (stops || []).forEach(s => {
+            if (!s) return;
+            const motivoLower = (s.motivo || '').toLowerCase();
+            if (
+                motivoLower.includes('aguardando operador') ||
+                motivoLower.includes('final de turno') ||
+                motivoLower.includes('fim de turno')
+            ) {
+                return;
+            }
+            if (s.inicio && s.inicio.includes(':')) {
+                const [h1, m1] = s.inicio.trim().split(':').map(Number);
+                if (!isNaN(h1) && !isNaN(m1)) {
+                    const min1 = h1 * 60 + m1;
+                    if (min1 >= 180) {
+                        if (min1 < earliestStartMin) earliestStartMin = min1;
+                        if (min1 > latestEndMin) latestEndMin = min1;
+                    }
+                }
+            }
+            if (s.fim && s.fim.includes(':')) {
+                const [h2, m2] = s.fim.trim().split(':').map(Number);
+                if (!isNaN(h2) && !isNaN(m2)) {
+                    const min2 = h2 * 60 + m2;
+                    if (min2 >= 180) {
+                        if (min2 < earliestStartMin) earliestStartMin = min2;
+                        if (min2 > latestEndMin) latestEndMin = min2;
+                    }
+                }
+            }
+        });
+
+        // 2. Verificar relatórios de turno (cleanShiftReports) na data selecionada
+        (cleanShiftReports || []).forEach(r => {
+            const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
+            if (!isThisOp) return;
+            const shiftName = (r.shift || '').toLowerCase();
+            const sStart = r.shiftStartTime ? new Date(r.shiftStartTime) : null;
+            const hour = sStart && !isNaN(sStart.getTime()) ? sStart.getHours() : -1;
+            const isRepTurnoB = shiftCfg.shiftCount === 2 && hasSecondShift && (shiftName.includes('b') || shiftName.includes('2') || (hour >= 15 && !shiftName.includes('a')));
+            if ((shiftType === 'B' && !isRepTurnoB) || (shiftType === 'A' && isRepTurnoB)) return;
+
+            const isAutoClosedRep = (r.observations || '').toLowerCase().includes('encerramento automático');
+
+            if (r.shiftStartTime && matchesDate(r.shiftStartTime, selectedDate)) {
+                const d = new Date(r.shiftStartTime);
+                if (!isNaN(d.getTime())) {
+                    const min = d.getHours() * 60 + d.getMinutes();
+                    if (min >= 180 && min < earliestStartMin) earliestStartMin = min;
+                }
+            }
+            if (!isAutoClosedRep && r.shiftEndTime && matchesDate(r.shiftEndTime, selectedDate)) {
+                const d = new Date(r.shiftEndTime);
+                if (!isNaN(d.getTime()) && (d.getHours() !== 23 || d.getMinutes() < 58)) {
+                    const min = d.getHours() * 60 + d.getMinutes();
+                    if (min >= 180 && min > latestEndMin) latestEndMin = min;
+                }
+            }
+        });
+
+        // 3. Verificar logs de operador (op.operatorLogs) na data selecionada
+        (op.operatorLogs || []).forEach((l: any) => {
+            if (!l || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG' || l.action === 'Sem Produção') return;
+            const rawStart = l.startTime || l.start_time;
+            const rawEnd = l.endTime || l.end_time;
+            const isAutoClosedLog = Boolean(
+                l.autoClosed ||
+                l.auto_closed ||
+                (l.observation || '').toLowerCase().includes('encerramento automático')
+            );
+
+            if (rawStart && matchesDate(rawStart, selectedDate)) {
+                const dStart = new Date(rawStart);
+                if (!isNaN(dStart.getTime())) {
+                    const isLogTurnoB = shiftCfg.shiftCount === 2 && hasSecondShift && dStart.getHours() >= 14;
+                    if ((shiftType === 'A' && !isLogTurnoB) || (shiftType === 'B' && isLogTurnoB)) {
+                        const minStart = dStart.getHours() * 60 + dStart.getMinutes();
+                        if (minStart >= 180 && minStart < earliestStartMin) earliestStartMin = minStart;
+
+                        if (!isAutoClosedLog && rawEnd && matchesDate(rawEnd, selectedDate)) {
+                            const dEnd = new Date(rawEnd);
+                            if (!isNaN(dEnd.getTime()) && (dEnd.getHours() !== 23 || dEnd.getMinutes() < 58)) {
+                                const minEnd = dEnd.getHours() * 60 + dEnd.getMinutes();
+                                if (minEnd >= 180 && minEnd > latestEndMin) latestEndMin = minEnd;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 4. Verificar pacotes pesados / lotes processados na data selecionada
+        const pkgAndLots = [...(op.weighedPackages || []), ...(op.processedLots || [])];
+        pkgAndLots.forEach((item: any) => {
+            const rawTs = item?.timestamp || item?.weighedAt || item?.createdAt || item?.endTime || item?.startTime;
+            if (rawTs && matchesDate(rawTs, selectedDate)) {
+                const d = new Date(rawTs);
+                if (!isNaN(d.getTime())) {
+                    const isItemTurnoB = shiftCfg.shiftCount === 2 && hasSecondShift && d.getHours() >= 15;
+                    if ((shiftType === 'A' && !isItemTurnoB) || (shiftType === 'B' && isItemTurnoB)) {
+                        const min = d.getHours() * 60 + d.getMinutes();
+                        if (min >= 180) {
+                            if (min < earliestStartMin) earliestStartMin = min;
+                            if (min > latestEndMin) latestEndMin = min;
+                        }
+                    }
+                }
+            }
+        });
+
+        const rawEarlyMin = (earliestStartMin < Infinity && earliestStartMin < schedStartMin)
+            ? (schedStartMin - earliestStartMin)
+            : 0;
+        const rawLateMin = (latestEndMin > -Infinity && latestEndMin > schedEndMin)
+            ? (latestEndMin - schedEndMin)
+            : 0;
+
+        const earlyMin = Math.min(360, Math.max(0, rawEarlyMin));
+        const lateMin = Math.min(480, Math.max(0, rawLateMin));
+        const totalMin = earlyMin + lateMin;
+
+        const earlySeconds = earlyMin * 60;
+        const lateSeconds = lateMin * 60;
+        const totalSeconds = totalMin * 60;
+
+        const actualStartStr = earlyMin > 0 ? formatMinToHHMM(earliestStartMin) : parts[0];
+        const actualEndStr = lateMin > 0 ? formatMinToHHMM(latestEndMin) : parts[1];
+
+        const detailsParts: string[] = [];
+        if (earlyMin > 0) {
+            const h = Math.floor(earlyMin / 60);
+            const m = earlyMin % 60;
+            const durLabel = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
+            detailsParts.push(`Início às ${actualStartStr} (+${durLabel} antes das ${parts[0]})`);
+        }
+        if (lateMin > 0) {
+            const h = Math.floor(lateMin / 60);
+            const m = lateMin % 60;
+            const durLabel = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
+            detailsParts.push(`Término às ${actualEndStr} (+${durLabel} após ${parts[1]})`);
+        }
+
+        const totalH = Math.floor(totalMin / 60);
+        const totalM = totalMin % 60;
+        const shortStr = totalMin > 0
+            ? (totalH > 0 ? `+${totalH}h ${String(totalM).padStart(2, '0')}m` : `+${totalM}m`)
+            : '0m';
+
+        return {
+            earlySeconds,
+            lateSeconds,
+            totalSeconds,
+            formattedStr: secondsToTime(totalSeconds),
+            shortStr,
+            detailsStr: detailsParts.join(' • '),
+            actualStartStr,
+            actualEndStr,
+            schedStartSec: schedStartMin * 60,
+            schedEndSec: schedEndMin * 60,
+        };
+    };
+
     // Helpers de tempo
     const timeToSeconds = (timeStr: string): number => {
         if (!timeStr) return 0;
@@ -1207,6 +1421,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             if (isTurnoEndReason && (dur > 180 * 60 || dur === 0 || startH >= 17 || startH < 6)) return false;
             if (dur > 480 * 60 && (startH >= 17 || startH < 6)) return false;
 
+            // Se for parada automática "AGUARDANDO OPERADOR INICIAR O TURNO", descartar se já houve atividade/parada real antes do término dela
+            if (motUpper.includes('AGUARDANDO OPERADOR')) {
+                const waitEndSec = timeToSeconds(s.fim || s.inicio);
+                const hasEarlierRealStop = list.some(other => {
+                    if (!other || other === s || !other.inicio) return false;
+                    const otherMot = (other.motivo || '').toUpperCase();
+                    if (otherMot.includes('AGUARDANDO OPERADOR')) return false;
+                    const otherStartSec = timeToSeconds(other.inicio);
+                    return otherStartSec > 0 && otherStartSec < (waitEndSec - 60);
+                });
+                if (hasEarlierRealStop) return false;
+            }
+
             return true;
         });
 
@@ -1648,6 +1875,30 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 return;
             }
 
+            // Se for "Aguardando Operador Iniciar o Turno", ignorar caso a máquina já tenha tido início ou parada anterior neste dia
+            if (reasonStr.toLowerCase().includes('aguardando operador') && rDate && !isNaN(rDate.getTime())) {
+                const waitEndMs = rDate.getTime();
+                const hadEarlierActivityOnDay = allMachineEvents.some((other: any) => {
+                    if (other === e) return false;
+                    const oReason = (other.reason || other.motivo || '').toLowerCase();
+                    if (oReason.includes('aguardando operador')) return false;
+                    const oStop = other.stopTime || other.stop_time;
+                    const oResume = other.resumeTime || other.resume_time;
+                    if (oStop && matchesDate(oStop, selectedDate)) {
+                        const oStopMs = new Date(oStop).getTime();
+                        if (!isNaN(oStopMs) && oStopMs < (waitEndMs - 60000)) return true;
+                    }
+                    if (oResume && matchesDate(oResume, selectedDate)) {
+                        const oResMs = new Date(oResume).getTime();
+                        if (!isNaN(oResMs) && oResMs < (waitEndMs - 60000)) return true;
+                    }
+                    return false;
+                });
+                if (hadEarlierActivityOnDay) {
+                    return;
+                }
+            }
+
             const startTimeStr = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
             const endTimeStr = rDate && !isNaN(rDate.getTime())
                 ? `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
@@ -1775,17 +2026,18 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             let earliestActivityMin = Infinity;
             let earliestActivityTimeStr = '';
 
-            // 1. Checar primeiro login do operador no dia
+            // 1. Checar primeiro login do operador no dia (incluindo inícios antes do horário programado, ex: 07:22)
             (productionOrders || []).concat(op ? [op] : []).forEach(o => {
                 const oMach = o.scheduledMachine || (o.machine as string);
                 const isSameMachine = oMach === machine || oMach?.toLowerCase() === machine.toLowerCase() || 
                     (machine.toLowerCase().includes('trefila') && (oMach || '').toLowerCase().includes('trefila'));
                 if (isSameMachine) {
-                    (o.operatorLogs || []).forEach(l => {
-                        if (l.startTime && matchesDate(l.startTime, selectedDate)) {
-                            const d = new Date(l.startTime);
+                    (o.operatorLogs || []).forEach((l: any) => {
+                        const rawStart = l.startTime || l.start_time;
+                        if (rawStart && l.action !== 'Criada no PCP' && l.operator !== 'GHOST_ORDER_FLAG' && matchesDate(rawStart, selectedDate)) {
+                            const d = new Date(rawStart);
                             const min = d.getHours() * 60 + d.getMinutes();
-                            if (min >= schedMin && min < earliestActivityMin) {
+                            if (min >= 300 && min < earliestActivityMin) {
                                 earliestActivityMin = min;
                                 earliestActivityTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                             }
@@ -1794,12 +2046,36 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 }
             });
 
+            // 1.b Checar retomada de Final de Turno ou paradas brutas na data selecionada
+            allMachineEvents.forEach((ev: any) => {
+                const evReason = (ev.reason || ev.motivo || '').toLowerCase();
+                if (evReason.includes('aguardando operador')) return;
+                const rawStop = ev.stopTime || ev.stop_time;
+                const rawResume = ev.resumeTime || ev.resume_time;
+                if (rawStop && matchesDate(rawStop, selectedDate)) {
+                    const d = new Date(rawStop);
+                    const min = d.getHours() * 60 + d.getMinutes();
+                    if (min >= 300 && min < earliestActivityMin) {
+                        earliestActivityMin = min;
+                        earliestActivityTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    }
+                }
+                if (rawResume && matchesDate(rawResume, selectedDate)) {
+                    const d = new Date(rawResume);
+                    const min = d.getHours() * 60 + d.getMinutes();
+                    if (min >= 300 && min < earliestActivityMin) {
+                        earliestActivityMin = min;
+                        earliestActivityTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    }
+                }
+            });
+
             // 2. Checar paradas registradas
             stopsListA.forEach(s => {
                 const [sH, sM] = (s.inicio || '').split(':').map(Number);
                 if (!isNaN(sH) && !isNaN(sM)) {
                     const min = sH * 60 + sM;
-                    if (min >= schedMin && min < earliestActivityMin) {
+                    if (min >= 300 && min < earliestActivityMin) {
                         earliestActivityMin = min;
                         earliestActivityTimeStr = s.inicio;
                     }
@@ -1811,7 +2087,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 if (r.shiftStartTime && matchesDate(r.shiftStartTime, selectedDate)) {
                     const d = new Date(r.shiftStartTime);
                     const min = d.getHours() * 60 + d.getMinutes();
-                    if (min >= schedMin && min < earliestActivityMin) {
+                    if (min >= 300 && min < earliestActivityMin) {
                         earliestActivityMin = min;
                         earliestActivityTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                     }
@@ -2436,43 +2712,60 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const rawSecondsParadoA = computeIntervalSeconds(stopsShiftA);
         const rawSecondsParadoB = computeIntervalSeconds(stopsShiftB);
 
-        const netDurationA = calculateShiftNetDuration(statsShiftA.horarioTurnoPrevisto, shiftCfg.noLunch);
-        const totalWorkedA = timeToSeconds(statsShiftA.horasTrabalhadas) || netDurationA.totalSeconds;
+        const defaultSchedA = machine.toLowerCase().includes('treli') ? '05:00 às 14:48' : '07:45 às 17:33';
+        const schedStrA = statsShiftA.horarioTurnoPrevisto || defaultSchedA;
+        const netDurationA = calculateShiftNetDuration(schedStrA, shiftCfg.noLunch);
+        const totalWorkedA = netDurationA.totalSeconds || timeToSeconds(statsShiftA.horasTrabalhadas);
 
-        const netDurationB = calculateShiftNetDuration(statsShiftB.horarioTurnoPrevisto, shiftCfg.noLunch);
-        const totalWorkedB = timeToSeconds(statsShiftB.horasTrabalhadas) || netDurationB.totalSeconds;
+        const defaultSchedB = machine.toLowerCase().includes('treli') ? '14:48 às 23:36' : '14:00 às 23:59';
+        const schedStrB = statsShiftB.horarioTurnoPrevisto || (statsShiftB.horasTrabalhadas !== '00:00:00' ? defaultSchedB : '');
+        const netDurationB = schedStrB
+            ? calculateShiftNetDuration(schedStrB, shiftCfg.noLunch)
+            : { formattedStr: '0h 00m', timeStr: '00:00:00', totalSeconds: 0 };
+        const totalWorkedB = statsShiftB.horasTrabalhadas === '00:00:00'
+            ? 0
+            : (netDurationB.totalSeconds || timeToSeconds(statsShiftB.horasTrabalhadas));
 
-        // Priorizar dados operacionais fiéis vindos do PCP (initialDayStats)
-        const statsEffectiveSecsA = initialDayStats?.effectiveMs 
-            ? Math.round(initialDayStats.effectiveMs / 1000) 
-            : parseTimeToSeconds(initialDayStats?.effectiveFormatted);
+        // Cálculo de Hora Extra (início antes do horário previsto ou término após o horário previsto)
+        const overtimeA = calculateShiftOvertime(schedStrA, stopsShiftA, 'A');
+        const overtimeB = (schedStrB && totalWorkedB > 0)
+            ? calculateShiftOvertime(schedStrB, stopsShiftB, 'B')
+            : {
+                earlySeconds: 0,
+                lateSeconds: 0,
+                totalSeconds: 0,
+                formattedStr: '00:00:00',
+                shortStr: '0m',
+                detailsStr: '',
+                actualStartStr: '',
+                actualEndStr: '',
+                schedStartSec: 0,
+                schedEndSec: 0,
+            };
 
         const statsDowntimeSecsA = initialDayStats?.downtimeMs 
             ? Math.round(initialDayStats.downtimeMs / 1000) 
             : parseTimeToSeconds(initialDayStats?.downtimeFormatted);
 
-        // Tempo Parado (Turno A)
-        const secondsParadoA = (statsDowntimeSecsA > 0) 
-            ? statsDowntimeSecsA 
-            : Math.min(rawSecondsParadoA, totalWorkedA);
+        // Tempo total do turno contabilizado = Carga Horária Programada + Hora Extra
+        const totalElapsedA = totalWorkedA + overtimeA.totalSeconds;
+        const totalElapsedB = totalWorkedB > 0 ? (totalWorkedB + overtimeB.totalSeconds) : 0;
 
-        // Tempo Efetivo (Turno A)
-        const secondsEfetivoA = (statsEffectiveSecsA > 0) 
-            ? statsEffectiveSecsA 
-            : Math.max(0, totalWorkedA - secondsParadoA);
+        // Tempo Parado (Turno A): usa sempre as paradas da tabela (rawSecondsParadoA) quando houver paradas listadas
+        const secondsParadoA = stopsShiftA.length > 0
+            ? Math.min(rawSecondsParadoA, totalElapsedA)
+            : Math.min(statsDowntimeSecsA, totalElapsedA);
 
-        // Tempo total do turno decorrido / contabilizado
-        const totalElapsedA = (statsEffectiveSecsA > 0)
-            ? Math.max(secondsEfetivoA + secondsParadoA, 1)
-            : totalWorkedA;
+        // Tempo Efetivo (Turno A): Carga Horária + Hora Extra - Tempo Parado
+        const secondsEfetivoA = Math.max(0, totalElapsedA - secondsParadoA);
 
         const percentParadoA = totalElapsedA > 0 ? (secondsParadoA / totalElapsedA) * 100 : 0;
         const percentEfetivoA = totalElapsedA > 0 ? (secondsEfetivoA / totalElapsedA) * 100 : 0;
 
-        const secondsParadoB = Math.min(rawSecondsParadoB, totalWorkedB);
-        const percentParadoB = totalWorkedB > 0 ? (secondsParadoB / totalWorkedB) * 100 : 0;
-        const secondsEfetivoB = Math.max(0, totalWorkedB - secondsParadoB);
-        const percentEfetivoB = totalWorkedB > 0 ? (secondsEfetivoB / totalWorkedB) * 100 : 0;
+        const secondsParadoB = Math.min(rawSecondsParadoB, totalElapsedB);
+        const percentParadoB = totalElapsedB > 0 ? (secondsParadoB / totalElapsedB) * 100 : 0;
+        const secondsEfetivoB = Math.max(0, totalElapsedB - secondsParadoB);
+        const percentEfetivoB = totalElapsedB > 0 ? (secondsEfetivoB / totalElapsedB) * 100 : 0;
 
         // Metros produzidos:
         // Treliça: peças * tamanho da peça
@@ -2498,40 +2791,38 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
         // Produtividade / Ritmo por hora
         const totalWorkedHoursA = totalElapsedA > 0 ? (totalElapsedA / 3600) : (totalWorkedA / 3600);
-        const ratePerHourA = (initialDayStats?.ratePerHour && initialDayStats.ratePerHour > 0)
-            ? initialDayStats.ratePerHour
-            : ((totalWorkedHoursA >= 0.16 && statsShiftA.pecasProduzidas > 0)
-                ? Math.round(statsShiftA.pecasProduzidas / totalWorkedHoursA)
-                : 0);
+        const ratePerHourA = (totalWorkedHoursA >= 0.16 && statsShiftA.pecasProduzidas > 0)
+            ? Math.round(statsShiftA.pecasProduzidas / totalWorkedHoursA)
+            : (initialDayStats?.ratePerHour && initialDayStats.ratePerHour > 0 ? initialDayStats.ratePerHour : 0);
         const rateUnitA = initialDayStats?.rateUnit || (isTrefila ? 'kg/h' : 'pçs/h');
         const ratePerHourStrA = ratePerHourA > 0 ? `${ratePerHourA.toLocaleString('pt-BR')} ${rateUnitA}` : `0 ${rateUnitA}`;
 
-        const cycleTimeSecondsA = (initialDayStats?.speedUnit === 's/pç' && initialDayStats?.speedValue && initialDayStats.speedValue > 0)
-            ? Math.round(initialDayStats.speedValue)
-            : ((!isTrefila && statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0)
-                ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas)
+        const cycleTimeSecondsA = (!isTrefila && statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0)
+            ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas)
+            : ((initialDayStats?.speedUnit === 's/pç' && initialDayStats?.speedValue && initialDayStats.speedValue > 0)
+                ? Math.round(initialDayStats.speedValue)
                 : 0);
 
         let velocidadeStrA = '';
         if (isTrefila) {
-            const mPerSec = (initialDayStats?.speedUnit === 'm/s' && initialDayStats?.speedFormatted) 
-                ? initialDayStats.speedFormatted 
-                : (secondsEfetivoA > 0 ? (metrosProduzidosA / secondsEfetivoA).toFixed(1).replace('.', ',') : '0,0');
+            const mPerSec = secondsEfetivoA > 0
+                ? (metrosProduzidosA / secondsEfetivoA).toFixed(1).replace('.', ',')
+                : ((initialDayStats?.speedUnit === 'm/s' && initialDayStats?.speedFormatted) ? initialDayStats.speedFormatted : '0,0');
             velocidadeStrA = `${mPerSec} m/s`;
         } else if (isMalha) {
-            const secPerPc = (initialDayStats?.speedUnit === 's/pç' && initialDayStats?.speedFormatted)
-                ? initialDayStats.speedFormatted
-                : (statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0 ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas) : 0);
+            const secPerPc = (statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0)
+                ? Math.round(secondsEfetivoA / statsShiftA.pecasProduzidas)
+                : ((initialDayStats?.speedUnit === 's/pç' && initialDayStats?.speedFormatted) ? initialDayStats.speedFormatted : 0);
             velocidadeStrA = `${secPerPc} s/pç`;
         } else {
             // Treliça
-            const mPerMin = (initialDayStats?.speedUnit === 'm/min' && initialDayStats?.speedFormatted)
-                ? initialDayStats.speedFormatted
-                : (velocidadeMinutoA > 0 ? velocidadeMinutoA.toFixed(1).replace('.', ',') : '0,0');
+            const mPerMin = velocidadeMinutoA > 0
+                ? velocidadeMinutoA.toFixed(1).replace('.', ',')
+                : ((initialDayStats?.speedUnit === 'm/min' && initialDayStats?.speedFormatted) ? initialDayStats.speedFormatted : '0,0');
             velocidadeStrA = `${mPerMin} metros/ minuto`;
         }
 
-        const totalWorkedHoursB = totalWorkedB > 0 ? (totalWorkedB / 3600) : 0;
+        const totalWorkedHoursB = totalElapsedB > 0 ? (totalElapsedB / 3600) : (totalWorkedB > 0 ? (totalWorkedB / 3600) : 0);
         const ratePerHourB = (totalWorkedHoursB >= 0.16 && statsShiftB.pecasProduzidas > 0)
             ? Math.round(statsShiftB.pecasProduzidas / totalWorkedHoursB)
             : 0;
@@ -2560,6 +2851,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 percentParado: percentParadoA.toFixed(1).replace('.', ','),
                 tempoEfetivoStr: secondsToTime(secondsEfetivoA),
                 percentEfetivo: percentEfetivoA.toFixed(1).replace('.', ','),
+                overtimeSeconds: overtimeA.totalSeconds,
+                overtimeStr: overtimeA.formattedStr,
+                overtimeShortStr: overtimeA.shortStr,
+                overtimeDetailsStr: overtimeA.detailsStr,
                 metrosProduzidos: metrosProduzidosA,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsA)),
                 cycleTimeSeconds: cycleTimeSecondsA,
@@ -2573,6 +2868,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 percentParado: percentParadoB.toFixed(1).replace('.', ','),
                 tempoEfetivoStr: secondsToTime(secondsEfetivoB),
                 percentEfetivo: percentEfetivoB.toFixed(1).replace('.', ','),
+                overtimeSeconds: overtimeB.totalSeconds,
+                overtimeStr: overtimeB.formattedStr,
+                overtimeShortStr: overtimeB.shortStr,
+                overtimeDetailsStr: overtimeB.detailsStr,
                 metrosProduzidos: metrosProduzidosB,
                 tempoPorPecaStr: secondsToTime(Math.floor(tempoPorPecaSecondsB)),
                 cycleTimeSeconds: cycleTimeSecondsB,
@@ -2582,7 +2881,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 velocidadeStr: `${velocidadeMinutoB.toFixed(1).replace('.', ',')} metros/ minuto`
             }
         };
-    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift, isTrefila, op.targetBitola, initialDayStats]);
+    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift, isTrefila, op, cleanShiftReports, selectedDate, shiftCfg, initialDayStats]);
 
     // AÇÃO 1: IMPRESSÃO LIMPA EM FOLHA A4
     const handlePrint = () => {
@@ -3538,6 +3837,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             <span className="text-[10px] font-black text-[#002060] bg-white px-2 py-0.5 rounded border border-slate-200">
                                                 {calculateShiftNetDuration(statsShiftA.horarioTurnoPrevisto || (machine.toLowerCase().includes('treli') ? '05:00 às 14:48' : '07:45 às 17:33'), shiftCfg.noLunch).formattedStr}
                                             </span>
+                                            {calculatedData.turnoA.overtimeSeconds > 0 && (
+                                                <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200" title={calculatedData.turnoA.overtimeDetailsStr}>
+                                                    {calculatedData.turnoA.overtimeShortStr} H.E.
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -3555,13 +3859,35 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     </div>
                                     {/* Tempo Efetivo */}
                                     <div className="flex items-center justify-between py-2.5 bg-emerald-50/30 px-1 rounded">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <ClockIcon className="h-4 w-4 text-emerald-500" />
                                             <span className="text-[13px] font-black text-emerald-600 uppercase tracking-tight">TEMPO DE MÁQUINA (E EFETIVO)</span>
+                                            {calculatedData.turnoA.overtimeSeconds > 0 && (
+                                                <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                    +{calculatedData.turnoA.overtimeStr} H.E. somada
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="flex gap-4 font-black text-sm text-emerald-600">
+                                        <div className="flex gap-4 font-black text-sm text-emerald-600 shrink-0">
                                             <span>{calculatedData.turnoA.tempoEfetivoStr}</span>
                                             <span className="w-12 text-right">{calculatedData.turnoA.percentEfetivo}%</span>
+                                        </div>
+                                    </div>
+                                    {/* Tempo de Hora Extra */}
+                                    <div className={`flex items-center justify-between py-2.5 px-1 rounded ${calculatedData.turnoA.overtimeSeconds > 0 ? 'bg-indigo-50/50' : ''}`}>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <ClockIcon className={`h-4 w-4 ${calculatedData.turnoA.overtimeSeconds > 0 ? 'text-indigo-600' : 'text-slate-400'}`} />
+                                            <span className={`text-[13px] font-black uppercase tracking-tight ${calculatedData.turnoA.overtimeSeconds > 0 ? 'text-indigo-700' : 'text-slate-500'}`}>
+                                                TEMPO DE HORA EXTRA
+                                            </span>
+                                            {calculatedData.turnoA.overtimeSeconds > 0 && calculatedData.turnoA.overtimeDetailsStr && (
+                                                <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                                                    {calculatedData.turnoA.overtimeDetailsStr}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className={`flex items-center gap-2 font-black text-sm shrink-0 ${calculatedData.turnoA.overtimeSeconds > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>
+                                            <span>{calculatedData.turnoA.overtimeSeconds > 0 ? `+ ${calculatedData.turnoA.overtimeStr}` : '00:00:00'}</span>
                                         </div>
                                     </div>
                                     {/* Peças Produzidas / Peso Produzido */}
@@ -3696,6 +4022,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     <span className="text-[10px] font-black text-[#002060] bg-white px-2 py-0.5 rounded border border-slate-200">
                                                         {calculateShiftNetDuration(statsShiftB.horarioTurnoPrevisto || (machine.toLowerCase().includes('treli') ? '14:48 às 23:36' : '14:00 às 23:59'), shiftCfg.noLunch).formattedStr}
                                                     </span>
+                                                    {calculatedData.turnoB.overtimeSeconds > 0 && (
+                                                        <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200" title={calculatedData.turnoB.overtimeDetailsStr}>
+                                                            {calculatedData.turnoB.overtimeShortStr} H.E.
+                                                        </span>
+                                                    )}
                                                 </>
                                             ) : (
                                                 <span className="text-[10px] font-bold text-slate-400">
@@ -3719,13 +4050,35 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     </div>
                                     {/* Tempo Efetivo */}
                                     <div className="flex items-center justify-between py-2.5 bg-emerald-50/30 px-1 rounded">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <ClockIcon className="h-4 w-4 text-emerald-500" />
                                             <span className="text-[13px] font-black text-emerald-600 uppercase tracking-tight">TEMPO DE MÁQUINA (E EFETIVO)</span>
+                                            {calculatedData.turnoB.overtimeSeconds > 0 && (
+                                                <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                    +{calculatedData.turnoB.overtimeStr} H.E. somada
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="flex gap-4 font-black text-sm text-emerald-600">
+                                        <div className="flex gap-4 font-black text-sm text-emerald-600 shrink-0">
                                             <span>{calculatedData.turnoB.tempoEfetivoStr}</span>
                                             <span className="w-12 text-right">{calculatedData.turnoB.percentEfetivo}%</span>
+                                        </div>
+                                    </div>
+                                    {/* Tempo de Hora Extra */}
+                                    <div className={`flex items-center justify-between py-2.5 px-1 rounded ${calculatedData.turnoB.overtimeSeconds > 0 ? 'bg-indigo-50/50' : ''}`}>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <ClockIcon className={`h-4 w-4 ${calculatedData.turnoB.overtimeSeconds > 0 ? 'text-indigo-600' : 'text-slate-400'}`} />
+                                            <span className={`text-[13px] font-black uppercase tracking-tight ${calculatedData.turnoB.overtimeSeconds > 0 ? 'text-indigo-700' : 'text-slate-500'}`}>
+                                                TEMPO DE HORA EXTRA
+                                            </span>
+                                            {calculatedData.turnoB.overtimeSeconds > 0 && calculatedData.turnoB.overtimeDetailsStr && (
+                                                <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                                                    {calculatedData.turnoB.overtimeDetailsStr}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className={`flex items-center gap-2 font-black text-sm shrink-0 ${calculatedData.turnoB.overtimeSeconds > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>
+                                            <span>{calculatedData.turnoB.overtimeSeconds > 0 ? `+ ${calculatedData.turnoB.overtimeStr}` : '00:00:00'}</span>
                                         </div>
                                     </div>
                                     {/* Peças Produzidas / Peso Produzido */}
