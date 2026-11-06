@@ -1580,6 +1580,37 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             });
         }
 
+        // Histórico de Troca de Rolo da Malha (Longitudinal / Transversal) salvo no summary da OP ou localStorage
+        const rawSummaryMalha = (targetOp?.summary as any)?.malhaActiveLots || (targetOp?.summary as any)?.malha_active_lots;
+        let malhaDayHistory: Array<{ id: string; timestamp: string; secOfDay: number; position: string; lotSai: string; lotEntra: string; used?: boolean }> = [];
+        if (isMalha) {
+            let rawHist: any[] = Array.isArray(rawSummaryMalha?.history) ? rawSummaryMalha.history : [];
+            if (rawHist.length === 0) {
+                try {
+                    const localRaw = localStorage.getItem(`malha_active_lots_${machine || 'Malha 1'}`);
+                    if (localRaw) {
+                        const parsed = JSON.parse(localRaw);
+                        if (Array.isArray(parsed?.history)) rawHist = parsed.history;
+                    }
+                } catch (e) {}
+            }
+            malhaDayHistory = rawHist
+                .filter(h => h && h.timestamp && (!effectiveDate || matchesDate(h.timestamp, effectiveDate)))
+                .map(h => {
+                    const d = new Date(h.timestamp);
+                    const secOfDay = !isNaN(d.getTime()) ? (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) : 0;
+                    return {
+                        id: h.id || String(Math.random()),
+                        timestamp: h.timestamp,
+                        secOfDay,
+                        position: String(h.position || 'LONGITUDINAL').toUpperCase(),
+                        lotSai: String(h.lotSai || h.lot_sai || 'S/ REGISTRO').replace(/^LOTE\s+/i, '').trim(),
+                        lotEntra: String(h.lotEntra || h.lot_entra || '').replace(/^LOTE\s+/i, '').trim()
+                    };
+                })
+                .filter(h => Boolean(h.lotEntra));
+        }
+
         let rollChangeCounter = 0;
 
         return sorted.map(s => {
@@ -1637,6 +1668,51 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         ...s,
                         motivo: preservedMotivo
                     };
+                }
+
+                // Se for Malha e houver registro no histórico (ex: operador apontou no card logo após retomar a parada), vincular pelo horário!
+                if (isMalha && malhaDayHistory.length > 0) {
+                    const stopStartSec = timeToSeconds(s.inicio);
+                    const stopEndSec = timeToSeconds(s.fim || s.inicio);
+                    let bestMatch: typeof malhaDayHistory[0] | null = null;
+                    let bestDiff = Infinity;
+                    for (const h of malhaDayHistory) {
+                        if (h.used) continue;
+                        const diffStart = Math.abs(h.secOfDay - stopStartSec);
+                        const diffEnd = Math.abs(h.secOfDay - stopEndSec);
+                        const minDiff = Math.min(diffStart, diffEnd);
+                        // Aceita apontamentos feitos durante a parada ou até 45 min antes/depois
+                        if (minDiff <= 45 * 60 && minDiff < bestDiff) {
+                            bestDiff = minDiff;
+                            bestMatch = h;
+                        }
+                    }
+                    if (bestMatch) {
+                        bestMatch.used = true;
+                        const saiDisplay = (!bestMatch.lotSai || bestMatch.lotSai === 'S/ REGISTRO')
+                            ? 'S/ REGISTRO'
+                            : `LOTE ${bestMatch.lotSai}`;
+                        const entraDisplay = `LOTE ${bestMatch.lotEntra}`;
+                        let cleanedExtraMalha = upper
+                            .replace(/TROCA\s+DE\s+ROLO/gi, '')
+                            .replace(/TROCA\s+DO\s+ROLO/gi, '')
+                            .replace(/TROCA\s+DE\s+BOBINA/gi, '')
+                            .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
+                            .replace(/PREPARA[ÇC][AÃ]O/gi, '')
+                            .replace(/\(\s*SAI:[^\)]*\)/gi, '')
+                            .replace(/\(\s*LOTE[^\)]*\)/gi, '')
+                            .replace(/^[\s\-\/]+/, '')
+                            .replace(/[\s\-\/]+$/, '')
+                            .trim();
+                        let malhaMotivo = `TROCA DE ROLO ${bestMatch.position} (SAI: ${saiDisplay} / ENTRA: ${entraDisplay})`;
+                        if (cleanedExtraMalha && cleanedExtraMalha !== '-' && !cleanedExtraMalha.includes('ROLO')) {
+                            malhaMotivo += ` - ${cleanedExtraMalha}`;
+                        }
+                        return {
+                            ...s,
+                            motivo: malhaMotivo
+                        };
+                    }
                 }
 
                 const targetLotIdx = rollChangeCounter - 1;
@@ -2185,6 +2261,43 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         setLoading(true);
         setSaveStatus('saving');
         try {
+            // 0. Buscar dados mais recentes da OP direto no Supabase (garante pegar novos apontamentos de lotes/paradas feitos no tablet sem precisar dar F5)
+            if (op?.id) {
+                try {
+                    const { data: freshOp } = await supabase
+                        .from('production_orders')
+                        .select('downtime_events, summary, operator_logs, actual_produced_quantity, actual_produced_weight')
+                        .eq('id', op.id)
+                        .single();
+                    if (freshOp) {
+                        if (Array.isArray(freshOp.downtime_events)) {
+                            op.downtimeEvents = freshOp.downtime_events.map((ev: any) => ({
+                                ...ev,
+                                stopTime: ev.stopTime || ev.stop_time,
+                                resumeTime: ev.resumeTime || ev.resume_time
+                            }));
+                        }
+                        if (freshOp.summary) {
+                            op.summary = freshOp.summary;
+                        }
+                        if (Array.isArray(freshOp.operator_logs)) {
+                            op.operatorLogs = freshOp.operator_logs.map((lg: any) => ({
+                                ...lg,
+                                startTime: lg.startTime || lg.start_time,
+                                endTime: lg.endTime || lg.end_time,
+                                startQuantity: lg.startQuantity ?? lg.start_quantity,
+                                endQuantity: lg.endQuantity ?? lg.end_quantity
+                            }));
+                        }
+                        if (freshOp.actual_produced_quantity !== undefined && freshOp.actual_produced_quantity !== null) {
+                            op.actualProducedQuantity = freshOp.actual_produced_quantity;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Falha ao atualizar OP em tempo real:', e);
+                }
+            }
+
             // 1. Tentar buscar no Supabase (pela data e pela OP ou máquina)
             const cleanOpNum = String(op.orderNumber || (op as any).order_number || '').trim();
             const { data: dbReports, error } = await supabase
@@ -2278,7 +2391,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     mergedStopsA = [...auto.stopsShiftA];
                 } else {
                     (auto.stopsShiftA || []).forEach(autoStop => {
-                        const isAlreadyPresent = mergedStopsA.some(s => {
+                        const matchIdx = mergedStopsA.findIndex(s => {
                             if (!s || !s.inicio || !autoStop.inicio) return false;
                             if (s.inicio === autoStop.inicio) return true;
                             const sPrefix = (s.inicio || '').substring(0, 5);
@@ -2290,8 +2403,21 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                             }
                             return false;
                         });
-                        if (!isAlreadyPresent) {
+                        if (matchIdx === -1) {
                             mergedStopsA.push(autoStop);
+                        } else {
+                            // Se a parada no relatório tinha apenas lote genérico (ex: SAI: LOTE 5) e o autoStop agora tem o lote real (LONGITUDINAL/TRANSVERSAL/ENTRA:), atualizar!
+                            const oldUpper = (mergedStopsA[matchIdx].motivo || '').toUpperCase();
+                            const newUpper = (autoStop.motivo || '').toUpperCase();
+                            if (
+                                (newUpper.includes('LONGITUDINAL') || newUpper.includes('TRANSVERSAL') || newUpper.includes('ENTRA:')) &&
+                                !oldUpper.includes('ENTRA:')
+                            ) {
+                                mergedStopsA[matchIdx] = {
+                                    ...mergedStopsA[matchIdx],
+                                    motivo: autoStop.motivo
+                                };
+                            }
                         }
                     });
                 }
@@ -2656,8 +2782,43 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     ]);
 
     // Recarregar os dados automáticos da OP
-    const handleReloadAutoData = () => {
+    const handleReloadAutoData = async () => {
         if (window.confirm('Deseja recarregar os dados automáticos da OP e turnos para esta data? Dados manuais não salvos poderão ser substituídos.')) {
+            if (op?.id) {
+                try {
+                    const { data: freshOp } = await supabase
+                        .from('production_orders')
+                        .select('downtime_events, summary, operator_logs, actual_produced_quantity, actual_produced_weight')
+                        .eq('id', op.id)
+                        .single();
+                    if (freshOp) {
+                        if (Array.isArray(freshOp.downtime_events)) {
+                            op.downtimeEvents = freshOp.downtime_events.map((ev: any) => ({
+                                ...ev,
+                                stopTime: ev.stopTime || ev.stop_time,
+                                resumeTime: ev.resumeTime || ev.resume_time
+                            }));
+                        }
+                        if (freshOp.summary) {
+                            op.summary = freshOp.summary;
+                        }
+                        if (Array.isArray(freshOp.operator_logs)) {
+                            op.operatorLogs = freshOp.operator_logs.map((lg: any) => ({
+                                ...lg,
+                                startTime: lg.startTime || lg.start_time,
+                                endTime: lg.endTime || lg.end_time,
+                                startQuantity: lg.startQuantity ?? lg.start_quantity,
+                                endQuantity: lg.endQuantity ?? lg.end_quantity
+                            }));
+                        }
+                        if (freshOp.actual_produced_quantity !== undefined && freshOp.actual_produced_quantity !== null) {
+                            op.actualProducedQuantity = freshOp.actual_produced_quantity;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Falha ao atualizar OP na sincronização:', e);
+                }
+            }
             const auto = generateAutoDataFromShopFloor();
             setProductionOrder(auto.productionOrder);
             setProductDescription(auto.productDescription);

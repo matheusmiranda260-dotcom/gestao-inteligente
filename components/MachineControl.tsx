@@ -90,14 +90,32 @@ export const getMalhaActiveLots = (machineName: string, activeOrder?: Production
         console.warn('Erro ao ler lotes ativos da Malha do localStorage:', e);
     }
 
-    const summaryData = (activeOrder?.summary as any)?.malhaActiveLots as MalhaActiveLotsState | undefined;
+    const rawSummaryLots = (activeOrder?.summary as any)?.malhaActiveLots || (activeOrder?.summary as any)?.malha_active_lots;
+    const normalizeHistory = (arr: any[]): MalhaRollChangeHistoryEntry[] => {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(h => ({
+            id: h.id || `ml-hist-${Math.random()}`,
+            timestamp: h.timestamp || new Date().toISOString(),
+            position: (h.position || 'LONGITUDINAL') as 'LONGITUDINAL' | 'TRANSVERSAL',
+            lotSai: h.lotSai || h.lot_sai || 'S/ REGISTRO',
+            lotEntra: h.lotEntra || h.lot_entra || '',
+            orderNumber: h.orderNumber || h.order_number
+        }));
+    };
+    const summaryData: MalhaActiveLotsState | undefined = rawSummaryLots ? {
+        longitudinal: rawSummaryLots.longitudinal || '',
+        transversal: rawSummaryLots.transversal || '',
+        updatedAt: rawSummaryLots.updatedAt || rawSummaryLots.updated_at,
+        history: normalizeHistory(rawSummaryLots.history)
+    } : undefined;
+
     if (summaryData && (summaryData.longitudinal || summaryData.transversal)) {
         if (!localData || (!localData.longitudinal && !localData.transversal)) {
             return {
                 longitudinal: summaryData.longitudinal || '',
                 transversal: summaryData.transversal || '',
                 updatedAt: summaryData.updatedAt,
-                history: Array.isArray(summaryData.history) ? summaryData.history : []
+                history: summaryData.history || []
             };
         }
         // Usa o mais recente entre localStorage e summary
@@ -108,7 +126,7 @@ export const getMalhaActiveLots = (machineName: string, activeOrder?: Production
                 longitudinal: summaryData.longitudinal || localData.longitudinal || '',
                 transversal: summaryData.transversal || localData.transversal || '',
                 updatedAt: summaryData.updatedAt,
-                history: Array.isArray(summaryData.history) ? summaryData.history : (localData.history || [])
+                history: (summaryData.history && summaryData.history.length > 0) ? summaryData.history : normalizeHistory(localData.history || [])
             };
         }
     }
@@ -117,7 +135,7 @@ export const getMalhaActiveLots = (machineName: string, activeOrder?: Production
         longitudinal: localData?.longitudinal || summaryData?.longitudinal || '',
         transversal: localData?.transversal || summaryData?.transversal || '',
         updatedAt: localData?.updatedAt || summaryData?.updatedAt,
-        history: Array.isArray(localData?.history) ? localData!.history : (Array.isArray(summaryData?.history) ? summaryData!.history : [])
+        history: Array.isArray(localData?.history) && localData!.history.length > 0 ? normalizeHistory(localData!.history) : (summaryData?.history || [])
     };
 };
 
@@ -1000,6 +1018,37 @@ const MalhaActiveLotsCard: React.FC<{
 
             if (onUpdateOpenDowntimeReason) {
                 onUpdateOpenDowntimeReason(formattedReason);
+            } else if (activeOrder?.id) {
+                // Mesmo na tela principal (após retomar a parada), vincula automaticamente à parada aberta ou à última parada de Troca de Rolo do dia!
+                try {
+                    const currentEvents = [...(activeOrder.downtimeEvents || (activeOrder as any).downtime_events || [])];
+                    let targetIdx = currentEvents.findIndex(e => !e.resumeTime && !(e as any).resume_time);
+                    if (targetIdx === -1) {
+                        // Procura de trás para frente a última parada de Troca de Rolo que ainda não tinha lote específico (ou a última Troca de Rolo)
+                        for (let i = currentEvents.length - 1; i >= 0; i--) {
+                            const rUp = String(currentEvents[i].reason || '').toUpperCase();
+                            if (rUp.includes('TROCA DE ROLO') || rUp.includes('TROCA DO ROLO') || rUp.includes('BOBINA')) {
+                                if (!rUp.includes('ENTRA:')) {
+                                    targetIdx = i;
+                                    break;
+                                }
+                                if (targetIdx === -1) targetIdx = i;
+                            }
+                        }
+                    }
+                    if (targetIdx !== -1) {
+                        currentEvents[targetIdx] = {
+                            ...currentEvents[targetIdx],
+                            reason: formattedReason
+                        };
+                        activeOrder.downtimeEvents = currentEvents;
+                        await updateItem('production_orders', activeOrder.id, {
+                            downtimeEvents: currentEvents
+                        } as any);
+                    }
+                } catch (err) {
+                    console.warn('Erro ao vincular troca de rolo à parada da Malha:', err);
+                }
             }
         }
 
