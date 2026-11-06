@@ -174,22 +174,25 @@ export const saveMalhaActiveLots = async (
     return payload;
 };
 
-export const resolveMalhaExpectedGauges = (activeOrder?: ProductionOrderData | null): { longitudinal: string; transversal: string } => {
-    const modelStr = (activeOrder?.malhaModel || '').toUpperCase();
-    const fallbackBitola = (activeOrder?.targetBitola || '').replace(',', '.').trim();
+export const resolveMalhaExpectedGauges = (activeOrder?: ProductionOrderData | null): { longitudinal: string; transversal: string; longitudinalSpec?: string; transversalSpec?: string } => {
+    const modelStr = (activeOrder?.malhaModel || (activeOrder as any)?.malha_model || activeOrder?.productDescription || '').toUpperCase();
+    const fallbackBitola = (activeOrder?.targetBitola || (activeOrder as any)?.target_bitola || '').replace(/mm/gi, '').replace(',', '.').trim();
     const matchedConfig = DefaultMalhaGauges.find(cfg =>
-        (cfg.code && modelStr.includes(cfg.code.toUpperCase())) ||
+        (cfg.productCode && modelStr.includes(cfg.productCode.toUpperCase())) ||
         (cfg.description && modelStr.includes(cfg.description.toUpperCase()))
     );
     if (matchedConfig) {
+        const cleanGauge = String(matchedConfig.gauge || fallbackBitola || '5.00').replace(/mm/gi, '').replace(',', '.').trim();
         return {
-            longitudinal: matchedConfig.longitudinal.replace(',', '.').trim(),
-            transversal: matchedConfig.transversal.replace(',', '.').trim()
+            longitudinal: cleanGauge,
+            transversal: cleanGauge,
+            longitudinalSpec: matchedConfig.longitudinal,
+            transversalSpec: matchedConfig.transversal
         };
     }
     return {
-        longitudinal: fallbackBitola,
-        transversal: fallbackBitola
+        longitudinal: fallbackBitola || '5.00',
+        transversal: fallbackBitola || '5.00'
     };
 };
 
@@ -1073,22 +1076,22 @@ const MalhaActiveLotsCard: React.FC<{
     }, [editingPos, expectedGauges, showAllGauges, pickingSai, lotSaiInput, lotEntraInput, availableLots]);
 
     return (
-        <div className={`${isStoppedMode ? 'bg-slate-900 border-2 border-amber-500/50 text-white' : 'bg-white border border-slate-200 text-slate-800'} p-4 md:p-5 rounded-2xl shadow-sm space-y-4 text-left`}>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/20">
-                <div className="flex items-center gap-2.5">
-                    <span className="p-2 rounded-xl bg-amber-500/15 text-amber-500 text-lg">🔄</span>
-                    <div>
-                        <h3 className={`text-sm sm:text-base font-black tracking-tight uppercase ${isStoppedMode ? 'text-amber-300' : 'text-slate-800'}`}>
-                            Lotes em Operação na Malha (Longitudinal & Transversal)
+        <div className={`${isStoppedMode ? 'bg-slate-900 border-2 border-amber-500/50 text-white' : 'bg-white border border-slate-200 text-slate-800'} p-3.5 sm:p-5 rounded-2xl shadow-sm space-y-3.5 text-left w-full max-w-full overflow-hidden`}>
+            <div className="flex items-start sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200/20">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                    <span className="p-2 rounded-xl bg-amber-500/15 text-amber-500 text-base sm:text-lg shrink-0">🔄</span>
+                    <div className="min-w-0">
+                        <h3 className={`text-xs sm:text-base font-black tracking-tight uppercase leading-tight break-words ${isStoppedMode ? 'text-amber-300' : 'text-slate-800'}`}>
+                            Lotes em Operação na Malha
                         </h3>
-                        <p className={`text-[11px] font-medium ${isStoppedMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Controle de qual lote saiu e qual entrou na máquina (sem alterar status do estoque)
+                        <p className={`text-[10px] sm:text-[11px] font-medium leading-snug mt-0.5 break-words ${isStoppedMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Longitudinal & Transversal (sem alterar status do estoque)
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                 {(['LONGITUDINAL', 'TRANSVERSAL'] as const).map(pos => {
                     const isLong = pos === 'LONGITUDINAL';
                     const activeLot = isLong ? lotsState.longitudinal : lotsState.transversal;
@@ -1097,7 +1100,7 @@ const MalhaActiveLotsCard: React.FC<{
                     return (
                         <div
                             key={pos}
-                            className={`p-3.5 rounded-2xl border-2 flex flex-col justify-between gap-3 ${
+                            className={`p-3 sm:p-3.5 rounded-2xl border-2 flex flex-col justify-between gap-2.5 min-w-0 w-full ${
                                 isStoppedMode
                                     ? 'bg-slate-950/80 border-white/10'
                                     : activeLot
@@ -1105,15 +1108,19 @@ const MalhaActiveLotsCard: React.FC<{
                                         : 'bg-slate-50 border-slate-200 border-dashed'
                             }`}
                         >
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1 ${isStoppedMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                            <div className="flex items-start justify-between gap-2 min-w-0">
+                                <div className="min-w-0">
+                                    <div className={`text-[10px] font-black uppercase tracking-wider flex items-center flex-wrap gap-1.5 ${isStoppedMode ? 'text-amber-400' : 'text-amber-700'}`}>
                                         <span>{isLong ? '↔️ FIO LONGITUDINAL' : '↕️ FIO TRANSVERSAL'}</span>
-                                        {gauge && <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[9px] font-mono">({gauge}mm)</span>}
-                                    </span>
+                                        {gauge && (
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[9px] font-mono shrink-0">
+                                                ({gauge}mm)
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="mt-1">
                                         {activeLot ? (
-                                            <span className={`text-xl font-black font-mono ${isStoppedMode ? 'text-white' : 'text-slate-900'}`}>
+                                            <span className={`text-lg sm:text-xl font-black font-mono ${isStoppedMode ? 'text-white' : 'text-slate-900'}`}>
                                                 LOTE {activeLot}
                                             </span>
                                         ) : (
@@ -1123,35 +1130,36 @@ const MalhaActiveLotsCard: React.FC<{
                                         )}
                                     </div>
                                 </div>
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${
                                     activeLot
-                                        ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
+                                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
                                         : 'bg-slate-500/20 text-slate-400'
                                 }`}>
                                     {activeLot ? 'Em Máquina' : 'Aguardando'}
                                 </span>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid grid-cols-2 gap-2 w-full">
                                 <button
                                     type="button"
                                     onClick={() => handleOpenEdit(pos, 'SWAP')}
-                                    className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                                    className="w-full py-2.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] sm:text-[11px] uppercase tracking-wide transition active:scale-95 cursor-pointer flex items-center justify-center gap-1 shadow-sm truncate"
                                 >
                                     <span>🔄</span>
-                                    <span>Trocar Lote (Sai / Entra)</span>
+                                    <span className="truncate">Trocar Lote</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => handleOpenEdit(pos, 'SET_CURRENT')}
-                                    className={`py-2 px-2.5 rounded-xl font-bold text-[10px] uppercase transition active:scale-95 cursor-pointer border ${
+                                    className={`w-full py-2.5 px-2 rounded-xl font-bold text-[10px] sm:text-[11px] uppercase transition active:scale-95 cursor-pointer border flex items-center justify-center gap-1 truncate ${
                                         isStoppedMode
                                             ? 'bg-slate-800 border-white/15 text-slate-300 hover:bg-slate-700'
-                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                                     }`}
                                     title="Definir ou corrigir o lote atual sem registrar troca"
                                 >
-                                    ✏️ Definir Atual
+                                    <span>✏️</span>
+                                    <span className="truncate">Definir Atual</span>
                                 </button>
                             </div>
                         </div>
@@ -1161,32 +1169,32 @@ const MalhaActiveLotsCard: React.FC<{
 
             {/* Painel de Edição / Seleção de Lote */}
             {editingPos && (
-                <div className="p-4 rounded-2xl bg-slate-900 text-white border-2 border-amber-400 space-y-3 animate-fade-in">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                        <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 text-white border-2 border-amber-400 space-y-3 animate-fade-in w-full max-w-full overflow-hidden">
+                    <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                        <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-300 leading-tight">
                             {editMode === 'SWAP'
-                                ? `🔄 Registrar Troca de Rolo • FIO ${editingPos}`
-                                : `✏️ Definir Lote Atual em Máquina • FIO ${editingPos}`}
+                                ? `🔄 Troca de Rolo • FIO ${editingPos}`
+                                : `✏️ Lote Atual • FIO ${editingPos}`}
                         </span>
                         <button
                             type="button"
                             onClick={() => setEditingPos(null)}
-                            className="text-xs font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded"
+                            className="text-xs font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded shrink-0"
                         >
                             ✕ Fechar
                         </button>
                     </div>
 
                     {editMode === 'SWAP' ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
                             <div
                                 onClick={() => setPickingSai(true)}
-                                className={`p-2.5 rounded-xl border cursor-pointer ${
+                                className={`p-2 sm:p-2.5 rounded-xl border cursor-pointer min-w-0 ${
                                     pickingSai ? 'bg-rose-950/50 border-rose-400' : 'bg-slate-950 border-white/10'
                                 }`}
                             >
-                                <label className="text-[9px] font-black uppercase text-rose-300 block mb-1">
-                                    📤 Lote que SAIU (Anterior)
+                                <label className="text-[9px] font-black uppercase text-rose-300 block mb-1 truncate">
+                                    📤 Lote que SAIU
                                 </label>
                                 <input
                                     type="text"
@@ -1194,25 +1202,25 @@ const MalhaActiveLotsCard: React.FC<{
                                     onFocus={() => setPickingSai(true)}
                                     onChange={e => setLotSaiInput(e.target.value)}
                                     placeholder="Ex: 8451"
-                                    className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-rose-500/40 text-xs font-mono font-black text-rose-200 outline-none"
+                                    className="w-full px-2 py-1.5 rounded-lg bg-black/60 border border-rose-500/40 text-xs font-mono font-black text-rose-200 outline-none"
                                 />
                             </div>
                             <div
                                 onClick={() => setPickingSai(false)}
-                                className={`p-2.5 rounded-xl border cursor-pointer ${
+                                className={`p-2 sm:p-2.5 rounded-xl border cursor-pointer min-w-0 ${
                                     !pickingSai ? 'bg-emerald-950/50 border-emerald-400' : 'bg-slate-950 border-white/10'
                                 }`}
                             >
-                                <label className="text-[9px] font-black uppercase text-emerald-300 block mb-1">
-                                    📥 Lote que ENTROU (Novo) *
+                                <label className="text-[9px] font-black uppercase text-emerald-300 block mb-1 truncate">
+                                    📥 Lote que ENTROU *
                                 </label>
                                 <input
                                     type="text"
                                     value={lotEntraInput}
                                     onFocus={() => setPickingSai(false)}
                                     onChange={e => setLotEntraInput(e.target.value)}
-                                    placeholder="Digite ou clique num lote abaixo..."
-                                    className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-emerald-500/50 text-xs font-mono font-black text-emerald-200 outline-none"
+                                    placeholder="Novo lote..."
+                                    className="w-full px-2 py-1.5 rounded-lg bg-black/60 border border-emerald-500/50 text-xs font-mono font-black text-emerald-200 outline-none"
                                 />
                             </div>
                         </div>
@@ -1232,9 +1240,9 @@ const MalhaActiveLotsCard: React.FC<{
                     )}
 
                     <div>
-                        <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                             <span className="text-[9px] font-bold text-slate-400 uppercase">
-                                Lotes CA-60 no estoque (clique para selecionar):
+                                Lotes CA-60 no estoque:
                             </span>
                             <button
                                 type="button"
@@ -1244,7 +1252,7 @@ const MalhaActiveLotsCard: React.FC<{
                                 {showAllGauges ? 'Mostrando Todas Bitolas' : 'Ver Todas Bitolas CA-60'}
                             </button>
                         </div>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1 bg-black/40 rounded-xl">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 max-h-40 overflow-y-auto custom-scrollbar p-1 bg-black/40 rounded-xl">
                             {filteredLots.map(item => {
                                 const cleanLot = String(item.internalLot || '').trim();
                                 const weightKg = Number(item.remainingQuantity ?? item.initialQuantity ?? 0);
@@ -1260,9 +1268,9 @@ const MalhaActiveLotsCard: React.FC<{
                                                 setLotEntraInput(cleanLot);
                                             }
                                         }}
-                                        className="p-1.5 rounded-lg border border-white/10 bg-slate-950 hover:border-amber-400 text-left transition active:scale-95 cursor-pointer flex flex-col"
+                                        className="p-2 rounded-lg border border-white/10 bg-slate-950 hover:border-amber-400 text-left transition active:scale-95 cursor-pointer flex flex-col min-w-0"
                                     >
-                                        <span className="text-[11px] font-black font-mono text-white truncate">Lote {cleanLot}</span>
+                                        <span className="text-xs font-black font-mono text-white truncate">Lote {cleanLot}</span>
                                         <span className="text-[9px] font-mono text-slate-400 truncate">{item.bitola}mm • {weightKg > 0 ? `${weightKg.toFixed(0)}kg` : ''}</span>
                                     </button>
                                 );
@@ -1270,20 +1278,20 @@ const MalhaActiveLotsCard: React.FC<{
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-1">
+                    <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2 pt-1">
                         <button
                             type="button"
                             onClick={() => setEditingPos(null)}
-                            className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                            className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold text-center"
                         >
                             Cancelar
                         </button>
                         <button
                             type="button"
                             onClick={handleConfirmEdit}
-                            className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
+                            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer text-center"
                         >
-                            ✓ Confirmar Lote
+                            ✓ Confirmar
                         </button>
                     </div>
                 </div>
@@ -4869,9 +4877,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                 </div>
                             )}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8 w-full max-w-full overflow-x-hidden">
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
-                                <div className={`lg:col-span-1 space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                <div className={`lg:col-span-1 min-w-0 max-w-full space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                     {/* Trefila Mobile: Optimized Panel (Enchuto) */}
                                     {activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? (
                                         <div className="md:hidden animate-fade-in space-y-4">
@@ -5098,7 +5106,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
-                                    <div className={`lg:col-span-2 space-y-4 md:space-y-6 ${(mobileTab !== 'monitor' && mobileTab !== 'performance') ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                    <div className={`lg:col-span-2 min-w-0 max-w-full space-y-4 md:space-y-6 ${(mobileTab !== 'monitor' && mobileTab !== 'performance') ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                         <div className={`grid grid-cols-1 gap-6 ${activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? 'hidden md:grid' : 'grid'}`}>
                                                 {/* Header Info - Simplified for Mobile */}
                                                 <div className="col-span-2">
@@ -5391,7 +5399,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                     </div>
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
-                                <div className={`lg:col-span-2 space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                <div className={`lg:col-span-2 min-w-0 max-w-full space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
 
                                     {activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? (
                                         <>

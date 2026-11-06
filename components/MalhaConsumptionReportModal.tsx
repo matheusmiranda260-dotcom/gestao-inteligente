@@ -38,9 +38,12 @@ export const inferDefaultMalhaTechConfig = (op?: ProductionOrderData | null): Ma
 
     let bitola = parseFloat(rawBitola);
     if (isNaN(bitola) || bitola <= 0) {
-        const matched = DefaultMalhaGauges.find(g => desc.includes(g.code.toUpperCase()) || desc.includes(g.description.toUpperCase()));
-        if (matched) {
-            bitola = parseFloat(matched.longitudinal.replace(',', '.')) || 5.0;
+        const matched = DefaultMalhaGauges.find(g =>
+            (g.productCode && desc.includes(g.productCode.toUpperCase())) ||
+            (g.description && desc.includes(g.description.toUpperCase()))
+        );
+        if (matched && matched.gauge) {
+            bitola = parseFloat(matched.gauge.replace(/mm/gi, '').replace(',', '.').trim()) || 5.0;
         } else if (desc.includes('4,2') || desc.includes('4.2')) {
             bitola = 4.2;
         } else if (desc.includes('3,4') || desc.includes('3.4')) {
@@ -1091,55 +1094,213 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         });
     };
 
+    const handleRemovePackage = (id: string) => {
+        if (reportData.packages.length <= 1) return;
+        const filtered = reportData.packages
+            .filter(p => p.id !== id)
+            .map((p, idx) => ({ ...p, packageCode: `p${idx + 1}` }));
+        persistData({
+            ...reportData,
+            packages: filtered
+        });
+    };
+
     const computed = useMemo(
         () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig),
         [reportData.packages, reportData.techConfig]
     );
 
     return (
-        <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+        <div className="bg-white p-3.5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4 w-full max-w-full overflow-hidden text-left">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
-                <div>
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                        <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
-                            <span>📦 Registro de Pacotes da Malha</span>
-                            <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                                50 malhas / pacote
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm sm:text-lg font-black text-slate-800 tracking-tight flex items-center gap-1.5">
+                            <span>📦 Pacotes de Malha</span>
+                            <span className="text-[10px] sm:text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                                50 malhas / pct
                             </span>
                         </h3>
-                        <span className="text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                            {reportData.packages.length} pacotes • {computed.totalQuantity} malhas • {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                        <span className="text-[10px] sm:text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            {reportData.packages.length} pcts • {computed.totalQuantity} pçs • {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
                         </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                        Selecione o Lote Longitudinal e Transversal, a quantidade (50) e o peso do lote para o sistema converter e descontar automaticamente
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-snug">
+                        Informe o lote longitudinal e transversal, quantidade (50) e peso do lote para conversão e desconto automático
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-mono font-bold text-slate-400">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                            type="button"
+                            onClick={handleAddPackage}
+                            className="py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] sm:text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm text-center justify-center flex items-center gap-1"
+                        >
+                            <span>+ Pacote (50)</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowFullModal(true)}
+                            className="py-2.5 px-3 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] sm:text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center justify-center gap-1"
+                        >
+                            <span>📊</span>
+                            <span className="truncate">Planilha</span>
+                        </button>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-slate-400 text-right sm:text-left">
                         {saveStatus === 'saved' ? '✓ Sincronizado' : 'Salvando...'}
                     </span>
-                    <button
-                        type="button"
-                        onClick={handleAddPackage}
-                        className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm"
-                    >
-                        + Pacote (50)
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setShowFullModal(true)}
-                        className="px-3.5 py-2 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
-                    >
-                        <span>📊</span>
-                        <span>Ver Planilha Completa</span>
-                    </button>
                 </div>
             </div>
 
-            {/* Tabela de Pacotes de 50 Malhas */}
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            {/* VISÃO MOBILE (CARDS COMPACTOS POR PACOTE DE 50 MALHAS - SEM ROLAGEM HORIZONTAL) */}
+            <div className="md:hidden space-y-3 w-full">
+                {computed.computedRows.map((row) => (
+                    <div
+                        key={row.id}
+                        className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/70 space-y-2.5 shadow-sm w-full"
+                    >
+                        {/* Cabeçalho do Pacote: Código p1 + Lote Etiqueta + Qtd 50 + Excluir */}
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                            <div className="flex items-center gap-1.5">
+                                <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black text-xs uppercase font-mono">
+                                    {row.packageCode.toUpperCase()}
+                                </span>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block leading-none">
+                                        Lote Etiqueta
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={row.finishedLotNumber}
+                                        onChange={e => updatePackageField(row.id, 'finishedLotNumber', e.target.value)}
+                                        placeholder="Ex: 88846"
+                                        className="w-24 mt-0.5 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 block leading-none text-center">
+                                        Qtd. Malhas
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={row.quantity}
+                                        onChange={e => updatePackageField(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
+                                        className="w-16 mt-0.5 px-2 py-1 border border-slate-300 rounded-lg text-xs font-black text-center text-slate-900 bg-white outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+                                {reportData.packages.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemovePackage(row.id)}
+                                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg font-bold text-xs"
+                                        title="Remover pacote"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Bloco Longitudinal */}
+                        <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                                    ↔️ Fio Longitudinal
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-slate-600">
+                                    Cons.: <strong>{row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</strong>
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[9px] font-bold uppercase text-amber-800 block mb-0.5">
+                                        Nº Lote Long.
+                                    </label>
+                                    <input
+                                        type="text"
+                                        list="malha-op-stock-lots"
+                                        value={row.longLot}
+                                        onChange={e => updatePackageField(row.id, 'longLot', e.target.value)}
+                                        placeholder="Ex: 7505"
+                                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-black text-slate-900 bg-white outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-bold uppercase text-amber-800 block mb-0.5">
+                                        Peso Lote (kg)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={row.longLotWeight || ''}
+                                        onChange={e => updatePackageField(row.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
+                                        placeholder="Ex: 2075"
+                                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-slate-900 bg-white outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-amber-200/60 text-[10px] font-mono">
+                                <span className="text-slate-600">Saldo após pacote:</span>
+                                <span className={`font-black ${row.longPesoInicial < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Bloco Transversal */}
+                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-blue-900">
+                                    ↕️ Fio Transversal
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-slate-600">
+                                    Cons.: <strong>{row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</strong>
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[9px] font-bold uppercase text-blue-800 block mb-0.5">
+                                        Nº Lote Trans.
+                                    </label>
+                                    <input
+                                        type="text"
+                                        list="malha-op-stock-lots"
+                                        value={row.transLot}
+                                        onChange={e => updatePackageField(row.id, 'transLot', e.target.value)}
+                                        placeholder="Ex: 7583"
+                                        className="w-full px-2.5 py-1.5 border border-blue-300 rounded-lg text-xs font-black text-slate-900 bg-white outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-bold uppercase text-blue-800 block mb-0.5">
+                                        Peso Lote (kg)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={row.transLotWeight || ''}
+                                        onChange={e => updatePackageField(row.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
+                                        placeholder="Ex: 2071"
+                                        className="w-full px-2.5 py-1.5 border border-blue-300 rounded-lg text-xs font-bold text-slate-900 bg-white outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 text-[10px] font-mono">
+                                <span className="text-slate-600">Saldo após pacote:</span>
+                                <span className={`font-black ${row.transPesoInicial < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* VISÃO DESKTOP: Tabela de Pacotes de 50 Malhas */}
+            <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-xl">
                 <table className="w-full text-xs border-collapse">
                     <thead>
                         <tr className="bg-[#1F3864] text-white font-black uppercase text-[10px]">
@@ -1246,17 +1407,17 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         ))}
                     </tbody>
                 </table>
-
-                <datalist id="malha-op-stock-lots">
-                    {(stock || [])
-                        .filter(s => s && s.internalLot && !String(s.status || '').toLowerCase().includes('consumido'))
-                        .map(s => (
-                            <option key={s.id} value={s.internalLot}>
-                                Lote {s.internalLot} • {s.bitola}mm • {Number(s.initialQuantity || s.remainingQuantity || 0).toFixed(0)}kg
-                            </option>
-                        ))}
-                </datalist>
             </div>
+
+            <datalist id="malha-op-stock-lots">
+                {(stock || [])
+                    .filter(s => s && s.internalLot && !String(s.status || '').toLowerCase().includes('consumido'))
+                    .map(s => (
+                        <option key={s.id} value={s.internalLot}>
+                            Lote {s.internalLot} • {s.bitola}mm • {Number(s.initialQuantity || s.remainingQuantity || 0).toFixed(0)}kg
+                        </option>
+                    ))}
+            </datalist>
 
             {/* Resumo Rápido de Lotes Consumidos e Sobra */}
             {computed.consumedLots.length > 0 && (
