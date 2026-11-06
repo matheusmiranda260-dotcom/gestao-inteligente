@@ -5939,18 +5939,12 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             </div>
                                         </>
                                     ) : activeMachine.startsWith('Malha') && activeOrder ? (
-                                        <>
-                                            <MalhaActiveLotsCard
-                                                machineName={activeMachine}
-                                                activeOrder={activeOrder}
-                                                stock={stock}
-                                            />
-                                            <MalhaPackagesOperatorPanel
-                                                op={activeOrder}
-                                                stock={stock}
-                                                shiftReports={shiftReports}
-                                            />
-                                        </>
+                                        <MalhaPackagesOperatorPanel
+                                            op={activeOrder}
+                                            stock={stock}
+                                            shiftReports={shiftReports}
+                                            machineName={activeMachine}
+                                        />
                                     ) : (
                                         <>
                                             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">

@@ -3,16 +3,32 @@ import type { ProductionOrderData, StockItem, ShiftReport } from '../types';
 import { DefaultMalhaGauges } from '../types';
 import { updateItem } from '../services/supabaseService';
 
+export interface MalhaLotSupplyItem {
+    id: string;
+    lot: string; // Ex: 7505, 7594
+    weight: number; // Peso do rolo/lote em kg (Ex: 2075)
+    addedAt?: string;
+}
+
+export interface MalhaPackageLotSplit {
+    lot: string;
+    consumedKg: number;
+    lotInitialKg: number;
+    balanceAfterKg: number;
+    exhausted: boolean;
+}
+
 export interface MalhaPackageRow {
     id: string;
     packageCode: string; // p1, p2, p3...
     finishedLotNumber: string; // Ex: 88846, 88849...
     quantity: number; // Padrão: 50 malhas
-    measuredPackageWeight?: number | null; // Peso real na balança (opcional)
+    measuredPackageWeight?: number | null;
     longLot: string; // Ex: 7594
     longLotWeight: number; // Ex: 2075
     transLot: string; // Ex: 7804
     transLotWeight: number; // Ex: 2071
+    confirmed?: boolean;
     recordedAt?: string;
     operator?: string;
 }
@@ -27,33 +43,51 @@ export interface MalhaTechnicalConfig {
 }
 
 export interface MalhaPackagesReportData {
+    version?: number;
     techConfig: MalhaTechnicalConfig;
+    longLotsQueue: MalhaLotSupplyItem[];
+    transLotsQueue: MalhaLotSupplyItem[];
     packages: MalhaPackageRow[];
     updatedAt?: string;
 }
 
 export const inferDefaultMalhaTechConfig = (op?: ProductionOrderData | null): MalhaTechnicalConfig => {
     const desc = String(op?.malhaModel || (op as any)?.malha_model || op?.productDescription || '').toUpperCase();
-    const rawBitola = String(op?.targetBitola || (op as any)?.target_bitola || '').replace(',', '.').trim();
+    const rawBitola = String(op?.targetBitola || (op as any)?.target_bitola || '').replace(/mm/gi, '').replace(',', '.').trim();
 
-    let bitola = parseFloat(rawBitola);
-    if (isNaN(bitola) || bitola <= 0) {
+    // 1. Tentar extrair a bitola diretamente da descrição da malha (ex: "5,00MM", "4,20MM", "3,40MM", "5MM")
+    let bitolaFromDesc = 0;
+    const mmMatch = desc.match(/(\d+(?:[.,]\d+)?)\s*MM/i);
+    if (mmMatch && mmMatch[1]) {
+        bitolaFromDesc = parseFloat(mmMatch[1].replace(',', '.'));
+    }
+    if (!bitolaFromDesc || isNaN(bitolaFromDesc)) {
         const matched = DefaultMalhaGauges.find(g =>
             (g.productCode && desc.includes(g.productCode.toUpperCase())) ||
             (g.description && desc.includes(g.description.toUpperCase()))
         );
         if (matched && matched.gauge) {
-            bitola = parseFloat(matched.gauge.replace(/mm/gi, '').replace(',', '.').trim()) || 5.0;
-        } else if (desc.includes('4,2') || desc.includes('4.2')) {
+            bitolaFromDesc = parseFloat(matched.gauge.replace(/mm/gi, '').replace(',', '.').trim()) || 0;
+        }
+    }
+
+    let parsedTarget = parseFloat(rawBitola);
+    // Nota: Em algumas OPs de Malha, targetBitola veio salvo como "6" (6 metros de comprimento do painel) em vez da bitola do fio (5.00mm)
+    if (parsedTarget === 6 && bitolaFromDesc > 0 && bitolaFromDesc !== 6) {
+        parsedTarget = bitolaFromDesc;
+    }
+
+    let bitola = bitolaFromDesc > 0 ? bitolaFromDesc : parsedTarget;
+    if (isNaN(bitola) || bitola <= 0 || bitola >= 6) {
+        if (desc.includes('4,2') || desc.includes('4.2')) {
             bitola = 4.2;
         } else if (desc.includes('3,4') || desc.includes('3.4')) {
             bitola = 3.4;
         } else {
-            bitola = 4.9;
+            bitola = 5.0;
         }
     }
 
-    // Inferir espaçamento (10x10 vs 15x15) e dimensões (6,00 x 2,45)
     const is15x15 = desc.includes('15X15');
     const longTam = 6.0;
     const transTam = 2.45;
@@ -70,14 +104,26 @@ export const inferDefaultMalhaTechConfig = (op?: ProductionOrderData | null): Ma
     };
 };
 
-export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null): MalhaPackagesReportData => {
+const cleanLotCode = (val: any): string => String(val ?? '').replace(/^LOTE\s+/i, '').trim();
+
+export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null, stock?: StockItem[]): MalhaPackagesReportData => {
     const defaultTech = inferDefaultMalhaTechConfig(op);
     if (!op) {
-        return { techConfig: defaultTech, packages: [] };
+        return { version: 2, techConfig: defaultTech, longLotsQueue: [], transLotsQueue: [], packages: [] };
     }
+
+    const stockWeightMap = new Map<string, number>();
+    (stock || []).forEach(item => {
+        if (item && item.internalLot) {
+            const c = cleanLotCode(item.internalLot).toLowerCase();
+            const w = Number(item.initialQuantity || item.remainingQuantity || 0);
+            if (c && w > 0) stockWeightMap.set(c, w);
+        }
+    });
 
     const summary: any = op.summary || {};
     const saved = summary.malhaPackagesData || summary.malha_packages_data;
+    const activeLots = summary.malhaActiveLots || summary.malha_active_lots || {};
 
     let localSaved: any = null;
     try {
@@ -94,10 +140,57 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null): Malh
         return saved || localSaved;
     })();
 
-    if (source && Array.isArray(source.packages) && source.packages.length > 0) {
+    const buildDefaultQueuesFromActive = (existingLong: MalhaLotSupplyItem[], existingTrans: MalhaLotSupplyItem[]) => {
+        const lQueue = [...existingLong];
+        const tQueue = [...existingTrans];
+
+        const activeLong = cleanLotCode(activeLots.longitudinal);
+        const activeTrans = cleanLotCode(activeLots.transversal);
+
+        if (activeLong && !lQueue.some(item => cleanLotCode(item.lot) === activeLong)) {
+            lQueue.push({
+                id: `lq-${Date.now()}-1`,
+                lot: activeLong,
+                weight: stockWeightMap.get(activeLong.toLowerCase()) || 0,
+                addedAt: new Date().toISOString()
+            });
+        }
+        if (activeTrans && !tQueue.some(item => cleanLotCode(item.lot) === activeTrans)) {
+            tQueue.push({
+                id: `tq-${Date.now()}-1`,
+                lot: activeTrans,
+                weight: stockWeightMap.get(activeTrans.toLowerCase()) || 0,
+                addedAt: new Date().toISOString()
+            });
+        }
+
+        // Auto-preencher peso do estoque se estiver zerado e existir no estoque
+        lQueue.forEach(item => {
+            if (!item.weight && item.lot) {
+                const found = stockWeightMap.get(cleanLotCode(item.lot).toLowerCase());
+                if (found) item.weight = found;
+            }
+        });
+        tQueue.forEach(item => {
+            if (!item.weight && item.lot) {
+                const found = stockWeightMap.get(cleanLotCode(item.lot).toLowerCase());
+                if (found) item.weight = found;
+            }
+        });
+
+        return { lQueue, tQueue };
+    };
+
+    if (source) {
         const rawTech = source.techConfig || source.tech_config || {};
+        let savedBitola = Number(rawTech.bitola ?? defaultTech.bitola) || defaultTech.bitola;
+        // Corrigir caso tenha ficado salvo bitola = 6 por engano numa malha 5,00mm
+        if (savedBitola === 6 && defaultTech.bitola !== 6) {
+            savedBitola = defaultTech.bitola;
+        }
+
         const techConfig: MalhaTechnicalConfig = {
-            bitola: Number(rawTech.bitola ?? defaultTech.bitola) || defaultTech.bitola,
+            bitola: savedBitola,
             longQnt: Number(rawTech.longQnt ?? rawTech.long_qnt ?? defaultTech.longQnt) || defaultTech.longQnt,
             longTam: Number(rawTech.longTam ?? rawTech.long_tam ?? defaultTech.longTam) || defaultTech.longTam,
             transQnt: Number(rawTech.transQnt ?? rawTech.trans_qnt ?? defaultTech.transQnt) || defaultTech.transQnt,
@@ -105,53 +198,98 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null): Malh
             defaultQtyPerPackage: Number(rawTech.defaultQtyPerPackage ?? rawTech.default_qty_per_package ?? 50) || 50
         };
 
-        const packages: MalhaPackageRow[] = source.packages.map((p: any, idx: number) => ({
+        const rawPackages: any[] = Array.isArray(source.packages) ? source.packages : [];
+        const isV2 = Number(source.version || 0) >= 2;
+
+        // Se era versão 1 (que gerou 38 linhas em branco automaticamente), filtrar apenas pacotes reais/confirmados
+        const validPackages = isV2
+            ? rawPackages
+            : rawPackages.filter((p: any) =>
+                  Boolean(
+                      p.confirmed ||
+                      p.finishedLotNumber ||
+                      Number(p.longLotWeight) > 0 ||
+                      Number(p.transLotWeight) > 0
+                  )
+              );
+
+        const packages: MalhaPackageRow[] = validPackages.map((p: any, idx: number) => ({
             id: p.id || `mpkg-${idx + 1}`,
-            packageCode: p.packageCode || p.package_code || `p${idx + 1}`,
+            packageCode: `p${idx + 1}`,
             finishedLotNumber: String(p.finishedLotNumber ?? p.finished_lot_number ?? ''),
             quantity: Number(p.quantity ?? 50) || 50,
             measuredPackageWeight: p.measuredPackageWeight ?? p.measured_package_weight ?? null,
-            longLot: String(p.longLot ?? p.long_lot ?? ''),
+            longLot: cleanLotCode(p.longLot ?? p.long_lot ?? ''),
             longLotWeight: Number(p.longLotWeight ?? p.long_lot_weight ?? 0) || 0,
-            transLot: String(p.transLot ?? p.trans_lot ?? ''),
+            transLot: cleanLotCode(p.transLot ?? p.trans_lot ?? ''),
             transLotWeight: Number(p.transLotWeight ?? p.trans_lot_weight ?? 0) || 0,
+            confirmed: true,
             recordedAt: p.recordedAt || p.recorded_at,
             operator: p.operator
         }));
 
+        // Reconstruir filas de lotes (Ativo + Reserva)
+        let rawLongQ: MalhaLotSupplyItem[] = Array.isArray(source.longLotsQueue)
+            ? source.longLotsQueue.map((item: any, i: number) => ({
+                  id: item.id || `lq-${i}`,
+                  lot: cleanLotCode(item.lot),
+                  weight: Number(item.weight) || 0,
+                  addedAt: item.addedAt
+              })).filter((x: MalhaLotSupplyItem) => Boolean(x.lot))
+            : [];
+
+        let rawTransQ: MalhaLotSupplyItem[] = Array.isArray(source.transLotsQueue)
+            ? source.transLotsQueue.map((item: any, i: number) => ({
+                  id: item.id || `tq-${i}`,
+                  lot: cleanLotCode(item.lot),
+                  weight: Number(item.weight) || 0,
+                  addedAt: item.addedAt
+              })).filter((x: MalhaLotSupplyItem) => Boolean(x.lot))
+            : [];
+
+        // Também incorporar eventuais lotes informados direto nas linhas dos pacotes
+        packages.forEach((p, idx) => {
+            if (p.longLot && !rawLongQ.some(q => q.lot === p.longLot)) {
+                rawLongQ.push({ id: `lq-pkg-${idx}`, lot: p.longLot, weight: p.longLotWeight || 0 });
+            } else if (p.longLot && p.longLotWeight > 0) {
+                const found = rawLongQ.find(q => q.lot === p.longLot);
+                if (found && !found.weight) found.weight = p.longLotWeight;
+            }
+            if (p.transLot && !rawTransQ.some(q => q.lot === p.transLot)) {
+                rawTransQ.push({ id: `tq-pkg-${idx}`, lot: p.transLot, weight: p.transLotWeight || 0 });
+            } else if (p.transLot && p.transLotWeight > 0) {
+                const found = rawTransQ.find(q => q.lot === p.transLot);
+                if (found && !found.weight) found.weight = p.transLotWeight;
+            }
+        });
+
+        const { lQueue, tQueue } = buildDefaultQueuesFromActive(rawLongQ, rawTransQ);
+
         return {
+            version: 2,
             techConfig,
+            longLotsQueue: lQueue,
+            transLotsQueue: tQueue,
             packages,
             updatedAt: source.updatedAt || source.updated_at
         };
     }
 
-    // Se ainda não houver pacotes salvos, gerar pacotes iniciais de 50 malhas com base na meta ou quantidade produzida
-    const activeLots = summary.malhaActiveLots || summary.malha_active_lots || {};
-    const totalProduced = Number(op.actualProducedQuantity || 0);
-    const numInitialPackages = Math.max(4, Math.ceil((totalProduced || 200) / 50));
-
-    const initialPackages: MalhaPackageRow[] = Array.from({ length: numInitialPackages }, (_, idx) => ({
-        id: `mpkg-${idx + 1}`,
-        packageCode: `p${idx + 1}`,
-        finishedLotNumber: '',
-        quantity: 50,
-        measuredPackageWeight: null,
-        longLot: idx === 0 ? String(activeLots.longitudinal || '') : '',
-        longLotWeight: 0,
-        transLot: idx === 0 ? String(activeLots.transversal || '') : '',
-        transLotWeight: 0
-    }));
+    const { lQueue, tQueue } = buildDefaultQueuesFromActive([], []);
 
     return {
+        version: 2,
         techConfig: defaultTech,
-        packages: initialPackages
+        longLotsQueue: lQueue,
+        transLotsQueue: tQueue,
+        packages: []
     };
 };
 
 export const saveMalhaPackagesData = async (op: ProductionOrderData, data: MalhaPackagesReportData) => {
     const payload: MalhaPackagesReportData = {
         ...data,
+        version: 2,
         updatedAt: new Date().toISOString()
     };
     try {
@@ -177,15 +315,14 @@ export const saveMalhaPackagesData = async (op: ProductionOrderData, data: Malha
 };
 
 export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig) => {
-    // Massa linear (kg/m): bitola^2 * 0.006162 (mesma constante física exata da planilha: 4,9^2 * 0,006162 = 0,14794962 kg/m)
     const massaLinear = (techConfig.bitola ** 2) * 0.006162;
     const longLinear = techConfig.longQnt * techConfig.longTam; // Ex: 25 * 6 = 150 m
     const transLinear = techConfig.transQnt * techConfig.transTam; // Ex: 60 * 2.45 = 147 m
     const totalLinear = longLinear + transLinear; // Ex: 297 m
 
-    const longPesoUnit = longLinear * massaLinear; // Ex: 150 * 0.14794962 = 22.19244 kg
-    const transPesoUnit = transLinear * massaLinear; // Ex: 147 * 0.14794962 = 21.74859 kg
-    const totalPesoUnit = longPesoUnit + transPesoUnit; // Ex: 43.94104 kg
+    const longPesoUnit = longLinear * massaLinear;
+    const transPesoUnit = transLinear * massaLinear;
+    const totalPesoUnit = longPesoUnit + transPesoUnit;
 
     return {
         massaLinear,
@@ -200,25 +337,37 @@ export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig) => {
 
 export interface ComputedPackageRow extends MalhaPackageRow {
     longKgCons: number;
-    longPesoInicial: number; // Saldo calculado na linha (igual à coluna PESO INICIAL da planilha)
+    longPesoInicial: number; // Saldo restante após este pacote
+    longSplits: MalhaPackageLotSplit[];
     transKgCons: number;
     transPesoInicial: number;
+    transSplits: MalhaPackageLotSplit[];
 }
 
 export interface ConsumedLotSummaryRow {
+    id: string;
     direction: 'LONGITUDINAL' | 'TRANSVERSAL';
     lot: string;
     kgEntra: number;
     cons: number;
     sobra: number;
+    roleStatus: 'CONSUMED' | 'ACTIVE' | 'RESERVE';
 }
 
 export const computeMalhaPackagesAndLots = (
     packages: MalhaPackageRow[],
-    techConfig: MalhaTechnicalConfig
+    techConfig: MalhaTechnicalConfig,
+    longLotsQueue: MalhaLotSupplyItem[] = [],
+    transLotsQueue: MalhaLotSupplyItem[] = []
 ): {
     computedRows: ComputedPackageRow[];
     consumedLots: ConsumedLotSummaryRow[];
+    longStatusList: ConsumedLotSummaryRow[];
+    transStatusList: ConsumedLotSummaryRow[];
+    activeLongLot: ConsumedLotSummaryRow | null;
+    reserveLongLot: ConsumedLotSummaryRow | null;
+    activeTransLot: ConsumedLotSummaryRow | null;
+    reserveTransLot: ConsumedLotSummaryRow | null;
     totalQuantity: number;
     totalLongCons: number;
     totalTransCons: number;
@@ -229,31 +378,201 @@ export const computeMalhaPackagesAndLots = (
 } => {
     const physics = calculateMalhaPhysics(techConfig);
 
-    // Cálculo em cascata idêntico à planilha Excel do gestor:
-    // A cada pacote, soma eventual novo PESO LOTE informado na linha e desconta o KG CONS. daquele pacote.
-    let runningLongBalance = 0;
-    let runningTransBalance = 0;
+    // Mesclar fila de lotes abastecidos com eventuais lotes digitados na planilha
+    const buildEffectiveQueue = (queue: MalhaLotSupplyItem[], dir: 'LONG' | 'TRANS'): MalhaLotSupplyItem[] => {
+        const list: MalhaLotSupplyItem[] = queue.map(q => ({
+            ...q,
+            lot: cleanLotCode(q.lot),
+            weight: Number(q.weight) || 0
+        })).filter(q => Boolean(q.lot));
 
-    const computedRows: ComputedPackageRow[] = packages.map((pkg) => {
-        const qty = Number(pkg.quantity) || 0;
-        // Se o operador informou um peso real de balança no pacote, podemos ratear proporcionalmente ou usar o peso técnico padrão
-        const longKgCons = qty * physics.longPesoUnit;
-        const transKgCons = qty * physics.transPesoUnit;
+        packages.forEach((p, idx) => {
+            const lCode = cleanLotCode(dir === 'LONG' ? p.longLot : p.transLot);
+            const lWeight = Number(dir === 'LONG' ? p.longLotWeight : p.transLotWeight) || 0;
+            if (!lCode) return;
+            const existing = list.find(x => x.lot === lCode);
+            if (!existing) {
+                list.push({ id: `auto-${dir}-${idx}`, lot: lCode, weight: lWeight });
+            } else if (existing.weight <= 0 && lWeight > 0) {
+                existing.weight = lWeight;
+            }
+        });
 
-        const enteredLongWeight = Number(pkg.longLotWeight) || 0;
-        const enteredTransWeight = Number(pkg.transLotWeight) || 0;
+        return list;
+    };
 
-        // Se na linha anterior o saldo ficou negativo (ex: -144,24 kg no p2) e o operador colocou o novo lote na mesma linha (p2) ou na próxima,
-        // o acumulado soma os pesos dos lotes que entraram e subtrai o consumo acumulado!
-        runningLongBalance = runningLongBalance + enteredLongWeight - longKgCons;
-        runningTransBalance = runningTransBalance + enteredTransWeight - transKgCons;
+    const effLongQueue = buildEffectiveQueue(longLotsQueue, 'LONG');
+    const effTransQueue = buildEffectiveQueue(transLotsQueue, 'TRANS');
+
+    // Simular consumo pacote a pacote em cascata FIFO (suportando 2 lotes num mesmo pacote: Ativo + Reserva!)
+    const simulateDirection = (queue: MalhaLotSupplyItem[], unitWeightKg: number, dir: 'LONG' | 'TRANS') => {
+        const lotTrackers = queue.map(q => ({
+            id: q.id,
+            lot: q.lot,
+            kgEntra: Number(q.weight) || 0,
+            cons: 0,
+            remaining: Number(q.weight) || 0
+        }));
+
+        let currentIdx = 0;
+
+        const packageResults = packages.map((pkg) => {
+            const qty = Number(pkg.quantity) || 0;
+            const totalNeed = qty * unitWeightKg;
+            let needed = totalNeed;
+            const splits: MalhaPackageLotSplit[] = [];
+
+            if (lotTrackers.length === 0) {
+                return {
+                    kgCons: totalNeed,
+                    balanceAfter: -totalNeed,
+                    splits: [],
+                    primaryLot: '',
+                    primaryLotWeight: 0
+                };
+            }
+
+            while (needed > 0.0001) {
+                if (currentIdx >= lotTrackers.length) {
+                    currentIdx = lotTrackers.length - 1;
+                }
+                const tracker = lotTrackers[currentIdx];
+                const hasNextLotWithWeight =
+                    currentIdx + 1 < lotTrackers.length &&
+                    (lotTrackers[currentIdx + 1].kgEntra > 0 || lotTrackers.length > currentIdx + 1);
+
+                if (tracker.remaining > 0.0001) {
+                    if (tracker.remaining >= needed - 0.0001) {
+                        // O lote ativo cobre 100% do pacote (ou o que faltava dele)
+                        tracker.cons += needed;
+                        tracker.remaining -= needed;
+                        const isExhausted = tracker.remaining <= 0.05;
+                        splits.push({
+                            lot: tracker.lot,
+                            consumedKg: needed,
+                            lotInitialKg: tracker.kgEntra,
+                            balanceAfterKg: tracker.remaining,
+                            exhausted: isExhausted
+                        });
+                        needed = 0;
+                        if (isExhausted && currentIdx + 1 < lotTrackers.length) {
+                            currentIdx++;
+                        }
+                    } else if (hasNextLotWithWeight && lotTrackers[currentIdx + 1].kgEntra > 0) {
+                        // O pacote consome o finalzinho do Lote Ativo e puxa a diferença automaticamente do Lote Reserva!
+                        const usedFromCurrent = tracker.remaining;
+                        tracker.cons += usedFromCurrent;
+                        tracker.remaining = 0;
+                        splits.push({
+                            lot: tracker.lot,
+                            consumedKg: usedFromCurrent,
+                            lotInitialKg: tracker.kgEntra,
+                            balanceAfterKg: 0,
+                            exhausted: true
+                        });
+                        needed -= usedFromCurrent;
+                        currentIdx++;
+                    } else {
+                        // Não há Lote Reserva com peso cadastrado ainda: desconta do lote atual deixando saldo negativo para alertar
+                        tracker.cons += needed;
+                        tracker.remaining -= needed;
+                        splits.push({
+                            lot: tracker.lot,
+                            consumedKg: needed,
+                            lotInitialKg: tracker.kgEntra,
+                            balanceAfterKg: tracker.remaining,
+                            exhausted: true
+                        });
+                        needed = 0;
+                    }
+                } else {
+                    // O lote atual está com saldo <= 0 (ex: peso ainda não informado ou já esgotado)
+                    if (currentIdx + 1 < lotTrackers.length && lotTrackers[currentIdx + 1].remaining > 0) {
+                        currentIdx++;
+                        continue;
+                    }
+                    tracker.cons += needed;
+                    tracker.remaining -= needed;
+                    splits.push({
+                        lot: tracker.lot,
+                        consumedKg: needed,
+                        lotInitialKg: tracker.kgEntra,
+                        balanceAfterKg: tracker.remaining,
+                        exhausted: true
+                    });
+                    needed = 0;
+                }
+            }
+
+            const lastSplit = splits[splits.length - 1];
+            const balanceAfter = lastSplit ? lastSplit.balanceAfterKg : 0;
+
+            return {
+                kgCons: totalNeed,
+                balanceAfter,
+                splits,
+                primaryLot: splits.map(s => s.lot).join(' + '),
+                primaryLotWeight: splits[0]?.lotInitialKg || 0
+            };
+        });
+
+        // Determinar quem é CONSUMED, quem é ACTIVE (1º não esgotado) e quem é RESERVE (próximos)
+        let foundActive = false;
+        const statusList: ConsumedLotSummaryRow[] = lotTrackers.map((t, idx) => {
+            const isExhausted = t.kgEntra > 0 && t.remaining <= 0.05 && idx < lotTrackers.length - 1;
+            let roleStatus: 'CONSUMED' | 'ACTIVE' | 'RESERVE' = 'RESERVE';
+            if (isExhausted) {
+                roleStatus = 'CONSUMED';
+            } else if (!foundActive) {
+                roleStatus = 'ACTIVE';
+                foundActive = true;
+            } else {
+                roleStatus = 'RESERVE';
+            }
+
+            return {
+                id: t.id,
+                direction: dir === 'LONG' ? 'LONGITUDINAL' : 'TRANSVERSAL',
+                lot: t.lot,
+                kgEntra: t.kgEntra,
+                cons: t.cons,
+                sobra: Math.max(0, t.remaining),
+                roleStatus
+            };
+        });
+
+        return { packageResults, statusList };
+    };
+
+    const longSim = simulateDirection(effLongQueue, physics.longPesoUnit, 'LONG');
+    const transSim = simulateDirection(effTransQueue, physics.transPesoUnit, 'TRANS');
+
+    // Rastrear quais lotes já apareceram em linhas anteriores na visão de planilha para exibir o peso do lote na linha onde ele entrou
+    const seenLongLots = new Set<string>();
+    const seenTransLots = new Set<string>();
+
+    const computedRows: ComputedPackageRow[] = packages.map((pkg, idx) => {
+        const lRes = longSim.packageResults[idx];
+        const tRes = transSim.packageResults[idx];
+
+        const newLongSplit = lRes.splits.find(s => !seenLongLots.has(s.lot));
+        lRes.splits.forEach(s => seenLongLots.add(s.lot));
+
+        const newTransSplit = tRes.splits.find(s => !seenTransLots.has(s.lot));
+        tRes.splits.forEach(s => seenTransLots.add(s.lot));
 
         return {
             ...pkg,
-            longKgCons,
-            longPesoInicial: runningLongBalance,
-            transKgCons,
-            transPesoInicial: runningTransBalance
+            longLot: newLongSplit ? newLongSplit.lot : (lRes.splits[0]?.lot || pkg.longLot || ''),
+            longLotWeight: newLongSplit ? newLongSplit.lotInitialKg : (pkg.longLotWeight || 0),
+            longKgCons: lRes.kgCons,
+            longPesoInicial: lRes.balanceAfter,
+            longSplits: lRes.splits,
+            transLot: newTransSplit ? newTransSplit.lot : (tRes.splits[0]?.lot || pkg.transLot || ''),
+            transLotWeight: newTransSplit ? newTransSplit.lotInitialKg : (pkg.transLotWeight || 0),
+            transKgCons: tRes.kgCons,
+            transPesoInicial: tRes.balanceAfter,
+            transSplits: tRes.splits
         };
     });
 
@@ -262,60 +581,25 @@ export const computeMalhaPackagesAndLots = (
     const totalTransCons = computedRows.reduce((acc, r) => acc + r.transKgCons, 0);
     const totalWeightKg = totalLongCons + totalTransCons;
 
-    // Construir tabela "LOTES CONSUMIDOS" (agrupando lotes Longitudinais e depois Transversais)
-    const buildDirectionLots = (dir: 'LONGITUDINAL' | 'TRANSVERSAL', totalDirCons: number): ConsumedLotSummaryRow[] => {
-        const uniqueLots: { lot: string; kgEntra: number }[] = [];
-        packages.forEach(p => {
-            const lotNum = (dir === 'LONGITUDINAL' ? p.longLot : p.transLot || '').trim();
-            const lotW = Number(dir === 'LONGITUDINAL' ? p.longLotWeight : p.transLotWeight) || 0;
-            if (!lotNum && lotW <= 0) return;
-            const existing = uniqueLots.find(u => u.lot === lotNum && lotNum !== '');
-            if (existing) {
-                if (lotW > 0 && existing.kgEntra === 0) existing.kgEntra = lotW;
-            } else {
-                uniqueLots.push({ lot: lotNum || 'S/ LOTE', kgEntra: lotW });
-            }
-        });
-
-        let remainingToConsume = totalDirCons;
-        return uniqueLots.map((item, idx) => {
-            const isLast = idx === uniqueLots.length - 1;
-            let cons = 0;
-            let sobra = 0;
-
-            if (!isLast && item.kgEntra > 0) {
-                // Se já entrou outro lote depois deste, este lote foi consumido por completo (ou até o limite do consumo total)
-                cons = Math.min(item.kgEntra, Math.max(0, remainingToConsume));
-                sobra = Math.max(0, item.kgEntra - cons);
-                remainingToConsume = Math.max(0, remainingToConsume - cons);
-            } else {
-                // Último lote (atual em máquina): consome o saldo restante necessário para fechar o consumo total da direção
-                cons = Math.max(0, remainingToConsume);
-                sobra = Math.max(0, item.kgEntra - cons);
-                remainingToConsume = 0;
-            }
-
-            return {
-                direction: dir,
-                lot: item.lot,
-                kgEntra: item.kgEntra,
-                cons,
-                sobra
-            };
-        });
-    };
-
-    const longLotsSummary = buildDirectionLots('LONGITUDINAL', totalLongCons);
-    const transLotsSummary = buildDirectionLots('TRANSVERSAL', totalTransCons);
-    const consumedLots = [...longLotsSummary, ...transLotsSummary];
-
+    const consumedLots = [...longSim.statusList, ...transSim.statusList];
     const totalLotEntraKg = consumedLots.reduce((acc, l) => acc + l.kgEntra, 0);
     const totalLotConsKg = consumedLots.reduce((acc, l) => acc + l.cons, 0);
     const totalLotSobraKg = consumedLots.reduce((acc, l) => acc + l.sobra, 0);
 
+    const activeLongLot = longSim.statusList.find(s => s.roleStatus === 'ACTIVE') || null;
+    const reserveLongLot = longSim.statusList.find(s => s.roleStatus === 'RESERVE') || null;
+    const activeTransLot = transSim.statusList.find(s => s.roleStatus === 'ACTIVE') || null;
+    const reserveTransLot = transSim.statusList.find(s => s.roleStatus === 'RESERVE') || null;
+
     return {
         computedRows,
         consumedLots,
+        longStatusList: longSim.statusList,
+        transStatusList: transSim.statusList,
+        activeLongLot,
+        reserveLongLot,
+        activeTransLot,
+        reserveTransLot,
         totalQuantity,
         totalLongCons,
         totalTransCons,
@@ -341,21 +625,20 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
     stock,
     shiftReports = []
 }) => {
-    const [reportData, setReportData] = useState<MalhaPackagesReportData>(() => getSavedMalhaPackagesData(op));
+    const [reportData, setReportData] = useState<MalhaPackagesReportData>(() => getSavedMalhaPackagesData(op, stock));
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
     useEffect(() => {
         if (isOpen && op) {
-            setReportData(getSavedMalhaPackagesData(op));
+            setReportData(getSavedMalhaPackagesData(op, stock));
         }
     }, [isOpen, op?.id]);
 
-    // Lotes CA-60 do estoque para auto-preencher o peso do lote quando digitar o número do lote
     const stockLotMap = useMemo(() => {
         const map = new Map<string, number>();
         (stock || []).forEach(item => {
             if (item && item.internalLot) {
-                const clean = String(item.internalLot).replace(/^LOTE\s+/i, '').trim();
+                const clean = cleanLotCode(item.internalLot);
                 const weight = Number(item.initialQuantity || item.remainingQuantity || 0);
                 if (clean && weight > 0) {
                     map.set(clean.toLowerCase(), weight);
@@ -386,18 +669,17 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
     const updatePackageRow = (id: string, field: keyof MalhaPackageRow, value: any) => {
         const nextPackages = reportData.packages.map(pkg => {
             if (pkg.id !== id) return pkg;
-            const updated: MalhaPackageRow = { ...pkg, [field]: value };
+            const updated: MalhaPackageRow = { ...pkg, [field]: value, confirmed: true };
 
-            // Se alterou o número do lote Longitudinal ou Transversal, busca automaticamente o peso do lote no estoque!
             if (field === 'longLot') {
-                const clean = String(value).replace(/^LOTE\s+/i, '').trim().toLowerCase();
+                const clean = cleanLotCode(value).toLowerCase();
                 const foundWeight = stockLotMap.get(clean);
                 if (foundWeight && (!updated.longLotWeight || updated.longLotWeight === 0)) {
                     updated.longLotWeight = foundWeight;
                 }
             }
             if (field === 'transLot') {
-                const clean = String(value).replace(/^LOTE\s+/i, '').trim().toLowerCase();
+                const clean = cleanLotCode(value).toLowerCase();
                 const foundWeight = stockLotMap.get(clean);
                 if (foundWeight && (!updated.transLotWeight || updated.transLotWeight === 0)) {
                     updated.transLotWeight = foundWeight;
@@ -406,8 +688,38 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
             return updated;
         });
 
+        // Se o gestor alterou o peso de um lote na linha da planilha, atualizar também na fila longLotsQueue / transLotsQueue
+        const targetPkg = nextPackages.find(p => p.id === id);
+        let nextLongQ = [...(reportData.longLotsQueue || [])];
+        let nextTransQ = [...(reportData.transLotsQueue || [])];
+
+        if (targetPkg && (field === 'longLot' || field === 'longLotWeight')) {
+            const cLot = cleanLotCode(targetPkg.longLot);
+            if (cLot) {
+                const existing = nextLongQ.find(q => cleanLotCode(q.lot) === cLot);
+                if (existing) {
+                    if (targetPkg.longLotWeight > 0) existing.weight = targetPkg.longLotWeight;
+                } else {
+                    nextLongQ.push({ id: `lq-${Date.now()}`, lot: cLot, weight: targetPkg.longLotWeight || 0 });
+                }
+            }
+        }
+        if (targetPkg && (field === 'transLot' || field === 'transLotWeight')) {
+            const cLot = cleanLotCode(targetPkg.transLot);
+            if (cLot) {
+                const existing = nextTransQ.find(q => cleanLotCode(q.lot) === cLot);
+                if (existing) {
+                    if (targetPkg.transLotWeight > 0) existing.weight = targetPkg.transLotWeight;
+                } else {
+                    nextTransQ.push({ id: `tq-${Date.now()}`, lot: cLot, weight: targetPkg.transLotWeight || 0 });
+                }
+            }
+        }
+
         handleSave({
             ...reportData,
+            longLotsQueue: nextLongQ,
+            transLotsQueue: nextTransQ,
             packages: nextPackages
         });
     };
@@ -424,6 +736,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
             longLotWeight: 0,
             transLot: '',
             transLotWeight: 0,
+            confirmed: true,
             recordedAt: new Date().toISOString()
         };
         handleSave({
@@ -433,7 +746,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
     };
 
     const handleRemovePackage = (id: string) => {
-        if (reportData.packages.length <= 1) return;
         const filtered = reportData.packages
             .filter(p => p.id !== id)
             .map((p, idx) => ({ ...p, packageCode: `p${idx + 1}` }));
@@ -445,11 +757,10 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
 
     const physics = useMemo(() => calculateMalhaPhysics(reportData.techConfig), [reportData.techConfig]);
     const computed = useMemo(
-        () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig),
-        [reportData.packages, reportData.techConfig]
+        () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
+        [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
     );
 
-    // Histórico de Produção Diária da OP (Tabela "ATUALIZAÇÃO PRODUÇÃO")
     const dailyUpdates = useMemo(() => {
         const byDate = new Map<string, number>();
         const logs: any[] = op.operatorLogs || (op as any).operator_logs || [];
@@ -502,20 +813,19 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                 className="bg-white text-slate-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden border-2 border-slate-300 my-auto"
                 onClick={e => e.stopPropagation()}
             >
-                {/* Barra de Topo de Ações (Não sai na impressão) */}
                 <div className="bg-[#0A1B27] text-white px-4 py-3 flex items-center justify-between gap-3 flex-wrap print:hidden">
                     <div className="flex items-center gap-2.5">
                         <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 text-lg">📊</span>
                         <div>
                             <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
-                                Planilha de Consumo por Lote & Pacotes (50 Malhas) • OP #{op.orderNumber}
+                                Relatório de Consumo por Lote & Pacotes (50 Malhas) • OP #{op.orderNumber}
                             </h2>
                             <p className="text-[11px] text-slate-400">
-                                Conversão automática de peso longitudinal e transversal com desconto de saldo por pacote
+                                Conversão automática Longitudinal + Transversal com suporte a Lote Ativo + Lote Reserva
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold ${
                             saveStatus === 'saved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'
                         }`}>
@@ -545,7 +855,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                     </div>
                 </div>
 
-                {/* Conteúdo estilo Planilha Excel (Fiel ao modelo da foto) */}
                 <div className="p-4 sm:p-6 overflow-y-auto space-y-6 bg-slate-50 flex-1">
                     {/* 1. CABEÇALHO DO MODELO / BITOLA / MASSA / ORDEM */}
                     <div className="overflow-x-auto">
@@ -570,7 +879,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             value={reportData.techConfig.bitola}
                                             onChange={e => updateTechField('bitola', parseFloat(e.target.value) || 0)}
                                             className="w-full text-center font-black text-slate-900 bg-transparent outline-none focus:bg-amber-100 rounded px-1"
-                                            title="Bitola em mm para cálculo de massa linear"
                                         />
                                     </td>
                                     <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center w-28 border border-[#1F3864]">
@@ -590,9 +898,8 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                         </table>
                     </div>
 
-                    {/* 2. DESCRIÇÃO TÉCNICA & RESUMO DA ORDEM (Lado a Lado) */}
+                    {/* 2. DESCRIÇÃO TÉCNICA & RESUMO DA ORDEM */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                        {/* DESCRIÇÃO TÉCNICA */}
                         <div className="lg:col-span-7 overflow-x-auto">
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
@@ -677,7 +984,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             </table>
                         </div>
 
-                        {/* RESUMO DA ORDEM */}
                         <div className="lg:col-span-5 overflow-x-auto">
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
@@ -723,7 +1029,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                         </div>
                     </div>
 
-                    {/* 3. CONSUMÍVEIS POR LOTE (TABELA PRINCIPAL DE PACOTES DE 50 MALHAS) */}
+                    {/* 3. CONSUMÍVEIS POR LOTE */}
                     <div className="overflow-x-auto">
                         <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                             <thead>
@@ -742,13 +1048,11 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                     <th className="py-1.5 px-2 border border-slate-400 text-center w-24">LOTE (Etiqueta)</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-center w-16">PACOTE</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-center w-16">QUNT.</th>
-                                    {/* Longitudinal */}
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">LOTE</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-28 bg-yellow-200/80">LOTE</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">PESO LOTE</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-right w-28">PESO INICIAL (Saldo)</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-right w-28">KG CONS.</th>
-                                    {/* Transversal */}
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">LOTE</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-28 bg-yellow-200/80">LOTE</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">PESO LOTE</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-right w-28">PESO INICIAL (Saldo)</th>
                                     <th className="py-1.5 px-2 border border-slate-400 text-right w-28">KG CONS.</th>
@@ -756,116 +1060,123 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                 </tr>
                             </thead>
                             <tbody>
-                                {computed.computedRows.map((row) => {
-                                    const hasLongEntry = Boolean(row.longLot || row.longLotWeight > 0);
-                                    const hasTransEntry = Boolean(row.transLot || row.transLotWeight > 0);
+                                {computed.computedRows.length > 0 ? (
+                                    computed.computedRows.map((row) => {
+                                        const hasLongEntry = Boolean(row.longLot || row.longLotWeight > 0);
+                                        const hasTransEntry = Boolean(row.transLot || row.transLotWeight > 0);
 
-                                    return (
-                                        <tr key={row.id} className="hover:bg-slate-50">
-                                            {/* Lote Etiqueta do Pacote */}
-                                            <td className="p-1 border border-slate-400 text-center">
-                                                <input
-                                                    type="text"
-                                                    value={row.finishedLotNumber}
-                                                    onChange={e => updatePackageRow(row.id, 'finishedLotNumber', e.target.value)}
-                                                    placeholder="Ex: 88846"
-                                                    className="w-full text-center font-bold text-slate-800 bg-transparent outline-none focus:bg-amber-50 rounded py-0.5"
-                                                />
-                                            </td>
-                                            {/* Código Pacote (p1, p2...) */}
-                                            <td className="p-1 border border-slate-400 text-center font-bold text-slate-700 bg-slate-50">
-                                                {row.packageCode}
-                                            </td>
-                                            {/* Quantidade de malhas no pacote (50) */}
-                                            <td className="p-1 border border-slate-400 text-center bg-amber-50/30">
-                                                <input
-                                                    type="number"
-                                                    value={row.quantity}
-                                                    onChange={e => updatePackageRow(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
-                                                    className="w-full text-center font-black text-slate-900 bg-transparent outline-none focus:bg-amber-100 rounded py-0.5"
-                                                />
-                                            </td>
+                                        return (
+                                            <tr key={row.id} className="hover:bg-slate-50">
+                                                <td className="p-1 border border-slate-400 text-center">
+                                                    <input
+                                                        type="text"
+                                                        value={row.finishedLotNumber}
+                                                        onChange={e => updatePackageRow(row.id, 'finishedLotNumber', e.target.value)}
+                                                        placeholder="Ex: 88846"
+                                                        className="w-full text-center font-bold text-slate-800 bg-transparent outline-none focus:bg-amber-50 rounded py-0.5"
+                                                    />
+                                                </td>
+                                                <td className="p-1 border border-slate-400 text-center font-bold text-slate-700 bg-slate-50">
+                                                    {row.packageCode}
+                                                </td>
+                                                <td className="p-1 border border-slate-400 text-center bg-amber-50/30">
+                                                    <input
+                                                        type="number"
+                                                        value={row.quantity}
+                                                        onChange={e => updatePackageRow(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
+                                                        className="w-full text-center font-black text-slate-900 bg-transparent outline-none focus:bg-amber-100 rounded py-0.5"
+                                                    />
+                                                </td>
 
-                                            {/* LONGITUDINAL: LOTE */}
-                                            <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                <input
-                                                    type="text"
-                                                    list="malha-stock-lots-datalist"
-                                                    value={row.longLot}
-                                                    onChange={e => updatePackageRow(row.id, 'longLot', e.target.value)}
-                                                    placeholder="Nº Lote"
-                                                    className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
-                                                />
-                                            </td>
-                                            {/* LONGITUDINAL: PESO LOTE */}
-                                            <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                <input
-                                                    type="number"
-                                                    value={row.longLotWeight || ''}
-                                                    onChange={e => updatePackageRow(row.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Kg Lote"
-                                                    className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
-                                                />
-                                            </td>
-                                            {/* LONGITUDINAL: PESO INICIAL (Saldo após pacote) */}
-                                            <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
-                                                row.longPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
-                                            }`}>
-                                                {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
-                                            </td>
-                                            {/* LONGITUDINAL: KG CONS. */}
-                                            <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
-                                                {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
-                                            </td>
+                                                {/* LONGITUDINAL */}
+                                                <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
+                                                    <input
+                                                        type="text"
+                                                        list="malha-stock-lots-datalist"
+                                                        value={row.longLot}
+                                                        onChange={e => updatePackageRow(row.id, 'longLot', e.target.value)}
+                                                        placeholder="Nº Lote"
+                                                        className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
+                                                    />
+                                                    {row.longSplits.length > 1 && (
+                                                        <div className="text-[9px] font-bold text-amber-900 leading-tight">
+                                                            {row.longSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
+                                                    <input
+                                                        type="number"
+                                                        value={row.longLotWeight || ''}
+                                                        onChange={e => updatePackageRow(row.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
+                                                        placeholder="Kg Lote"
+                                                        className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
+                                                    />
+                                                </td>
+                                                <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
+                                                    row.longPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
+                                                }`}>
+                                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                </td>
+                                                <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
+                                                    {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                </td>
 
-                                            {/* TRANSVERSAL: LOTE */}
-                                            <td className={`p-1 border border-slate-400 text-center ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                <input
-                                                    type="text"
-                                                    list="malha-stock-lots-datalist"
-                                                    value={row.transLot}
-                                                    onChange={e => updatePackageRow(row.id, 'transLot', e.target.value)}
-                                                    placeholder="Nº Lote"
-                                                    className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
-                                                />
-                                            </td>
-                                            {/* TRANSVERSAL: PESO LOTE */}
-                                            <td className={`p-1 border border-slate-400 text-center ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                <input
-                                                    type="number"
-                                                    value={row.transLotWeight || ''}
-                                                    onChange={e => updatePackageRow(row.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
-                                                    placeholder="Kg Lote"
-                                                    className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
-                                                />
-                                            </td>
-                                            {/* TRANSVERSAL: PESO INICIAL (Saldo após pacote) */}
-                                            <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
-                                                row.transPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
-                                            }`}>
-                                                {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
-                                            </td>
-                                            {/* TRANSVERSAL: KG CONS. */}
-                                            <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
-                                                {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
-                                            </td>
+                                                {/* TRANSVERSAL */}
+                                                <td className={`p-1 border border-slate-400 text-center ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
+                                                    <input
+                                                        type="text"
+                                                        list="malha-stock-lots-datalist"
+                                                        value={row.transLot}
+                                                        onChange={e => updatePackageRow(row.id, 'transLot', e.target.value)}
+                                                        placeholder="Nº Lote"
+                                                        className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
+                                                    />
+                                                    {row.transSplits.length > 1 && (
+                                                        <div className="text-[9px] font-bold text-blue-900 leading-tight">
+                                                            {row.transSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className={`p-1 border border-slate-400 text-center ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
+                                                    <input
+                                                        type="number"
+                                                        value={row.transLotWeight || ''}
+                                                        onChange={e => updatePackageRow(row.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
+                                                        placeholder="Kg Lote"
+                                                        className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
+                                                    />
+                                                </td>
+                                                <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
+                                                    row.transPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
+                                                }`}>
+                                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                </td>
+                                                <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
+                                                    {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                </td>
 
-                                            {/* Botão remover linha */}
-                                            <td className="p-1 border border-slate-400 text-center print:hidden">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemovePackage(row.id)}
-                                                    className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
-                                                    title="Remover pacote"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                                <td className="p-1 border border-slate-400 text-center print:hidden">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemovePackage(row.id)}
+                                                        className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
+                                                        title="Remover pacote"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan={12} className="py-6 text-center text-slate-400 italic">
+                                            Nenhum pacote confirmado ainda. Clique em "+ Pacote (50 pçs)" ou confirme os pacotes no app do operador.
+                                        </td>
+                                    </tr>
+                                )}
 
-                                {/* Linha de Totais da Tabela CONSUMÍVEIS POR LOTE */}
                                 <tr className="bg-[#2F5597] text-white font-black">
                                     <td className="py-1.5 px-2 border border-slate-400"></td>
                                     <td className="py-1.5 px-2 border border-slate-400 text-center">TOTAL</td>
@@ -889,7 +1200,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             </tbody>
                         </table>
 
-                        {/* Datalist de lotes do estoque para autopreenchimento rápido */}
                         <datalist id="malha-stock-lots-datalist">
                             {(stock || [])
                                 .filter(s => s && s.internalLot && !String(s.status || '').toLowerCase().includes('consumido'))
@@ -901,15 +1211,14 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                         </datalist>
                     </div>
 
-                    {/* 4. LOTES CONSUMIDOS (Entrada, Consumo e Sobra) & ATUALIZAÇÃO PRODUÇÃO */}
+                    {/* 4. LOTES CONSUMIDOS & ATUALIZAÇÃO PRODUÇÃO */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start max-w-4xl mx-auto">
-                        {/* TABELA LOTES CONSUMIDOS */}
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
                                     <tr>
                                         <th colSpan={5} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
-                                            LOTES CONSUMIDOS (CÁLCULO DE CONVERSÃO E SOBRA)
+                                            LOTES CONSUMIDOS (CONVERSÃO E SOBRA)
                                         </th>
                                     </tr>
                                     <tr className="bg-[#2F5597] text-white font-bold uppercase text-[11px]">
@@ -944,7 +1253,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                     ) : (
                                         <tr>
                                             <td colSpan={5} className="py-4 text-center text-slate-400 italic">
-                                                Informe os lotes e pesos na tabela acima para calcular o consumo e a sobra automaticamente.
+                                                Defina o Lote Ativo e o Peso para ver o cálculo de consumo e sobra.
                                             </td>
                                         </tr>
                                     )}
@@ -964,7 +1273,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             </table>
                         </div>
 
-                        {/* TABELA ATUALIZAÇÃO PRODUÇÃO */}
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
@@ -1013,24 +1321,43 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
     );
 };
 
+// ============================================================================
+// PAINEL DO OPERADOR NO APP (SIMPLES, INTUITIVO, SEM CARA DE PLANILHA!)
+// 1. Lote Ativo + Lote Reserva (Longitudinal & Transversal) com Peso e Barra de Saldo
+// 2. Fechamento de Pacote de 50 Malhas com 1 Toque (Desconto Automático em 1 ou 2 Lotes)
+// ============================================================================
 export const MalhaPackagesOperatorPanel: React.FC<{
     op: ProductionOrderData;
     stock: StockItem[];
     shiftReports?: ShiftReport[];
-}> = ({ op, stock, shiftReports = [] }) => {
-    const [reportData, setReportData] = useState<MalhaPackagesReportData>(() => getSavedMalhaPackagesData(op));
+    machineName?: string;
+}> = ({ op, stock, shiftReports = [], machineName = 'Malha 1' }) => {
+    const [reportData, setReportData] = useState<MalhaPackagesReportData>(() => getSavedMalhaPackagesData(op, stock));
     const [showFullModal, setShowFullModal] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
+    // Estado para Fechar Novo Pacote de 50 Malhas
+    const [newPkgQty, setNewPkgQty] = useState<number>(50);
+    const [newPkgTag, setNewPkgTag] = useState<string>('');
+
+    // Estado para modal/painel rápido de seleção de lote (Ativo ou Reserva)
+    const [pickerTarget, setPickerTarget] = useState<{
+        dir: 'LONGITUDINAL' | 'TRANSVERSAL';
+        slot: 'ACTIVE' | 'RESERVE';
+    } | null>(null);
+    const [pickerLotInput, setPickerLotInput] = useState<string>('');
+    const [pickerWeightInput, setPickerWeightInput] = useState<string>('');
+    const [showAllStockGauges, setShowAllStockGauges] = useState<boolean>(false);
+
     useEffect(() => {
-        setReportData(getSavedMalhaPackagesData(op));
-    }, [op?.id, (op?.summary as any)?.malhaPackagesData?.updatedAt]);
+        setReportData(getSavedMalhaPackagesData(op, stock));
+    }, [op?.id, (op?.summary as any)?.malhaPackagesData?.updatedAt, (op?.summary as any)?.malhaActiveLots?.updatedAt]);
 
     const stockLotMap = useMemo(() => {
         const map = new Map<string, number>();
         (stock || []).forEach(item => {
             if (item && item.internalLot) {
-                const clean = String(item.internalLot).replace(/^LOTE\s+/i, '').trim();
+                const clean = cleanLotCode(item.internalLot);
                 const weight = Number(item.initialQuantity || item.remainingQuantity || 0);
                 if (clean && weight > 0) {
                     map.set(clean.toLowerCase(), weight);
@@ -1040,419 +1367,706 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         return map;
     }, [stock]);
 
-    const persistData = async (nextData: MalhaPackagesReportData) => {
+    const availableStockLots = useMemo(() => {
+        const targetB = String(reportData.techConfig.bitola || 5).replace(',', '.');
+        return (stock || [])
+            .filter(item => {
+                if (!item || !item.internalLot) return false;
+                const st = String(item.status || '').toLowerCase();
+                if (st.includes('consumido') || st.includes('sucata')) return false;
+                const mat = String(item.materialType || '').toUpperCase();
+                if (mat.includes('FIO MÁQUINA')) return false;
+                if (!showAllStockGauges) {
+                    const itemB = parseFloat(String(item.bitola || '').replace(',', '.'));
+                    const reqB = parseFloat(targetB);
+                    if (!isNaN(itemB) && !isNaN(reqB) && Math.abs(itemB - reqB) > 0.25) return false;
+                }
+                if (pickerLotInput.trim()) {
+                    return String(item.internalLot).toLowerCase().includes(pickerLotInput.trim().toLowerCase());
+                }
+                return true;
+            })
+            .sort((a, b) => String(b.internalLot).localeCompare(String(a.internalLot), undefined, { numeric: true }))
+            .slice(0, 20);
+    }, [stock, reportData.techConfig.bitola, showAllStockGauges, pickerLotInput]);
+
+    const physics = useMemo(() => calculateMalhaPhysics(reportData.techConfig), [reportData.techConfig]);
+    const computed = useMemo(
+        () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
+        [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
+    );
+
+    const persistDataAndSyncActiveLots = async (nextData: MalhaPackagesReportData) => {
         setReportData(nextData);
         setSaveStatus('saving');
-        await saveMalhaPackagesData(op, nextData);
+
+        // Calcular quem ficou como Lote Ativo em cada direção para manter malhaActiveLots 100% sincronizado
+        const sim = computeMalhaPackagesAndLots(nextData.packages, nextData.techConfig, nextData.longLotsQueue, nextData.transLotsQueue);
+        const currentActiveLong = sim.activeLongLot?.lot || nextData.longLotsQueue[nextData.longLotsQueue.length - 1]?.lot || '';
+        const currentActiveTrans = sim.activeTransLot?.lot || nextData.transLotsQueue[nextData.transLotsQueue.length - 1]?.lot || '';
+
+        const currentSummary: any = (op.summary && typeof op.summary === 'object') ? op.summary : {};
+        const prevActiveLots = currentSummary.malhaActiveLots || {};
+        const nextActiveLots = {
+            ...prevActiveLots,
+            longitudinal: currentActiveLong,
+            transversal: currentActiveTrans,
+            reserveLongitudinal: sim.reserveLongLot?.lot || '',
+            reserveTransversal: sim.reserveTransLot?.lot || '',
+            updatedAt: new Date().toISOString()
+        };
+
+        try {
+            localStorage.setItem(`malha_active_lots_${machineName}_${op.id || 'default'}`, JSON.stringify(nextActiveLots));
+            localStorage.setItem(`malha_packages_data_${op.id || op.orderNumber}`, JSON.stringify({ ...nextData, version: 2, updatedAt: new Date().toISOString() }));
+        } catch (e) {}
+
+        if (op.id) {
+            try {
+                const updatedSummary = {
+                    ...currentSummary,
+                    malhaActiveLots: nextActiveLots,
+                    malhaPackagesData: {
+                        ...nextData,
+                        version: 2,
+                        updatedAt: new Date().toISOString()
+                    }
+                };
+                op.summary = updatedSummary;
+                await updateItem('production_orders', op.id, {
+                    summary: updatedSummary
+                } as any);
+            } catch (err) {
+                console.warn('Erro ao sincronizar pacotes e lotes da malha:', err);
+            }
+        }
         setSaveStatus('saved');
     };
 
-    const updatePackageField = (id: string, field: keyof MalhaPackageRow, value: any) => {
-        const nextPackages = reportData.packages.map(pkg => {
-            if (pkg.id !== id) return pkg;
-            const updated: MalhaPackageRow = { ...pkg, [field]: value };
-            if (field === 'longLot') {
-                const clean = String(value).replace(/^LOTE\s+/i, '').trim().toLowerCase();
-                const foundWeight = stockLotMap.get(clean);
-                if (foundWeight && (!updated.longLotWeight || updated.longLotWeight === 0)) {
-                    updated.longLotWeight = foundWeight;
-                }
-            }
-            if (field === 'transLot') {
-                const clean = String(value).replace(/^LOTE\s+/i, '').trim().toLowerCase();
-                const foundWeight = stockLotMap.get(clean);
-                if (foundWeight && (!updated.transLotWeight || updated.transLotWeight === 0)) {
-                    updated.transLotWeight = foundWeight;
-                }
-            }
-            return updated;
-        });
-
-        persistData({
-            ...reportData,
-            packages: nextPackages
-        });
+    // Atualizar apenas o peso de um lote já na fila (Ativo ou Reserva) direto no input numérico
+    const handleUpdateLotWeightInQueue = (dir: 'LONGITUDINAL' | 'TRANSVERSAL', lotId: string, newWeight: number) => {
+        if (dir === 'LONGITUDINAL') {
+            const nextQ = reportData.longLotsQueue.map(item => item.id === lotId ? { ...item, weight: newWeight } : item);
+            persistDataAndSyncActiveLots({ ...reportData, longLotsQueue: nextQ });
+        } else {
+            const nextQ = reportData.transLotsQueue.map(item => item.id === lotId ? { ...item, weight: newWeight } : item);
+            persistDataAndSyncActiveLots({ ...reportData, transLotsQueue: nextQ });
+        }
     };
 
-    const handleAddPackage = () => {
+    // Abrir seletor para definir/trocar Lote Ativo ou Lote Reserva
+    const openLotPicker = (dir: 'LONGITUDINAL' | 'TRANSVERSAL', slot: 'ACTIVE' | 'RESERVE') => {
+        const currentLotObj = dir === 'LONGITUDINAL'
+            ? (slot === 'ACTIVE' ? computed.activeLongLot : computed.reserveLongLot)
+            : (slot === 'ACTIVE' ? computed.activeTransLot : computed.reserveTransLot);
+
+        setPickerTarget({ dir, slot });
+        setPickerLotInput(currentLotObj?.lot || '');
+        setPickerWeightInput(currentLotObj?.kgEntra ? String(currentLotObj.kgEntra) : '');
+    };
+
+    const handleConfirmPickerLot = () => {
+        if (!pickerTarget) return;
+        const cleanLot = cleanLotCode(pickerLotInput);
+        if (!cleanLot) return;
+
+        const autoWeight = stockLotMap.get(cleanLot.toLowerCase()) || 0;
+        const weightVal = parseFloat(pickerWeightInput) || autoWeight || 0;
+
+        const isLong = pickerTarget.dir === 'LONGITUDINAL';
+        const queue = [...(isLong ? reportData.longLotsQueue : reportData.transLotsQueue)];
+        const currentActive = isLong ? computed.activeLongLot : computed.activeTransLot;
+        const currentReserve = isLong ? computed.reserveLongLot : computed.reserveTransLot;
+
+        if (pickerTarget.slot === 'ACTIVE') {
+            if (currentActive) {
+                const idx = queue.findIndex(q => q.id === currentActive.id);
+                if (idx >= 0) {
+                    queue[idx] = { ...queue[idx], lot: cleanLot, weight: weightVal };
+                } else {
+                    queue.push({ id: `q-${Date.now()}`, lot: cleanLot, weight: weightVal, addedAt: new Date().toISOString() });
+                }
+            } else {
+                queue.push({ id: `q-${Date.now()}`, lot: cleanLot, weight: weightVal, addedAt: new Date().toISOString() });
+            }
+        } else {
+            // Slot RESERVE
+            if (currentReserve) {
+                const idx = queue.findIndex(q => q.id === currentReserve.id);
+                if (idx >= 0) {
+                    queue[idx] = { ...queue[idx], lot: cleanLot, weight: weightVal };
+                } else {
+                    queue.push({ id: `q-${Date.now()}`, lot: cleanLot, weight: weightVal, addedAt: new Date().toISOString() });
+                }
+            } else {
+                queue.push({ id: `q-${Date.now()}`, lot: cleanLot, weight: weightVal, addedAt: new Date().toISOString() });
+            }
+        }
+
+        const nextData: MalhaPackagesReportData = {
+            ...reportData,
+            longLotsQueue: isLong ? queue : reportData.longLotsQueue,
+            transLotsQueue: !isLong ? queue : reportData.transLotsQueue
+        };
+
+        persistDataAndSyncActiveLots(nextData);
+        setPickerTarget(null);
+    };
+
+    // Confirmar fechamento de 1 pacote de 50 malhas com 1 clique (sem precisar digitar os lotes novamente!)
+    const handleConfirmNewPackage = () => {
         const nextNum = reportData.packages.length + 1;
-        const newRow: MalhaPackageRow = {
+        const newPkg: MalhaPackageRow = {
             id: `mpkg-${Date.now()}`,
             packageCode: `p${nextNum}`,
-            finishedLotNumber: '',
-            quantity: reportData.techConfig.defaultQtyPerPackage || 50,
+            finishedLotNumber: newPkgTag.trim(),
+            quantity: Number(newPkgQty) || 50,
             measuredPackageWeight: null,
             longLot: '',
             longLotWeight: 0,
             transLot: '',
             transLotWeight: 0,
+            confirmed: true,
             recordedAt: new Date().toISOString()
         };
-        persistData({
+
+        persistDataAndSyncActiveLots({
             ...reportData,
-            packages: [...reportData.packages, newRow]
+            packages: [...reportData.packages, newPkg]
         });
+        setNewPkgTag('');
+        setNewPkgQty(50);
+    };
+
+    const handleUpdatePackageTagOrQty = (id: string, field: 'finishedLotNumber' | 'quantity', value: any) => {
+        const nextPackages = reportData.packages.map(p => p.id === id ? { ...p, [field]: value } : p);
+        persistDataAndSyncActiveLots({ ...reportData, packages: nextPackages });
     };
 
     const handleRemovePackage = (id: string) => {
-        if (reportData.packages.length <= 1) return;
         const filtered = reportData.packages
             .filter(p => p.id !== id)
             .map((p, idx) => ({ ...p, packageCode: `p${idx + 1}` }));
-        persistData({
-            ...reportData,
-            packages: filtered
-        });
+        persistDataAndSyncActiveLots({ ...reportData, packages: filtered });
     };
 
-    const computed = useMemo(
-        () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig),
-        [reportData.packages, reportData.techConfig]
-    );
+    const nextPackageNumber = reportData.packages.length + 1;
+    const previewLongCons = (Number(newPkgQty) || 50) * physics.longPesoUnit;
+    const previewTransCons = (Number(newPkgQty) || 50) * physics.transPesoUnit;
 
-    return (
-        <div className="bg-white p-3.5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4 w-full max-w-full overflow-hidden text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
-                <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm sm:text-lg font-black text-slate-800 tracking-tight flex items-center gap-1.5">
-                            <span>📦 Pacotes de Malha</span>
-                            <span className="text-[10px] sm:text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                                50 malhas / pct
-                            </span>
-                        </h3>
-                        <span className="text-[10px] sm:text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-                            {reportData.packages.length} pcts • {computed.totalQuantity} pçs • {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+    const renderDirectionSupplyCard = (dir: 'LONGITUDINAL' | 'TRANSVERSAL') => {
+        const isLong = dir === 'LONGITUDINAL';
+        const activeItem = isLong ? computed.activeLongLot : computed.activeTransLot;
+        const reserveItem = isLong ? computed.reserveLongLot : computed.reserveTransLot;
+        const consumedHistory = (isLong ? computed.longStatusList : computed.transStatusList).filter(x => x.roleStatus === 'CONSUMED');
+        const packageNeedKg = isLong ? previewLongCons : previewTransCons;
+
+        // Verificar se o próximo pacote vai usar 2 lotes (Ativo + Reserva)
+        const willSplitNextPackage =
+            activeItem &&
+            activeItem.kgEntra > 0 &&
+            activeItem.sobra > 0 &&
+            activeItem.sobra < packageNeedKg;
+
+        const pctRemaining = activeItem && activeItem.kgEntra > 0
+            ? Math.max(0, Math.min(100, (activeItem.sobra / activeItem.kgEntra) * 100))
+            : 0;
+
+        return (
+            <div className="p-3.5 sm:p-4 rounded-2xl border-2 border-slate-200 bg-white shadow-sm space-y-3 min-w-0 w-full">
+                {/* Título da Direção */}
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${
+                            isLong ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                        }`}>
+                            {isLong ? '↔️ Fio Longitudinal' : '↕️ Fio Transversal'}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-slate-400">
+                            ({reportData.techConfig.bitola}mm)
                         </span>
                     </div>
-                    <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-snug">
-                        Informe o lote longitudinal e transversal, quantidade (50) e peso do lote para conversão e desconto automático
-                    </p>
+                    <span className="text-[10px] font-mono font-bold text-slate-500">
+                        {packageNeedKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg / pct
+                    </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                    <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+                {/* 1. SLOT LOTE ATIVO (EM MÁQUINA) */}
+                <div className="p-3 rounded-xl bg-emerald-50/70 border-2 border-emerald-300 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                            <span>🟢 1º Lote Ativo (Em Máquina)</span>
+                        </span>
                         <button
                             type="button"
-                            onClick={handleAddPackage}
-                            className="py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] sm:text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm text-center justify-center flex items-center gap-1"
+                            onClick={() => openLotPicker(dir, 'ACTIVE')}
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black uppercase cursor-pointer transition active:scale-95"
                         >
-                            <span>+ Pacote (50)</span>
+                            {activeItem ? '🔄 Trocar Lote' : '+ Selecionar Lote'}
                         </button>
+                    </div>
+
+                    {activeItem ? (
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2 items-end">
+                                <div>
+                                    <span className="text-[9px] font-bold uppercase text-slate-500 block">
+                                        Lote em Operação
+                                    </span>
+                                    <span className="text-lg sm:text-xl font-black font-mono text-slate-900">
+                                        LOTE {activeItem.lot}
+                                    </span>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-emerald-800 block mb-0.5">
+                                        ⚖️ Peso do Lote (kg) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={activeItem.kgEntra || ''}
+                                        onChange={e => handleUpdateLotWeightInQueue(dir, activeItem.id, parseFloat(e.target.value) || 0)}
+                                        placeholder="Ex: 2075"
+                                        className="w-full px-2.5 py-1.5 rounded-lg border-2 border-emerald-400 bg-white font-mono font-black text-sm text-slate-900 outline-none focus:border-emerald-600 text-center"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Barra de Saldo do Lote Ativo */}
+                            {activeItem.kgEntra > 0 ? (
+                                <div className="space-y-1 pt-1">
+                                    <div className="flex justify-between text-[10px] font-mono">
+                                        <span className="text-slate-600">
+                                            Consumido: <strong>{activeItem.cons.toFixed(0)} kg</strong>
+                                        </span>
+                                        <span className={`font-black ${activeItem.sobra < packageNeedKg ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                            Saldo Atual: {activeItem.sobra.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                                        </span>
+                                    </div>
+                                    <div className="w-full h-2 bg-emerald-200/70 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full transition-all duration-500 ${
+                                                activeItem.sobra < packageNeedKg ? 'bg-amber-500' : 'bg-emerald-600'
+                                            }`}
+                                            style={{ width: `${pctRemaining}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-[10px] font-bold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-lg">
+                                    👆 Digite o Peso do Lote {activeItem.lot} acima (ex: 2075 kg) para o sistema abater sozinho nos pacotes!
+                                </p>
+                            )}
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => openLotPicker(dir, 'ACTIVE')}
+                            className="w-full py-3 rounded-xl border-2 border-dashed border-emerald-400 text-emerald-700 font-black text-xs uppercase hover:bg-emerald-100/50 transition cursor-pointer"
+                        >
+                            + Definir Lote Ativo ({dir})
+                        </button>
+                    )}
+                </div>
+
+                {/* 2. SLOT LOTE RESERVA (PRÓXIMO A ENTRAR QUANDO O ATIVO ACABAR) */}
+                <div className={`p-3 rounded-xl border-2 space-y-2 ${
+                    willSplitNextPackage
+                        ? 'bg-amber-50 border-amber-400 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 border-dashed'
+                }`}>
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                            <span>🟡 2º Lote Reserva (Próximo da Fila)</span>
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => openLotPicker(dir, 'RESERVE')}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black uppercase cursor-pointer transition active:scale-95"
+                        >
+                            {reserveItem ? '✏️ Trocar Reserva' : '+ Lote Reserva'}
+                        </button>
+                    </div>
+
+                    {willSplitNextPackage && (
+                        <div className="p-2 rounded-lg bg-amber-200/70 border border-amber-400 text-[10px] font-bold text-amber-950 leading-snug">
+                            ⚡ O Lote Ativo ({activeItem?.lot}) tem <strong>{activeItem?.sobra.toFixed(0)} kg</strong> e o próximo pacote precisa de <strong>{packageNeedKg.toFixed(0)} kg</strong>.
+                            {reserveItem
+                                ? ` O sistema vai usar os ${activeItem?.sobra.toFixed(0)} kg finais do Lote ${activeItem?.lot} + ${(packageNeedKg - (activeItem?.sobra || 0)).toFixed(0)} kg do Reserva (Lote ${reserveItem.lot})!`
+                                : ` Cadastre o Lote Reserva abaixo para abater os ${(packageNeedKg - (activeItem?.sobra || 0)).toFixed(0)} kg restantes!`}
+                        </div>
+                    )}
+
+                    {reserveItem ? (
+                        <div className="grid grid-cols-2 gap-2 items-end">
+                            <div>
+                                <span className="text-[9px] font-bold uppercase text-slate-500 block">
+                                    Próximo Lote Engatilhado
+                                </span>
+                                <span className="text-base sm:text-lg font-black font-mono text-slate-800">
+                                    LOTE {reserveItem.lot}
+                                </span>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black uppercase text-amber-900 block mb-0.5">
+                                    ⚖️ Peso Reserva (kg) *
+                                </label>
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={reserveItem.kgEntra || ''}
+                                    onChange={e => handleUpdateLotWeightInQueue(dir, reserveItem.id, parseFloat(e.target.value) || 0)}
+                                    placeholder="Ex: 2066"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border-2 border-amber-400 bg-white font-mono font-black text-sm text-slate-900 outline-none focus:border-amber-600 text-center"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-[10px] text-slate-500 italic">
+                            Nenhum lote reserva engatilhado. Clique em <strong>+ Lote Reserva</strong> para deixar o próximo rolo pronto para quando o ativo acabar.
+                        </p>
+                    )}
+                </div>
+
+                {/* Lotes já 100% consumidos nesta direção */}
+                {consumedHistory.length > 0 && (
+                    <div className="pt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[9px] font-black uppercase text-slate-400">Lotes já finalizados (Sobra 0):</span>
+                        {consumedHistory.map(h => (
+                            <span key={h.id} className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[9px] font-mono font-bold text-slate-600">
+                                Lote {h.lot} ({h.kgEntra.toFixed(0)}kg ✓)
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <div className="space-y-4 w-full max-w-full overflow-hidden text-left">
+            {/* BLOCO 1: ABASTECIMENTO DE LOTES (ATIVO + RESERVA) */}
+            <div className="bg-slate-100/80 p-3.5 sm:p-5 rounded-2xl border border-slate-200 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h3 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
+                            <span>🔄 1. Lotes na Máquina (Ativo & Reserva)</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                            Você só aponta o lote e o peso aqui 1 vez. Quando 1 pacote precisar de 2 lotes, o sistema desconta do Ativo e puxa o resto do Reserva sozinho!
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                            {saveStatus === 'saved' ? '✓ Sincronizado' : 'Salvando...'}
+                        </span>
                         <button
                             type="button"
                             onClick={() => setShowFullModal(true)}
-                            className="py-2.5 px-3 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] sm:text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center justify-center gap-1"
+                            className="px-3 py-1.5 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
                         >
                             <span>📊</span>
-                            <span className="truncate">Planilha</span>
+                            <span>Relatório Completo</span>
                         </button>
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-slate-400 text-right sm:text-left">
-                        {saveStatus === 'saved' ? '✓ Sincronizado' : 'Salvando...'}
-                    </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {renderDirectionSupplyCard('LONGITUDINAL')}
+                    {renderDirectionSupplyCard('TRANSVERSAL')}
                 </div>
             </div>
 
-            {/* VISÃO MOBILE (CARDS COMPACTOS POR PACOTE DE 50 MALHAS - SEM ROLAGEM HORIZONTAL) */}
-            <div className="md:hidden space-y-3 w-full">
-                {computed.computedRows.map((row) => (
-                    <div
-                        key={row.id}
-                        className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/70 space-y-2.5 shadow-sm w-full"
-                    >
-                        {/* Cabeçalho do Pacote: Código p1 + Lote Etiqueta + Qtd 50 + Excluir */}
-                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">
-                            <div className="flex items-center gap-1.5">
-                                <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black text-xs uppercase font-mono">
-                                    {row.packageCode.toUpperCase()}
-                                </span>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block leading-none">
-                                        Lote Etiqueta
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={row.finishedLotNumber}
-                                        onChange={e => updatePackageField(row.id, 'finishedLotNumber', e.target.value)}
-                                        placeholder="Ex: 88846"
-                                        className="w-24 mt-0.5 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-                            </div>
+            {/* MODAL/PAINEL DE SELEÇÃO DE LOTE (ATIVO OU RESERVA) */}
+            {pickerTarget && (
+                <div className="p-4 rounded-2xl bg-slate-900 text-white border-2 border-amber-400 space-y-3 shadow-xl animate-fade-in">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                            {pickerTarget.slot === 'ACTIVE'
+                                ? `🟢 Selecionar Lote ATIVO • FIO ${pickerTarget.dir}`
+                                : `🟡 Selecionar Lote RESERVA (Próximo) • FIO ${pickerTarget.dir}`}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setPickerTarget(null)}
+                            className="text-xs font-bold text-slate-400 hover:text-white px-2 py-0.5"
+                        >
+                            ✕ Fechar
+                        </button>
+                    </div>
 
-                            <div className="flex items-center gap-2">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-slate-400 block leading-none text-center">
-                                        Qtd. Malhas
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={row.quantity}
-                                        onChange={e => updatePackageField(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
-                                        className="w-16 mt-0.5 px-2 py-1 border border-slate-300 rounded-lg text-xs font-black text-center text-slate-900 bg-white outline-none focus:border-indigo-500"
-                                    />
-                                </div>
-                                {reportData.packages.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemovePackage(row.id)}
-                                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg font-bold text-xs"
-                                        title="Remover pacote"
-                                    >
-                                        ✕
-                                    </button>
-                                )}
-                            </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-amber-300 block mb-1">
+                                Número do Lote *
+                            </label>
+                            <input
+                                type="text"
+                                value={pickerLotInput}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setPickerLotInput(val);
+                                    const foundW = stockLotMap.get(cleanLotCode(val).toLowerCase());
+                                    if (foundW) setPickerWeightInput(String(foundW));
+                                }}
+                                placeholder="Ex: 7505"
+                                className="w-full px-3 py-2 rounded-xl bg-black/60 border border-amber-400/60 text-sm font-mono font-black text-white outline-none"
+                            />
                         </div>
-
-                        {/* Bloco Longitudinal */}
-                        <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900">
-                                    ↔️ Fio Longitudinal
-                                </span>
-                                <span className="text-[10px] font-mono font-bold text-slate-600">
-                                    Cons.: <strong>{row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</strong>
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[9px] font-bold uppercase text-amber-800 block mb-0.5">
-                                        Nº Lote Long.
-                                    </label>
-                                    <input
-                                        type="text"
-                                        list="malha-op-stock-lots"
-                                        value={row.longLot}
-                                        onChange={e => updatePackageField(row.id, 'longLot', e.target.value)}
-                                        placeholder="Ex: 7505"
-                                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-black text-slate-900 bg-white outline-none focus:border-amber-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-bold uppercase text-amber-800 block mb-0.5">
-                                        Peso Lote (kg)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={row.longLotWeight || ''}
-                                        onChange={e => updatePackageField(row.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
-                                        placeholder="Ex: 2075"
-                                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs font-bold text-slate-900 bg-white outline-none focus:border-amber-500"
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between pt-1 border-t border-amber-200/60 text-[10px] font-mono">
-                                <span className="text-slate-600">Saldo após pacote:</span>
-                                <span className={`font-black ${row.longPesoInicial < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Bloco Transversal */}
-                        <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-blue-900">
-                                    ↕️ Fio Transversal
-                                </span>
-                                <span className="text-[10px] font-mono font-bold text-slate-600">
-                                    Cons.: <strong>{row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</strong>
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[9px] font-bold uppercase text-blue-800 block mb-0.5">
-                                        Nº Lote Trans.
-                                    </label>
-                                    <input
-                                        type="text"
-                                        list="malha-op-stock-lots"
-                                        value={row.transLot}
-                                        onChange={e => updatePackageField(row.id, 'transLot', e.target.value)}
-                                        placeholder="Ex: 7583"
-                                        className="w-full px-2.5 py-1.5 border border-blue-300 rounded-lg text-xs font-black text-slate-900 bg-white outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-bold uppercase text-blue-800 block mb-0.5">
-                                        Peso Lote (kg)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={row.transLotWeight || ''}
-                                        onChange={e => updatePackageField(row.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
-                                        placeholder="Ex: 2071"
-                                        className="w-full px-2.5 py-1.5 border border-blue-300 rounded-lg text-xs font-bold text-slate-900 bg-white outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 text-[10px] font-mono">
-                                <span className="text-slate-600">Saldo após pacote:</span>
-                                <span className={`font-black ${row.transPesoInicial < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg
-                                </span>
-                            </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-emerald-300 block mb-1">
+                                Peso do Lote (kg) *
+                            </label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                value={pickerWeightInput}
+                                onChange={e => setPickerWeightInput(e.target.value)}
+                                placeholder="Ex: 2075"
+                                className="w-full px-3 py-2 rounded-xl bg-black/60 border border-emerald-400/60 text-sm font-mono font-black text-emerald-300 outline-none"
+                            />
                         </div>
                     </div>
-                ))}
-            </div>
 
-            {/* VISÃO DESKTOP: Tabela de Pacotes de 50 Malhas */}
-            <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-xs border-collapse">
-                    <thead>
-                        <tr className="bg-[#1F3864] text-white font-black uppercase text-[10px]">
-                            <th colSpan={3} className="p-2 border border-slate-400 text-center">PACOTE (50 MALHAS)</th>
-                            <th colSpan={4} className="p-2 border border-slate-400 text-center bg-[#1F4E79]">↔️ FIO LONGITUDINAL</th>
-                            <th colSpan={4} className="p-2 border border-slate-400 text-center bg-[#2E75B6]">↕️ FIO TRANSVERSAL</th>
-                        </tr>
-                        <tr className="bg-slate-100 text-slate-700 font-black uppercase text-[10px]">
-                            <th className="p-2 border border-slate-300 text-center">Lote (Pkt)</th>
-                            <th className="p-2 border border-slate-300 text-center">Pct</th>
-                            <th className="p-2 border border-slate-300 text-center">Qnt.</th>
-                            <th className="p-2 border border-slate-300 text-center bg-yellow-100">Lote Long.</th>
-                            <th className="p-2 border border-slate-300 text-center bg-yellow-100">Peso Lote (kg)</th>
-                            <th className="p-2 border border-slate-300 text-right">Saldo (kg)</th>
-                            <th className="p-2 border border-slate-300 text-right">Kg Cons.</th>
-                            <th className="p-2 border border-slate-300 text-center bg-yellow-100">Lote Trans.</th>
-                            <th className="p-2 border border-slate-300 text-center bg-yellow-100">Peso Lote (kg)</th>
-                            <th className="p-2 border border-slate-300 text-right">Saldo (kg)</th>
-                            <th className="p-2 border border-slate-300 text-right">Kg Cons.</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {computed.computedRows.map((row) => (
-                            <tr key={row.id} className="hover:bg-slate-50">
-                                <td className="p-1.5 border border-slate-200 text-center">
-                                    <input
-                                        type="text"
-                                        value={row.finishedLotNumber}
-                                        onChange={e => updatePackageField(row.id, 'finishedLotNumber', e.target.value)}
-                                        placeholder="Ex: 88846"
-                                        className="w-20 p-1.5 border border-slate-300 rounded-lg text-center font-bold text-slate-800 focus:border-indigo-500 outline-none"
-                                    />
-                                </td>
-                                <td className="p-1.5 border border-slate-200 text-center font-black text-slate-700 bg-slate-50">
-                                    {row.packageCode}
-                                </td>
-                                <td className="p-1.5 border border-slate-200 text-center">
-                                    <input
-                                        type="number"
-                                        value={row.quantity}
-                                        onChange={e => updatePackageField(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
-                                        className="w-16 p-1.5 border border-slate-300 rounded-lg text-center font-black text-slate-900 focus:border-indigo-500 outline-none"
-                                    />
-                                </td>
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] font-bold uppercase text-slate-400">
+                                Ou toque num lote do estoque abaixo (já preenche o peso):
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowAllStockGauges(!showAllStockGauges)}
+                                className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-white/10 text-cyan-300"
+                            >
+                                {showAllStockGauges ? 'Mostrando Todos' : 'Ver Todas Bitolas'}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 max-h-40 overflow-y-auto p-1 bg-black/40 rounded-xl">
+                            {availableStockLots.map(item => {
+                                const cLot = cleanLotCode(item.internalLot);
+                                const wKg = Number(item.initialQuantity || item.remainingQuantity || 0);
+                                return (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setPickerLotInput(cLot);
+                                            if (wKg > 0) setPickerWeightInput(String(wKg));
+                                        }}
+                                        className={`p-2 rounded-lg border text-left transition active:scale-95 cursor-pointer flex flex-col ${
+                                            cleanLotCode(pickerLotInput) === cLot
+                                                ? 'bg-amber-500/20 border-amber-400'
+                                                : 'bg-slate-950 border-white/10 hover:border-amber-400'
+                                        }`}
+                                    >
+                                        <span className="text-xs font-black font-mono text-white truncate">Lote {cLot}</span>
+                                        <span className="text-[9px] font-mono text-emerald-300 truncate">
+                                            {item.bitola}mm • {wKg > 0 ? `${wKg.toFixed(0)} kg` : 'S/ peso'}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
 
-                                {/* Longitudinal */}
-                                <td className="p-1.5 border border-slate-200 text-center bg-yellow-50/70">
-                                    <input
-                                        type="text"
-                                        list="malha-op-stock-lots"
-                                        value={row.longLot}
-                                        onChange={e => updatePackageField(row.id, 'longLot', e.target.value)}
-                                        placeholder="Nº Lote"
-                                        className="w-20 p-1.5 border border-amber-300 rounded-lg text-center font-black text-slate-900 bg-white focus:border-amber-500 outline-none"
-                                    />
-                                </td>
-                                <td className="p-1.5 border border-slate-200 text-center bg-yellow-50/70">
-                                    <input
-                                        type="number"
-                                        value={row.longLotWeight || ''}
-                                        onChange={e => updatePackageField(row.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
-                                        placeholder="Kg Lote"
-                                        className="w-20 p-1.5 border border-amber-300 rounded-lg text-center font-bold text-slate-900 bg-white focus:border-amber-500 outline-none"
-                                    />
-                                </td>
-                                <td className={`p-2 border border-slate-200 text-right font-mono font-bold ${
-                                    row.longPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800'
-                                }`}>
-                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-                                </td>
-                                <td className="p-2 border border-slate-200 text-right font-mono font-semibold text-slate-600 bg-slate-50">
-                                    {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-                                </td>
-
-                                {/* Transversal */}
-                                <td className="p-1.5 border border-slate-200 text-center bg-yellow-50/70">
-                                    <input
-                                        type="text"
-                                        list="malha-op-stock-lots"
-                                        value={row.transLot}
-                                        onChange={e => updatePackageField(row.id, 'transLot', e.target.value)}
-                                        placeholder="Nº Lote"
-                                        className="w-20 p-1.5 border border-amber-300 rounded-lg text-center font-black text-slate-900 bg-white focus:border-amber-500 outline-none"
-                                    />
-                                </td>
-                                <td className="p-1.5 border border-slate-200 text-center bg-yellow-50/70">
-                                    <input
-                                        type="number"
-                                        value={row.transLotWeight || ''}
-                                        onChange={e => updatePackageField(row.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
-                                        placeholder="Kg Lote"
-                                        className="w-20 p-1.5 border border-amber-300 rounded-lg text-center font-bold text-slate-900 bg-white focus:border-amber-500 outline-none"
-                                    />
-                                </td>
-                                <td className={`p-2 border border-slate-200 text-right font-mono font-bold ${
-                                    row.transPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800'
-                                }`}>
-                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-                                </td>
-                                <td className="p-2 border border-slate-200 text-right font-mono font-semibold text-slate-600 bg-slate-50">
-                                    {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            <datalist id="malha-op-stock-lots">
-                {(stock || [])
-                    .filter(s => s && s.internalLot && !String(s.status || '').toLowerCase().includes('consumido'))
-                    .map(s => (
-                        <option key={s.id} value={s.internalLot}>
-                            Lote {s.internalLot} • {s.bitola}mm • {Number(s.initialQuantity || s.remainingQuantity || 0).toFixed(0)}kg
-                        </option>
-                    ))}
-            </datalist>
-
-            {/* Resumo Rápido de Lotes Consumidos e Sobra */}
-            {computed.consumedLots.length > 0 && (
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
-                        ⚖️ Resumo de Lotes Consumidos e Sobra (Conversão Automática)
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                        {computed.consumedLots.map((item, idx) => (
-                            <div key={idx} className="p-2.5 rounded-lg bg-white border border-slate-200 shadow-sm">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[9px] font-black uppercase text-slate-400">
-                                        {item.direction === 'LONGITUDINAL' ? '↔️ LONG.' : '↕️ TRANS.'}
-                                    </span>
-                                    <span className="text-xs font-black font-mono text-slate-900">Lote {item.lot}</span>
-                                </div>
-                                <div className="mt-1.5 space-y-0.5 text-[10px] font-mono">
-                                    <div className="flex justify-between text-slate-500">
-                                        <span>Entra:</span>
-                                        <strong>{item.kgEntra.toFixed(0)} kg</strong>
-                                    </div>
-                                    <div className="flex justify-between text-rose-600">
-                                        <span>Cons.:</span>
-                                        <strong>{item.cons.toFixed(0)} kg</strong>
-                                    </div>
-                                    <div className="flex justify-between text-emerald-700 border-t border-slate-100 pt-0.5">
-                                        <span>Sobra:</span>
-                                        <strong className="font-black">{item.sobra.toFixed(0)} kg</strong>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => setPickerTarget(null)}
+                            className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmPickerLot}
+                            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
+                        >
+                            ✓ Salvar Lote & Peso
+                        </button>
                     </div>
                 </div>
             )}
+
+            {/* BLOCO 2: FECHAR PACOTE DE 50 MALHAS (1 CLIQUE - SEM REPETIR LOTE!) */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm sm:text-base font-black uppercase text-slate-800">
+                                📦 2. Fechar Pacotes de Malha (50 Peças)
+                            </h3>
+                            <span className="text-xs font-mono font-black bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                                {reportData.packages.length} pacotes prontos • {computed.totalQuantity} malhas ({computed.totalWeightKg.toFixed(0)} kg)
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                            Não precisa apontar os lotes de novo: ao confirmar o pacote, o sistema já desconta dos lotes ativos (e reserva) automaticamente!
+                        </p>
+                    </div>
+                </div>
+
+                {/* Card de Ação Rápida: Fechar Próximo Pacote */}
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-[#0F2437] to-slate-900 text-white space-y-3 shadow-md">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black font-mono text-sm uppercase">
+                                PACOTE P{nextPackageNumber}
+                            </span>
+                            <span className="text-xs font-bold text-slate-300">
+                                Pronto para bater o pacote?
+                            </span>
+                        </div>
+                        <div className="text-[10px] font-mono text-amber-300">
+                            Abate: ↔️ {previewLongCons.toFixed(1)} kg | ↕️ {previewTransCons.toFixed(1)} kg
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 items-end">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                Qtd. Malhas no Pacote
+                            </label>
+                            <input
+                                type="number"
+                                value={newPkgQty}
+                                onChange={e => setNewPkgQty(parseInt(e.target.value, 10) || 0)}
+                                className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-black text-sm text-center outline-none focus:border-amber-400"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                                Nº Etiqueta Pacote (Opcional)
+                            </label>
+                            <input
+                                type="text"
+                                value={newPkgTag}
+                                onChange={e => setNewPkgTag(e.target.value)}
+                                placeholder="Ex: 88846"
+                                className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-bold text-sm text-center outline-none focus:border-amber-400"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleConfirmNewPackage}
+                            className="col-span-2 sm:col-span-1 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                            <span>✅</span>
+                            <span>Confirmar Pacote P{nextPackageNumber}</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Lista de Cards Simples dos Pacotes Já Confirmados */}
+                {computed.computedRows.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {computed.computedRows.map((row) => {
+                            const usedTwoLong = row.longSplits.length > 1;
+                            const usedTwoTrans = row.transSplits.length > 1;
+
+                            return (
+                                <div
+                                    key={row.id}
+                                    className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/70 space-y-2.5 flex flex-col justify-between"
+                                >
+                                    <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
+                                                {row.packageCode.toUpperCase()}
+                                            </span>
+                                            <span className="text-xs font-black text-slate-800">
+                                                {row.quantity} malhas
+                                            </span>
+                                            <span className="text-[10px] font-mono text-slate-500">
+                                                ({(row.longKgCons + row.transKgCons).toFixed(0)} kg)
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="text"
+                                                value={row.finishedLotNumber}
+                                                onChange={e => handleUpdatePackageTagOrQty(row.id, 'finishedLotNumber', e.target.value)}
+                                                placeholder="Etiqueta..."
+                                                className="w-20 px-2 py-1 rounded-lg border border-slate-300 bg-white text-[11px] font-mono font-bold text-center text-slate-800 outline-none"
+                                                title="Etiqueta do pacote pronto"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemovePackage(row.id)}
+                                                className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-bold cursor-pointer"
+                                                title="Excluir pacote"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Resumo Automático do Desconto Longitudinal */}
+                                    <div className={`p-2 rounded-xl border text-[11px] ${
+                                        usedTwoLong ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'
+                                    }`}>
+                                        <div className="flex items-center justify-between font-bold text-slate-700">
+                                            <span>↔️ Longitudinal (-{row.longKgCons.toFixed(1)} kg):</span>
+                                            {usedTwoLong && (
+                                                <span className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[9px] uppercase">
+                                                    Usou 2 Lotes (Ativo + Reserva)
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-1 space-y-0.5 font-mono text-[10px]">
+                                            {row.longSplits.map((sp, i) => (
+                                                <div key={i} className="flex items-center justify-between text-slate-600">
+                                                    <span>
+                                                        • Lote <strong>{sp.lot}</strong>: abateu <strong>{sp.consumedKg.toFixed(1)} kg</strong>
+                                                    </span>
+                                                    <span className={sp.exhausted ? 'text-rose-600 font-black' : 'text-emerald-700 font-bold'}>
+                                                        {sp.exhausted && sp.balanceAfterKg === 0
+                                                            ? 'Zerou (0 kg)'
+                                                            : `Restou ${sp.balanceAfterKg.toFixed(1)} kg`}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Resumo Automático do Desconto Transversal */}
+                                    <div className={`p-2 rounded-xl border text-[11px] ${
+                                        usedTwoTrans ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'
+                                    }`}>
+                                        <div className="flex items-center justify-between font-bold text-slate-700">
+                                            <span>↕️ Transversal (-{row.transKgCons.toFixed(1)} kg):</span>
+                                            {usedTwoTrans && (
+                                                <span className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[9px] uppercase">
+                                                    Usou 2 Lotes (Ativo + Reserva)
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-1 space-y-0.5 font-mono text-[10px]">
+                                            {row.transSplits.map((sp, i) => (
+                                                <div key={i} className="flex items-center justify-between text-slate-600">
+                                                    <span>
+                                                        • Lote <strong>{sp.lot}</strong>: abateu <strong>{sp.consumedKg.toFixed(1)} kg</strong>
+                                                    </span>
+                                                    <span className={sp.exhausted ? 'text-rose-600 font-black' : 'text-emerald-700 font-bold'}>
+                                                        {sp.exhausted && sp.balanceAfterKg === 0
+                                                            ? 'Zerou (0 kg)'
+                                                            : `Restou ${sp.balanceAfterKg.toFixed(1)} kg`}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="p-6 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400 text-xs">
+                        Nenhum pacote de 50 malhas fechado ainda. Confirme o <strong>Pacote P1</strong> no botão verde acima quando terminar o primeiro pacote!
+                    </div>
+                )}
+            </div>
 
             {showFullModal && (
                 <MalhaConsumptionReportModal
