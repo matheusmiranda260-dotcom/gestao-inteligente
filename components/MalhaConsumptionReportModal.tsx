@@ -1449,6 +1449,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     } | null>(null);
     const [pickerLotInput, setPickerLotInput] = useState<string>('');
     const [pickerWeightInput, setPickerWeightInput] = useState<string>('');
+    const [pickerError, setPickerError] = useState<string | null>(null);
     const [showAllStockGauges, setShowAllStockGauges] = useState<boolean>(false);
 
     useEffect(() => {
@@ -1469,6 +1470,30 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         return map;
     }, [stock]);
 
+    // Conjunto de todos os lotes já cadastrados/utilizados nesta OP (Ativos, Reservas ou já Finalizados com Sobra 0)
+    const usedLotCodesMap = useMemo(() => {
+        const map = new Map<string, string>(); // lotCodeLower -> descrição de onde está sendo usado
+        computed.longStatusList.forEach(item => {
+            if (!item.lot) return;
+            const label = item.roleStatus === 'CONSUMED'
+                ? 'Já consumido (Sobra 0) no Longitudinal'
+                : item.roleStatus === 'ACTIVE'
+                    ? 'Já está ATIVO no Longitudinal'
+                    : 'Já está na RESERVA do Longitudinal';
+            map.set(cleanLotCode(item.lot).toLowerCase(), label);
+        });
+        computed.transStatusList.forEach(item => {
+            if (!item.lot) return;
+            const label = item.roleStatus === 'CONSUMED'
+                ? 'Já consumido (Sobra 0) no Transversal'
+                : item.roleStatus === 'ACTIVE'
+                    ? 'Já está ATIVO no Transversal'
+                    : 'Já está na RESERVA do Transversal';
+            map.set(cleanLotCode(item.lot).toLowerCase(), label);
+        });
+        return map;
+    }, [computed.longStatusList, computed.transStatusList]);
+
     const availableStockLots = useMemo(() => {
         const targetB = String(reportData.techConfig.bitola || 5).replace(',', '.');
         return (stock || [])
@@ -1478,6 +1503,10 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                 if (st.includes('consumido') || st.includes('sucata')) return false;
                 const mat = String(item.materialType || '').toUpperCase();
                 if (mat.includes('FIO MÁQUINA')) return false;
+                // Não listar lotes que já foram usados/finalizados ou que já estão em operação/reserva na máquina
+                const cLotLower = cleanLotCode(item.internalLot).toLowerCase();
+                if (usedLotCodesMap.has(cLotLower)) return false;
+
                 if (!showAllStockGauges) {
                     const itemB = parseFloat(String(item.bitola || '').replace(',', '.'));
                     const reqB = parseFloat(targetB);
@@ -1490,7 +1519,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
             })
             .sort((a, b) => String(b.internalLot).localeCompare(String(a.internalLot), undefined, { numeric: true }))
             .slice(0, 20);
-    }, [stock, reportData.techConfig.bitola, showAllStockGauges, pickerLotInput]);
+    }, [stock, reportData.techConfig.bitola, showAllStockGauges, pickerLotInput, usedLotCodesMap]);
 
     const computed = useMemo(
         () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
@@ -1568,23 +1597,44 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         setPickerTarget({ dir, slot });
         setPickerLotInput(currentLotObj?.lot || '');
         setPickerWeightInput(currentLotObj?.kgEntra ? String(currentLotObj.kgEntra) : '');
+        setPickerError(null);
     };
 
     const handleConfirmPickerLot = () => {
         if (!pickerTarget) return;
         const cleanLot = cleanLotCode(pickerLotInput);
-        if (!cleanLot) return;
+        if (!cleanLot) {
+            setPickerError('⚠️ Informe o número do lote!');
+            return;
+        }
+
+        const isLong = pickerTarget.dir === 'LONGITUDINAL';
+        const currentActive = isLong ? computed.activeLongLot : computed.activeTransLot;
+        const currentReserve = isLong ? computed.reserveLongLot : computed.reserveTransLot;
+        const editingLotObj = pickerTarget.slot === 'ACTIVE' ? currentActive : currentReserve;
+
+        // Bloquear se o operador tentar selecionar um lote que JÁ está em uso (Ativo/Reserva) ou JÁ foi consumido nesta OP!
+        const existingUsage = usedLotCodesMap.get(cleanLot.toLowerCase());
+        const isSameSlotEdit = editingLotObj && cleanLotCode(editingLotObj.lot).toLowerCase() === cleanLot.toLowerCase();
+        if (existingUsage && !isSameSlotEdit) {
+            setPickerError(`🚫 O Lote ${cleanLot} não pode ser selecionado novamente (${existingUsage})!`);
+            return;
+        }
 
         const autoWeight = stockLotMap.get(cleanLot.toLowerCase()) || 0;
         const weightVal = parseFloat(pickerWeightInput) || autoWeight || 0;
+        if (weightVal <= 0) {
+            setPickerError(`⚠️ Informe o Peso Inicial (kg) do Lote ${cleanLot}!`);
+            return;
+        }
 
-        const isLong = pickerTarget.dir === 'LONGITUDINAL';
         const queue = [...(isLong ? reportData.longLotsQueue : reportData.transLotsQueue)];
-        const currentActive = isLong ? computed.activeLongLot : computed.activeTransLot;
-        const currentReserve = isLong ? computed.reserveLongLot : computed.reserveTransLot;
 
         if (pickerTarget.slot === 'ACTIVE') {
-            if (currentActive) {
+            if (currentActive && currentActive.cons > 0 && !isSameSlotEdit) {
+                // Se o lote ativo atual já teve consumo parcial e o operador está trocando por um novo lote, adicionar na fila
+                queue.push({ id: `q-${Date.now()}`, lot: cleanLot, weight: weightVal, addedAt: new Date().toISOString() });
+            } else if (currentActive) {
                 const idx = queue.findIndex(q => q.id === currentActive.id);
                 if (idx >= 0) {
                     queue[idx] = { ...queue[idx], lot: cleanLot, weight: weightVal };
@@ -1615,6 +1665,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
 
         persistDataAndSyncActiveLots(nextData);
         setPickerTarget(null);
+        setPickerError(null);
         setValidationError(null);
     };
 
@@ -1816,14 +1867,22 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                             </div>
 
                             {activeItem.kgEntra > 0 ? (
-                                <div className="space-y-1 pt-1">
-                                    <div className="flex justify-between text-[10px] font-mono">
-                                        <span className="text-slate-600">
-                                            Consumido: <strong>{activeItem.cons.toFixed(0)} kg</strong>
-                                        </span>
-                                        <span className={`font-black ${activeItem.sobra < packageNeedKg ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                            Saldo Atual: {activeItem.sobra.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
-                                        </span>
+                                <div className="space-y-1.5 pt-1">
+                                    <div className="grid grid-cols-3 gap-1.5 text-center bg-white/90 p-2 rounded-xl border border-emerald-200">
+                                        <div>
+                                            <span className="text-[8px] font-black uppercase text-slate-400 block">Peso Inicial</span>
+                                            <span className="text-xs font-mono font-bold text-slate-700">{activeItem.kgEntra.toFixed(0)} kg</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[8px] font-black uppercase text-rose-500 block">Já Abatido</span>
+                                            <span className="text-xs font-mono font-bold text-rose-600">-{activeItem.cons.toFixed(0)} kg</span>
+                                        </div>
+                                        <div className="bg-emerald-100/80 rounded-lg py-0.5 px-1">
+                                            <span className="text-[8px] font-black uppercase text-emerald-800 block">Sobrou (Saldo)</span>
+                                            <span className={`text-xs sm:text-sm font-mono font-black ${activeItem.sobra < packageNeedKg ? 'text-amber-700' : 'text-emerald-800'}`}>
+                                                {activeItem.sobra.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="w-full h-2 bg-emerald-200/70 rounded-full overflow-hidden">
                                         <div
@@ -1987,6 +2046,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 onChange={e => {
                                     const val = e.target.value;
                                     setPickerLotInput(val);
+                                    setPickerError(null);
                                     const foundW = stockLotMap.get(cleanLotCode(val).toLowerCase());
                                     if (foundW) setPickerWeightInput(String(foundW));
                                 }}
@@ -2002,12 +2062,21 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 type="number"
                                 inputMode="decimal"
                                 value={pickerWeightInput}
-                                onChange={e => setPickerWeightInput(e.target.value)}
+                                onChange={e => {
+                                    setPickerWeightInput(e.target.value);
+                                    setPickerError(null);
+                                }}
                                 placeholder="Ex: 2075"
                                 className="w-full px-3 py-2 rounded-xl bg-black/60 border border-emerald-400/60 text-sm font-mono font-black text-emerald-300 outline-none"
                             />
                         </div>
                     </div>
+
+                    {pickerError && (
+                        <div className="p-2.5 rounded-xl bg-rose-950 border border-rose-500 text-rose-200 text-xs font-black">
+                            {pickerError}
+                        </div>
+                    )}
 
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
