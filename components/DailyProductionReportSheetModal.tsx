@@ -1612,6 +1612,33 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
             if (isRollChange) {
                 rollChangeCounter++;
+
+                // Se a parada já contém identificação explícita de Lote (ex: Malha Longitudinal/Transversal ou SAI/ENTRA informado), preservar integralmente!
+                const hasExplicitMalhaOrLotInfo =
+                    upper.includes('LONGITUDINAL') ||
+                    upper.includes('TRANSVERSAL') ||
+                    upper.includes('ENTRA:') ||
+                    upper.includes('ENTROU') ||
+                    upper.includes('SAIU') ||
+                    (() => {
+                        const saiMatch = upper.match(/\(\s*SAI:\s*(?:LOTE\s*)?([^\)\/]+)\)/i);
+                        if (!saiMatch) return false;
+                        const captured = saiMatch[1].trim();
+                        // Se não for apenas um contador sequencial genérico (1..9) quando dayLotsList está vazio, preserva
+                        return captured.length >= 2 || (dayLotsList.length === 0 && !/^[1-9]$/.test(captured));
+                    })();
+
+                if (hasExplicitMalhaOrLotInfo) {
+                    const preservedMotivo = upper
+                        .replace(/\/\s*PREPARA[ÇC][AÃ]O/gi, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    return {
+                        ...s,
+                        motivo: preservedMotivo
+                    };
+                }
+
                 const targetLotIdx = rollChangeCounter - 1;
 
                 let lotSai = '';

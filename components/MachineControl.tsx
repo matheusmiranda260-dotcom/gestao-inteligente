@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Page, MachineType, StockItem, ProductionOrderData, User, PartsRequest, ShiftReport, TrelicaSelectedLots, Ponta, StockGauge, Employee, DowntimeConfig, TrelicaSpoolStand, PcpShiftConfig, PcpHoliday } from '../types';
-import { DOWNTIME_THRESHOLDS } from '../types';
+import { DOWNTIME_THRESHOLDS, DefaultMalhaGauges } from '../types';
 import { ArrowLeftIcon, PlayIcon, PauseIcon, ClockIcon, WarningIcon, StopIcon, CheckCircleIcon, WrenchScrewdriverIcon, ArchiveIcon, ClipboardListIcon, CogIcon, DocumentReportIcon, ScaleIcon, TrashIcon, CalculatorIcon, ChartBarIcon, ExclamationIcon, SaveIcon, XCircleIcon, ChevronDownIcon, AdjustmentsIcon, ChevronRightIcon, ArrowPathIcon } from './icons';
 import PartsRequestModal from './PartsRequestModal';
 import ShiftReportsModal from './ShiftReportsModal';
@@ -64,6 +64,120 @@ const IdleActivityLogger: React.FC<{
 
 // Hardcoded fallback reasons removed in favor of dynamic configs from DB
 
+export interface MalhaRollChangeHistoryEntry {
+    id: string;
+    timestamp: string;
+    position: 'LONGITUDINAL' | 'TRANSVERSAL';
+    lotSai: string;
+    lotEntra: string;
+    orderNumber?: string;
+}
+
+export interface MalhaActiveLotsState {
+    longitudinal: string;
+    transversal: string;
+    updatedAt?: string;
+    history?: MalhaRollChangeHistoryEntry[];
+}
+
+export const getMalhaActiveLots = (machineName: string, activeOrder?: ProductionOrderData | null): MalhaActiveLotsState => {
+    const key = `malha_active_lots_${machineName || 'Malha 1'}`;
+    let localData: MalhaActiveLotsState | null = null;
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw) localData = JSON.parse(raw);
+    } catch (e) {
+        console.warn('Erro ao ler lotes ativos da Malha do localStorage:', e);
+    }
+
+    const summaryData = (activeOrder?.summary as any)?.malhaActiveLots as MalhaActiveLotsState | undefined;
+    if (summaryData && (summaryData.longitudinal || summaryData.transversal)) {
+        if (!localData || (!localData.longitudinal && !localData.transversal)) {
+            return {
+                longitudinal: summaryData.longitudinal || '',
+                transversal: summaryData.transversal || '',
+                updatedAt: summaryData.updatedAt,
+                history: Array.isArray(summaryData.history) ? summaryData.history : []
+            };
+        }
+        // Usa o mais recente entre localStorage e summary
+        const localTime = localData.updatedAt ? new Date(localData.updatedAt).getTime() : 0;
+        const summaryTime = summaryData.updatedAt ? new Date(summaryData.updatedAt).getTime() : 0;
+        if (summaryTime > localTime) {
+            return {
+                longitudinal: summaryData.longitudinal || localData.longitudinal || '',
+                transversal: summaryData.transversal || localData.transversal || '',
+                updatedAt: summaryData.updatedAt,
+                history: Array.isArray(summaryData.history) ? summaryData.history : (localData.history || [])
+            };
+        }
+    }
+
+    return {
+        longitudinal: localData?.longitudinal || summaryData?.longitudinal || '',
+        transversal: localData?.transversal || summaryData?.transversal || '',
+        updatedAt: localData?.updatedAt || summaryData?.updatedAt,
+        history: Array.isArray(localData?.history) ? localData!.history : (Array.isArray(summaryData?.history) ? summaryData!.history : [])
+    };
+};
+
+export const saveMalhaActiveLots = async (
+    machineName: string,
+    activeOrder: ProductionOrderData | null | undefined,
+    nextState: MalhaActiveLotsState
+) => {
+    const key = `malha_active_lots_${machineName || 'Malha 1'}`;
+    const payload: MalhaActiveLotsState = {
+        ...nextState,
+        updatedAt: new Date().toISOString(),
+        history: (nextState.history || []).slice(0, 50)
+    };
+    try {
+        localStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+        console.warn('Erro ao salvar lotes da Malha no localStorage:', e);
+    }
+
+    if (activeOrder?.id) {
+        try {
+            const currentSummary = (activeOrder.summary && typeof activeOrder.summary === 'object') ? activeOrder.summary : {};
+            const updatedSummary = {
+                ...currentSummary,
+                malhaActiveLots: payload
+            };
+            await updateItem('production_orders', activeOrder.id, {
+                summary: updatedSummary
+            } as any);
+        } catch (e) {
+            console.warn('Erro ao sincronizar lotes da Malha no summary da OP:', e);
+        }
+    }
+    return payload;
+};
+
+export const resolveMalhaExpectedGauges = (activeOrder?: ProductionOrderData | null): { longitudinal: string; transversal: string } => {
+    const modelStr = (activeOrder?.malhaModel || '').toUpperCase();
+    const fallbackBitola = (activeOrder?.targetBitola || '').replace(',', '.').trim();
+    const matchedConfig = DefaultMalhaGauges.find(cfg =>
+        (cfg.code && modelStr.includes(cfg.code.toUpperCase())) ||
+        (cfg.description && modelStr.includes(cfg.description.toUpperCase()))
+    );
+    if (matchedConfig) {
+        return {
+            longitudinal: matchedConfig.longitudinal.replace(',', '.').trim(),
+            transversal: matchedConfig.transversal.replace(',', '.').trim()
+        };
+    }
+    return {
+        longitudinal: fallbackBitola,
+        transversal: fallbackBitola
+    };
+};
+
+const formatCleanLotNumber = (val: string) => {
+    return val.replace(/^LOTE\s+/i, '').trim();
+};
+
 const DowntimeModal: React.FC<{
     onClose: () => void;
     onSubmit: (reason: string) => void;
@@ -73,11 +187,16 @@ const DowntimeModal: React.FC<{
     downtimeEvents?: any[];
     downtimeConfigs?: DowntimeConfig[];
     machineType?: string;
-}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause, downtimeEvents, downtimeConfigs = [], machineType = 'Geral' }) => {
+    stock?: StockItem[];
+    activeOrder?: ProductionOrderData | null;
+    onMalhaLotsUpdated?: (nextState: MalhaActiveLotsState) => void;
+}> = ({ onClose, onSubmit, onEndShift, onPauseOrder, canPause, downtimeEvents, downtimeConfigs = [], machineType = 'Geral', stock = [], activeOrder, onMalhaLotsUpdated }) => {
     const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
 
     // Controladoria de Eletrodos para Treliça
     const isTrelica = (machineType || '').startsWith('Treliça');
+    const isMalha = (machineType || '').toLowerCase().includes('malha');
+
     const machineElectrodes = useMemo(() => {
         if (!isTrelica) return [];
         return getLocalMachineElectrodes(machineType || 'Treliça 1');
@@ -94,6 +213,76 @@ const DowntimeModal: React.FC<{
     const isTrocaSelected = useMemo(() => {
         return selectedReasons.some(r => r.toLowerCase().includes('troca de eletrodo'));
     }, [selectedReasons]);
+
+    // Controladoria de Troca de Rolo para Malha (Longitudinal e Transversal, sem alterar status do estoque)
+    const isMalhaRollChangeSelected = useMemo(() => {
+        if (!isMalha) return false;
+        return selectedReasons.some(r => {
+            const low = r.toLowerCase();
+            return low.includes('rolo') || low.includes('bobina');
+        });
+    }, [isMalha, selectedReasons]);
+
+    const currentMalhaLots = useMemo(() => {
+        if (!isMalha) return { longitudinal: '', transversal: '', history: [] };
+        return getMalhaActiveLots(machineType || 'Malha 1', activeOrder);
+    }, [isMalha, machineType, activeOrder]);
+
+    const expectedMalhaGauges = useMemo(() => resolveMalhaExpectedGauges(activeOrder), [activeOrder]);
+
+    const [malhaSelectedPositions, setMalhaSelectedPositions] = useState<Array<'LONGITUDINAL' | 'TRANSVERSAL'>>([]);
+    const [malhaLotSaiLong, setMalhaLotSaiLong] = useState<string>(() => currentMalhaLots.longitudinal || '');
+    const [malhaLotEntraLong, setMalhaLotEntraLong] = useState<string>('');
+    const [malhaLotSaiTrans, setMalhaLotSaiTrans] = useState<string>(() => currentMalhaLots.transversal || '');
+    const [malhaLotEntraTrans, setMalhaLotEntraTrans] = useState<string>('');
+    const [showAllGaugesLong, setShowAllGaugesLong] = useState<boolean>(false);
+    const [showAllGaugesTrans, setShowAllGaugesTrans] = useState<boolean>(false);
+    const [pickingSaiField, setPickingSaiField] = useState<{ LONGITUDINAL?: boolean; TRANSVERSAL?: boolean }>({});
+
+    useEffect(() => {
+        if (isMalha) {
+            const latest = getMalhaActiveLots(machineType || 'Malha 1', activeOrder);
+            if (latest.longitudinal && !malhaLotSaiLong) setMalhaLotSaiLong(latest.longitudinal);
+            if (latest.transversal && !malhaLotSaiTrans) setMalhaLotSaiTrans(latest.transversal);
+        }
+    }, [isMalha, machineType, activeOrder]);
+
+    const toggleMalhaPosition = (pos: 'LONGITUDINAL' | 'TRANSVERSAL') => {
+        setMalhaSelectedPositions(prev =>
+            prev.includes(pos) ? prev.filter(p => p !== pos) : [...prev, pos]
+        );
+    };
+
+    const availableMalhaStockLots = useMemo(() => {
+        if (!isMalha || !Array.isArray(stock)) return [];
+        return stock
+            .filter(item => {
+                if (!item || !item.internalLot) return false;
+                const st = (item.status || '').toLowerCase();
+                if (st.includes('consumido') || st.includes('finalizado') || st.includes('sucata')) return false;
+                const mat = (item.materialType || '').toUpperCase();
+                // Prioriza CA-60 (ou qualquer item que não seja Fio Máquina bruto se houver CA-60)
+                return mat.includes('CA-60') || mat.includes('CA60') || !mat.includes('FIO MÁQUINA');
+            })
+            .sort((a, b) => String(b.internalLot).localeCompare(String(a.internalLot), undefined, { numeric: true }));
+    }, [isMalha, stock]);
+
+    const getFilteredLotsForPosition = (pos: 'LONGITUDINAL' | 'TRANSVERSAL', searchVal: string, showAllGauges: boolean) => {
+        const expectedGauge = pos === 'LONGITUDINAL' ? expectedMalhaGauges.longitudinal : expectedMalhaGauges.transversal;
+        const cleanSearch = formatCleanLotNumber(searchVal).toLowerCase();
+
+        return availableMalhaStockLots.filter(item => {
+            const itemGauge = String(item.bitola || '').replace(',', '.').trim();
+            if (!showAllGauges && expectedGauge && itemGauge !== expectedGauge) {
+                return false;
+            }
+            if (cleanSearch) {
+                const lotStr = String(item.internalLot || '').toLowerCase();
+                return lotStr.includes(cleanSearch);
+            }
+            return true;
+        }).slice(0, 24);
+    };
 
     const [isAllElectrodes, setIsAllElectrodes] = useState(false);
     const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
@@ -241,6 +430,80 @@ const DowntimeModal: React.FC<{
             }
 
             finalReason = `${finalReason} [${electrodeNote}]`;
+        }
+
+        // Se motivo envolver Troca de Rolo na Malha, exigir seleção Longitudinal/Transversal e lote que entra
+        if (isMalhaRollChangeSelected) {
+            if (malhaSelectedPositions.length === 0) {
+                alert('⚠️ ATENÇÃO OPERADOR:\n\nSelecione qual rolo está sendo trocado na Malha:\n• FIO LONGITUDINAL e/ou\n• FIO TRANSVERSAL');
+                return;
+            }
+
+            const rollParts: string[] = [];
+            const latestState = getMalhaActiveLots(machineType || 'Malha 1', activeOrder);
+            let nextLong = latestState.longitudinal || '';
+            let nextTrans = latestState.transversal || '';
+            const newHistoryEntries: MalhaRollChangeHistoryEntry[] = [];
+
+            if (malhaSelectedPositions.includes('LONGITUDINAL')) {
+                const cleanEntra = formatCleanLotNumber(malhaLotEntraLong);
+                const cleanSai = formatCleanLotNumber(malhaLotSaiLong || latestState.longitudinal || '');
+                if (!cleanEntra) {
+                    alert('⚠️ ATENÇÃO OPERADOR:\n\nSelecione ou digite o LOTE QUE ENTRA no Fio LONGITUDINAL.');
+                    return;
+                }
+                const saiDisplay = cleanSai ? `LOTE ${cleanSai}` : 'S/ REGISTRO';
+                rollParts.push(`LONGITUDINAL (SAI: ${saiDisplay} / ENTRA: LOTE ${cleanEntra})`);
+                nextLong = cleanEntra;
+                newHistoryEntries.push({
+                    id: `ml-hist-${Date.now()}-L`,
+                    timestamp: new Date().toISOString(),
+                    position: 'LONGITUDINAL',
+                    lotSai: cleanSai || 'S/ REGISTRO',
+                    lotEntra: cleanEntra,
+                    orderNumber: activeOrder?.orderNumber
+                });
+            }
+
+            if (malhaSelectedPositions.includes('TRANSVERSAL')) {
+                const cleanEntra = formatCleanLotNumber(malhaLotEntraTrans);
+                const cleanSai = formatCleanLotNumber(malhaLotSaiTrans || latestState.transversal || '');
+                if (!cleanEntra) {
+                    alert('⚠️ ATENÇÃO OPERADOR:\n\nSelecione ou digite o LOTE QUE ENTRA no Fio TRANSVERSAL.');
+                    return;
+                }
+                const saiDisplay = cleanSai ? `LOTE ${cleanSai}` : 'S/ REGISTRO';
+                rollParts.push(`TRANSVERSAL (SAI: ${saiDisplay} / ENTRA: LOTE ${cleanEntra})`);
+                nextTrans = cleanEntra;
+                newHistoryEntries.push({
+                    id: `ml-hist-${Date.now()}-T`,
+                    timestamp: new Date().toISOString(),
+                    position: 'TRANSVERSAL',
+                    lotSai: cleanSai || 'S/ REGISTRO',
+                    lotEntra: cleanEntra,
+                    orderNumber: activeOrder?.orderNumber
+                });
+            }
+
+            const nextMalhaState: MalhaActiveLotsState = {
+                longitudinal: nextLong,
+                transversal: nextTrans,
+                updatedAt: new Date().toISOString(),
+                history: [...newHistoryEntries, ...(latestState.history || [])].slice(0, 50)
+            };
+
+            saveMalhaActiveLots(machineType || 'Malha 1', activeOrder, nextMalhaState);
+            if (onMalhaLotsUpdated) {
+                onMalhaLotsUpdated(nextMalhaState);
+            }
+
+            // Substitui o motivo "Troca de Rolo" pela descrição completa com Longitudinal/Transversal e SAI/ENTRA
+            const otherReasons = reasons.filter(r => {
+                const low = r.toLowerCase();
+                return !low.includes('rolo') && !low.includes('bobina');
+            });
+            const formattedRollChange = `Troca de Rolo ${rollParts.join(' + ')}`;
+            finalReason = [formattedRollChange, ...otherReasons].join(' + ');
         }
 
         // Check for repeat reasons (excluding ADMINISTRATIVE reasons like Shift End)
@@ -410,6 +673,212 @@ const DowntimeModal: React.FC<{
                         </div>
                     )}
 
+                    {/* PAINEL DE TROCA DE ROLO DA MALHA (LONGITUDINAL E TRANSVERSAL - SEM ALTERAR STATUS DE ESTOQUE) */}
+                    {isMalhaRollChangeSelected && (
+                        <div className="mb-6 p-4 sm:p-5 rounded-3xl bg-slate-900 border-2 border-amber-500/60 shadow-xl space-y-4 animate-fade-in text-white">
+                            <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 text-lg">🔄</span>
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">
+                                            Troca de Rolo • {machineType} (Longitudinal / Transversal)
+                                        </h4>
+                                        <p className="text-[10px] text-slate-400">
+                                            Selecione a posição do fio e o lote que entra na máquina (apenas registro p/ relatório)
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Botões de Seleção de Posição: Longitudinal / Transversal */}
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">
+                                    1. Qual posição de fio está trocando?
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {(['LONGITUDINAL', 'TRANSVERSAL'] as const).map(pos => {
+                                        const isPosSelected = malhaSelectedPositions.includes(pos);
+                                        const currentActiveLot = pos === 'LONGITUDINAL' ? currentMalhaLots.longitudinal : currentMalhaLots.transversal;
+                                        const expectedGauge = pos === 'LONGITUDINAL' ? expectedMalhaGauges.longitudinal : expectedMalhaGauges.transversal;
+                                        return (
+                                            <button
+                                                key={pos}
+                                                type="button"
+                                                onClick={() => toggleMalhaPosition(pos)}
+                                                className={`p-3.5 rounded-2xl border-2 text-left transition-all active:scale-95 cursor-pointer flex flex-col gap-1 ${
+                                                    isPosSelected
+                                                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg shadow-amber-500/10'
+                                                        : 'bg-slate-800/80 border-white/10 text-slate-300 hover:border-white/30'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between w-full">
+                                                    <span className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                                                        <span>{pos === 'LONGITUDINAL' ? '↔️' : '↕️'}</span>
+                                                        <span>{pos}</span>
+                                                    </span>
+                                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${
+                                                        isPosSelected ? 'bg-amber-400 text-slate-950' : 'bg-white/10 text-transparent'
+                                                    }`}>
+                                                        ✓
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                                                    <span>Atual: <strong className="text-amber-300 font-mono">{currentActiveLot ? `LOTE ${currentActiveLot}` : 'Não def.'}</strong></span>
+                                                    {expectedGauge && <span className="bg-white/10 px-1.5 py-0.5 rounded font-mono text-[9px] text-cyan-300">{expectedGauge}mm</span>}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Campos de Lote SAI / Lote ENTRA para cada posição selecionada */}
+                            {malhaSelectedPositions.map(pos => {
+                                const isLong = pos === 'LONGITUDINAL';
+                                const lotSai = isLong ? malhaLotSaiLong : malhaLotSaiTrans;
+                                const setLotSai = isLong ? setMalhaLotSaiLong : setMalhaLotSaiTrans;
+                                const lotEntra = isLong ? malhaLotEntraLong : malhaLotEntraTrans;
+                                const setLotEntra = isLong ? setMalhaLotEntraLong : setMalhaLotEntraTrans;
+                                const showAllGauges = isLong ? showAllGaugesLong : showAllGaugesTrans;
+                                const setShowAllGauges = isLong ? setShowAllGaugesLong : setShowAllGaugesTrans;
+                                const expectedGauge = isLong ? expectedMalhaGauges.longitudinal : expectedMalhaGauges.transversal;
+                                const isPickingSai = !!pickingSaiField[pos];
+
+                                const activeSearchValue = isPickingSai ? lotSai : lotEntra;
+                                const filteredStockLots = getFilteredLotsForPosition(pos, activeSearchValue, showAllGauges);
+
+                                return (
+                                    <div key={pos} className="p-3.5 rounded-2xl bg-slate-950/90 border border-amber-500/30 space-y-3 animate-fade-in">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                                                <span>{isLong ? '↔️' : '↕️'}</span>
+                                                <span>FIO {pos}</span>
+                                            </span>
+                                            {expectedGauge && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAllGauges(!showAllGauges)}
+                                                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition cursor-pointer ${
+                                                        showAllGauges
+                                                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                                                            : 'bg-white/5 border-white/15 text-slate-400 hover:text-white'
+                                                    }`}
+                                                >
+                                                    {showAllGauges ? 'Mostrando Todas Bitolas CA-60' : `Filtro Bitola ${expectedGauge}mm (Ver Todas)`}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {/* LOTE QUE SAI */}
+                                            <div
+                                                onClick={() => setPickingSaiField(prev => ({ ...prev, [pos]: true }))}
+                                                className={`p-2.5 rounded-xl border transition cursor-pointer ${
+                                                    isPickingSai
+                                                        ? 'bg-rose-950/40 border-rose-400 ring-1 ring-rose-400/50'
+                                                        : 'bg-slate-900/80 border-white/10 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[9px] font-black uppercase tracking-wider text-rose-300">
+                                                        📤 Lote que SAI (Anterior)
+                                                    </label>
+                                                    {isPickingSai && <span className="text-[8px] font-bold bg-rose-500 text-white px-1.5 py-0.2 rounded">Selecionando abaixo</span>}
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={lotSai}
+                                                    onFocus={() => setPickingSaiField(prev => ({ ...prev, [pos]: true }))}
+                                                    onChange={(e) => setLotSai(e.target.value)}
+                                                    placeholder="Ex: 8451 (ou deixe vazio)"
+                                                    className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-rose-500/40 text-xs font-mono font-black text-rose-200 outline-none focus:border-rose-400"
+                                                />
+                                            </div>
+
+                                            {/* LOTE QUE ENTRA */}
+                                            <div
+                                                onClick={() => setPickingSaiField(prev => ({ ...prev, [pos]: false }))}
+                                                className={`p-2.5 rounded-xl border transition cursor-pointer ${
+                                                    !isPickingSai
+                                                        ? 'bg-emerald-950/40 border-emerald-400 ring-1 ring-emerald-400/50'
+                                                        : 'bg-slate-900/80 border-white/10 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[9px] font-black uppercase tracking-wider text-emerald-300">
+                                                        📥 Lote que ENTRA (Novo) *
+                                                    </label>
+                                                    {!isPickingSai && <span className="text-[8px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded">Selecionando abaixo</span>}
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={lotEntra}
+                                                    onFocus={() => setPickingSaiField(prev => ({ ...prev, [pos]: false }))}
+                                                    onChange={(e) => setLotEntra(e.target.value)}
+                                                    placeholder="Digite ou clique num lote abaixo..."
+                                                    className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-emerald-500/50 text-xs font-mono font-black text-emerald-200 outline-none focus:border-emerald-400"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Lista rápida de Lotes do Estoque para clicar e preencher */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                    Clique em um lote disponível para preencher {isPickingSai ? '📤 LOTE QUE SAI' : '📥 LOTE QUE ENTRA'}:
+                                                </span>
+                                                <span className="text-[9px] font-mono text-slate-500">
+                                                    {filteredStockLots.length} lote(s)
+                                                </span>
+                                            </div>
+                                            {filteredStockLots.length > 0 ? (
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1 bg-black/30 rounded-xl border border-white/5">
+                                                    {filteredStockLots.map(item => {
+                                                        const cleanLot = String(item.internalLot || '').trim();
+                                                        const isSelectedHere = formatCleanLotNumber(activeSearchValue) === cleanLot;
+                                                        const weightKg = Number(item.remainingQuantity ?? item.initialQuantity ?? 0);
+                                                        return (
+                                                            <button
+                                                                key={item.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (isPickingSai) {
+                                                                        setLotSai(cleanLot);
+                                                                        setPickingSaiField(prev => ({ ...prev, [pos]: false }));
+                                                                    } else {
+                                                                        setLotEntra(cleanLot);
+                                                                    }
+                                                                }}
+                                                                className={`p-1.5 rounded-lg border text-left transition active:scale-95 cursor-pointer flex flex-col ${
+                                                                    isSelectedHere
+                                                                        ? isPickingSai
+                                                                            ? 'bg-rose-500/30 border-rose-400 text-white'
+                                                                            : 'bg-emerald-500/30 border-emerald-400 text-white'
+                                                                        : 'bg-slate-900 border-white/10 text-slate-300 hover:border-amber-400/50 hover:bg-slate-800'
+                                                                }`}
+                                                            >
+                                                                <span className="text-[11px] font-black font-mono text-white truncate">
+                                                                    Lote {cleanLot}
+                                                                </span>
+                                                                <span className="text-[9px] font-mono text-slate-400 truncate">
+                                                                    {item.bitola}mm • {weightKg > 0 ? `${weightKg.toFixed(0)}kg` : ''}
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-2.5 px-3 bg-black/20 rounded-xl border border-white/5 text-[10px] text-slate-400">
+                                                    Nenhum lote encontrado no filtro atual. Você pode digitar o número do lote diretamente acima ou clicar em "Ver Todas".
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
                     <div className="flex flex-col gap-4">
                         <button 
                             type="button"
@@ -445,6 +914,330 @@ const DowntimeModal: React.FC<{
                     </div>
                 </div>
             </div>
+        </div>
+    );
+};
+
+const MalhaActiveLotsCard: React.FC<{
+    machineName: string;
+    activeOrder: ProductionOrderData;
+    stock: StockItem[];
+    isStoppedMode?: boolean;
+    onUpdateOpenDowntimeReason?: (newFormattedRollReason: string) => void;
+}> = ({ machineName, activeOrder, stock, isStoppedMode = false, onUpdateOpenDowntimeReason }) => {
+    const [lotsState, setLotsState] = useState<MalhaActiveLotsState>(() => getMalhaActiveLots(machineName, activeOrder));
+    const [editingPos, setEditingPos] = useState<'LONGITUDINAL' | 'TRANSVERSAL' | null>(null);
+    const [editMode, setEditMode] = useState<'SET_CURRENT' | 'SWAP'>('SET_CURRENT');
+    const [lotSaiInput, setLotSaiInput] = useState<string>('');
+    const [lotEntraInput, setLotEntraInput] = useState<string>('');
+    const [showAllGauges, setShowAllGauges] = useState<boolean>(false);
+    const [pickingSai, setPickingSai] = useState<boolean>(false);
+
+    useEffect(() => {
+        setLotsState(getMalhaActiveLots(machineName, activeOrder));
+    }, [machineName, activeOrder?.id, (activeOrder?.summary as any)?.malhaActiveLots?.updatedAt]);
+
+    const expectedGauges = useMemo(() => resolveMalhaExpectedGauges(activeOrder), [activeOrder]);
+
+    const availableLots = useMemo(() => {
+        if (!Array.isArray(stock)) return [];
+        return stock
+            .filter(item => {
+                if (!item || !item.internalLot) return false;
+                const st = (item.status || '').toLowerCase();
+                if (st.includes('consumido') || st.includes('finalizado') || st.includes('sucata')) return false;
+                const mat = (item.materialType || '').toUpperCase();
+                return mat.includes('CA-60') || mat.includes('CA60') || !mat.includes('FIO MÁQUINA');
+            })
+            .sort((a, b) => String(b.internalLot).localeCompare(String(a.internalLot), undefined, { numeric: true }));
+    }, [stock]);
+
+    const handleOpenEdit = (pos: 'LONGITUDINAL' | 'TRANSVERSAL', mode: 'SET_CURRENT' | 'SWAP') => {
+        const currentVal = pos === 'LONGITUDINAL' ? lotsState.longitudinal : lotsState.transversal;
+        setEditingPos(pos);
+        setEditMode(mode);
+        if (mode === 'SET_CURRENT') {
+            setLotEntraInput(currentVal || '');
+            setLotSaiInput('');
+            setPickingSai(false);
+        } else {
+            setLotSaiInput(currentVal || '');
+            setLotEntraInput('');
+            setPickingSai(false);
+        }
+    };
+
+    const handleConfirmEdit = async () => {
+        if (!editingPos) return;
+        const cleanEntra = formatCleanLotNumber(lotEntraInput);
+        if (!cleanEntra) {
+            alert('Por favor, selecione ou digite o número do lote.');
+            return;
+        }
+        const cleanSai = formatCleanLotNumber(lotSaiInput);
+        const nextState: MalhaActiveLotsState = {
+            ...lotsState,
+            longitudinal: editingPos === 'LONGITUDINAL' ? cleanEntra : lotsState.longitudinal,
+            transversal: editingPos === 'TRANSVERSAL' ? cleanEntra : lotsState.transversal,
+            updatedAt: new Date().toISOString(),
+            history: [...(lotsState.history || [])]
+        };
+
+        if (editMode === 'SWAP') {
+            const saiLabel = cleanSai ? `LOTE ${cleanSai}` : 'S/ REGISTRO';
+            const formattedReason = `Troca de Rolo ${editingPos} (SAI: ${saiLabel} / ENTRA: LOTE ${cleanEntra})`;
+            nextState.history = [
+                {
+                    id: `ml-hist-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    position: editingPos,
+                    lotSai: cleanSai || 'S/ REGISTRO',
+                    lotEntra: cleanEntra,
+                    orderNumber: activeOrder.orderNumber
+                },
+                ...(lotsState.history || [])
+            ].slice(0, 50);
+
+            if (onUpdateOpenDowntimeReason) {
+                onUpdateOpenDowntimeReason(formattedReason);
+            }
+        }
+
+        const saved = await saveMalhaActiveLots(machineName, activeOrder, nextState);
+        setLotsState(saved);
+        setEditingPos(null);
+    };
+
+    const filteredLots = useMemo(() => {
+        if (!editingPos) return [];
+        const expectedGauge = editingPos === 'LONGITUDINAL' ? expectedGauges.longitudinal : expectedGauges.transversal;
+        const searchVal = formatCleanLotNumber(pickingSai ? lotSaiInput : lotEntraInput).toLowerCase();
+        return availableLots.filter(item => {
+            const itemGauge = String(item.bitola || '').replace(',', '.').trim();
+            if (!showAllGauges && expectedGauge && itemGauge !== expectedGauge) return false;
+            if (searchVal) {
+                return String(item.internalLot || '').toLowerCase().includes(searchVal);
+            }
+            return true;
+        }).slice(0, 24);
+    }, [editingPos, expectedGauges, showAllGauges, pickingSai, lotSaiInput, lotEntraInput, availableLots]);
+
+    return (
+        <div className={`${isStoppedMode ? 'bg-slate-900 border-2 border-amber-500/50 text-white' : 'bg-white border border-slate-200 text-slate-800'} p-4 md:p-5 rounded-2xl shadow-sm space-y-4 text-left`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/20">
+                <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-amber-500/15 text-amber-500 text-lg">🔄</span>
+                    <div>
+                        <h3 className={`text-sm sm:text-base font-black tracking-tight uppercase ${isStoppedMode ? 'text-amber-300' : 'text-slate-800'}`}>
+                            Lotes em Operação na Malha (Longitudinal & Transversal)
+                        </h3>
+                        <p className={`text-[11px] font-medium ${isStoppedMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Controle de qual lote saiu e qual entrou na máquina (sem alterar status do estoque)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(['LONGITUDINAL', 'TRANSVERSAL'] as const).map(pos => {
+                    const isLong = pos === 'LONGITUDINAL';
+                    const activeLot = isLong ? lotsState.longitudinal : lotsState.transversal;
+                    const gauge = isLong ? expectedGauges.longitudinal : expectedGauges.transversal;
+
+                    return (
+                        <div
+                            key={pos}
+                            className={`p-3.5 rounded-2xl border-2 flex flex-col justify-between gap-3 ${
+                                isStoppedMode
+                                    ? 'bg-slate-950/80 border-white/10'
+                                    : activeLot
+                                        ? 'bg-amber-50/40 border-amber-200'
+                                        : 'bg-slate-50 border-slate-200 border-dashed'
+                            }`}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1 ${isStoppedMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                                        <span>{isLong ? '↔️ FIO LONGITUDINAL' : '↕️ FIO TRANSVERSAL'}</span>
+                                        {gauge && <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[9px] font-mono">({gauge}mm)</span>}
+                                    </span>
+                                    <div className="mt-1">
+                                        {activeLot ? (
+                                            <span className={`text-xl font-black font-mono ${isStoppedMode ? 'text-white' : 'text-slate-900'}`}>
+                                                LOTE {activeLot}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs font-bold text-slate-400 italic">
+                                                Nenhum lote definido
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                    activeLot
+                                        ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
+                                        : 'bg-slate-500/20 text-slate-400'
+                                }`}>
+                                    {activeLot ? 'Em Máquina' : 'Aguardando'}
+                                </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenEdit(pos, 'SWAP')}
+                                    className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                                >
+                                    <span>🔄</span>
+                                    <span>Trocar Lote (Sai / Entra)</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenEdit(pos, 'SET_CURRENT')}
+                                    className={`py-2 px-2.5 rounded-xl font-bold text-[10px] uppercase transition active:scale-95 cursor-pointer border ${
+                                        isStoppedMode
+                                            ? 'bg-slate-800 border-white/15 text-slate-300 hover:bg-slate-700'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                    title="Definir ou corrigir o lote atual sem registrar troca"
+                                >
+                                    ✏️ Definir Atual
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Painel de Edição / Seleção de Lote */}
+            {editingPos && (
+                <div className="p-4 rounded-2xl bg-slate-900 text-white border-2 border-amber-400 space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                            {editMode === 'SWAP'
+                                ? `🔄 Registrar Troca de Rolo • FIO ${editingPos}`
+                                : `✏️ Definir Lote Atual em Máquina • FIO ${editingPos}`}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setEditingPos(null)}
+                            className="text-xs font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded"
+                        >
+                            ✕ Fechar
+                        </button>
+                    </div>
+
+                    {editMode === 'SWAP' ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div
+                                onClick={() => setPickingSai(true)}
+                                className={`p-2.5 rounded-xl border cursor-pointer ${
+                                    pickingSai ? 'bg-rose-950/50 border-rose-400' : 'bg-slate-950 border-white/10'
+                                }`}
+                            >
+                                <label className="text-[9px] font-black uppercase text-rose-300 block mb-1">
+                                    📤 Lote que SAIU (Anterior)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={lotSaiInput}
+                                    onFocus={() => setPickingSai(true)}
+                                    onChange={e => setLotSaiInput(e.target.value)}
+                                    placeholder="Ex: 8451"
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-rose-500/40 text-xs font-mono font-black text-rose-200 outline-none"
+                                />
+                            </div>
+                            <div
+                                onClick={() => setPickingSai(false)}
+                                className={`p-2.5 rounded-xl border cursor-pointer ${
+                                    !pickingSai ? 'bg-emerald-950/50 border-emerald-400' : 'bg-slate-950 border-white/10'
+                                }`}
+                            >
+                                <label className="text-[9px] font-black uppercase text-emerald-300 block mb-1">
+                                    📥 Lote que ENTROU (Novo) *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={lotEntraInput}
+                                    onFocus={() => setPickingSai(false)}
+                                    onChange={e => setLotEntraInput(e.target.value)}
+                                    placeholder="Digite ou clique num lote abaixo..."
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-emerald-500/50 text-xs font-mono font-black text-emerald-200 outline-none"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-emerald-300 block mb-1">
+                                📥 Lote atualmente em operação no Fio {editingPos}:
+                            </label>
+                            <input
+                                type="text"
+                                value={lotEntraInput}
+                                onChange={e => setLotEntraInput(e.target.value)}
+                                placeholder="Digite ou selecione abaixo o número do lote..."
+                                className="w-full px-3 py-2 rounded-xl bg-black/60 border border-emerald-500/50 text-sm font-mono font-black text-emerald-200 outline-none"
+                            />
+                        </div>
+                    )}
+
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">
+                                Lotes CA-60 no estoque (clique para selecionar):
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowAllGauges(!showAllGauges)}
+                                className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-white/10 text-cyan-300 hover:bg-white/20 cursor-pointer"
+                            >
+                                {showAllGauges ? 'Mostrando Todas Bitolas' : 'Ver Todas Bitolas CA-60'}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1 bg-black/40 rounded-xl">
+                            {filteredLots.map(item => {
+                                const cleanLot = String(item.internalLot || '').trim();
+                                const weightKg = Number(item.remainingQuantity ?? item.initialQuantity ?? 0);
+                                return (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => {
+                                            if (editMode === 'SWAP' && pickingSai) {
+                                                setLotSaiInput(cleanLot);
+                                                setPickingSai(false);
+                                            } else {
+                                                setLotEntraInput(cleanLot);
+                                            }
+                                        }}
+                                        className="p-1.5 rounded-lg border border-white/10 bg-slate-950 hover:border-amber-400 text-left transition active:scale-95 cursor-pointer flex flex-col"
+                                    >
+                                        <span className="text-[11px] font-black font-mono text-white truncate">Lote {cleanLot}</span>
+                                        <span className="text-[9px] font-mono text-slate-400 truncate">{item.bitola}mm • {weightKg > 0 ? `${weightKg.toFixed(0)}kg` : ''}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => setEditingPos(null)}
+                            className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirmEdit}
+                            className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
+                        >
+                            ✓ Confirmar Lote
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -2902,8 +3695,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
                     // PARADA OPERACIONAL PADRÃO (OUTROS MOTIVOS: ENROSCO, MANUTENÇÃO, ETC.)
                     return (
-                        <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
-                            <div className="text-center p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-sm mx-auto animate-zoom-in border border-white/20">
+                        <div className={`fixed inset-0 flex items-center justify-center z-[100] p-4 overflow-y-auto transition-all duration-500 ${isOverLimit ? 'bg-rose-600/90 animate-stop-pulse' : 'bg-amber-500/90 animate-warning-pulse'} backdrop-blur-xl`}>
+                            <div className={`text-center p-6 sm:p-8 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] w-full ${activeMachine.startsWith('Malha') ? 'max-w-xl' : 'max-w-sm'} mx-auto my-auto animate-zoom-in border border-white/20`}>
                                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transition-colors ${isOverLimit ? 'bg-rose-100 border-2 border-rose-500' : 'bg-amber-100 border-2 border-amber-500 animate-warning-pulse'}`}>
                                     <PauseIcon className={`h-10 w-10 ${isOverLimit ? 'text-rose-600' : 'text-amber-600'}`} />
                                 </div>
@@ -2937,6 +3730,34 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
                                     )}
                                 </div>
+
+                                {activeMachine.startsWith('Malha') && activeOrder && (
+                                    <div className="mb-6">
+                                        <MalhaActiveLotsCard
+                                            machineName={activeMachine}
+                                            activeOrder={activeOrder}
+                                            stock={stock}
+                                            isStoppedMode={true}
+                                            onUpdateOpenDowntimeReason={async (newFormattedRollReason) => {
+                                                try {
+                                                    const currentEvents = [...(activeOrder.downtimeEvents || [])];
+                                                    const openIdx = currentEvents.findIndex(e => !e.resumeTime && !(e as any).resume_time);
+                                                    if (openIdx !== -1) {
+                                                        currentEvents[openIdx] = {
+                                                            ...currentEvents[openIdx],
+                                                            reason: newFormattedRollReason
+                                                        };
+                                                        await updateItem('production_orders', activeOrder.id, {
+                                                            downtimeEvents: currentEvents
+                                                        } as any);
+                                                    }
+                                                } catch (err) {
+                                                    console.warn('Erro ao atualizar motivo de troca de rolo da Malha:', err);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                )}
 
                                 {activeMachine.startsWith('Treliça') && (
                                     <div className="flex flex-col gap-2 mb-4">
@@ -3175,6 +3996,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     downtimeEvents={activeOrder?.downtimeEvents || []}
                     downtimeConfigs={downtimeConfigs}
                     machineType={activeMachine}
+                    stock={stock}
+                    activeOrder={activeOrder}
                 />
             )}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
@@ -5059,6 +5882,14 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </>
                                     ) : (
                                         <>
+                                            {activeMachine.startsWith('Malha') && activeOrder && (
+                                                <MalhaActiveLotsCard
+                                                    machineName={activeMachine}
+                                                    activeOrder={activeOrder}
+                                                    stock={stock}
+                                                />
+                                            )}
+
                                             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-slate-100 gap-2">
                                                     <div className="flex items-center gap-3 flex-wrap">
