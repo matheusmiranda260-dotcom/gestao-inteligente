@@ -23,7 +23,7 @@ export interface MalhaPackageRow {
     packageCode: string; // p1, p2, p3...
     finishedLotNumber: string; // Ex: 88846, 88849...
     quantity: number; // Padrão: 50 malhas
-    measuredPackageWeight?: number | null;
+    measuredPackageWeight?: number | null; // Peso real do pacote na balança (kg)
     longLot: string; // Ex: 7594
     longLotWeight: number; // Ex: 2075
     transLot: string; // Ex: 7804
@@ -55,7 +55,6 @@ export const inferDefaultMalhaTechConfig = (op?: ProductionOrderData | null): Ma
     const desc = String(op?.malhaModel || (op as any)?.malha_model || op?.productDescription || '').toUpperCase();
     const rawBitola = String(op?.targetBitola || (op as any)?.target_bitola || '').replace(/mm/gi, '').replace(',', '.').trim();
 
-    // 1. Tentar extrair a bitola diretamente da descrição da malha (ex: "5,00MM", "4,20MM", "3,40MM", "5MM")
     let bitolaFromDesc = 0;
     const mmMatch = desc.match(/(\d+(?:[.,]\d+)?)\s*MM/i);
     if (mmMatch && mmMatch[1]) {
@@ -72,7 +71,6 @@ export const inferDefaultMalhaTechConfig = (op?: ProductionOrderData | null): Ma
     }
 
     let parsedTarget = parseFloat(rawBitola);
-    // Nota: Em algumas OPs de Malha, targetBitola veio salvo como "6" (6 metros de comprimento do painel) em vez da bitola do fio (5.00mm)
     if (parsedTarget === 6 && bitolaFromDesc > 0 && bitolaFromDesc !== 6) {
         parsedTarget = bitolaFromDesc;
     }
@@ -164,7 +162,6 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null, stock
             });
         }
 
-        // Auto-preencher peso do estoque se estiver zerado e existir no estoque
         lQueue.forEach(item => {
             if (!item.weight && item.lot) {
                 const found = stockWeightMap.get(cleanLotCode(item.lot).toLowerCase());
@@ -184,7 +181,6 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null, stock
     if (source) {
         const rawTech = source.techConfig || source.tech_config || {};
         let savedBitola = Number(rawTech.bitola ?? defaultTech.bitola) || defaultTech.bitola;
-        // Corrigir caso tenha ficado salvo bitola = 6 por engano numa malha 5,00mm
         if (savedBitola === 6 && defaultTech.bitola !== 6) {
             savedBitola = defaultTech.bitola;
         }
@@ -201,13 +197,13 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null, stock
         const rawPackages: any[] = Array.isArray(source.packages) ? source.packages : [];
         const isV2 = Number(source.version || 0) >= 2;
 
-        // Se era versão 1 (que gerou 38 linhas em branco automaticamente), filtrar apenas pacotes reais/confirmados
         const validPackages = isV2
             ? rawPackages
             : rawPackages.filter((p: any) =>
                   Boolean(
                       p.confirmed ||
                       p.finishedLotNumber ||
+                      Number(p.measuredPackageWeight) > 0 ||
                       Number(p.longLotWeight) > 0 ||
                       Number(p.transLotWeight) > 0
                   )
@@ -228,7 +224,6 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null, stock
             operator: p.operator
         }));
 
-        // Reconstruir filas de lotes (Ativo + Reserva)
         let rawLongQ: MalhaLotSupplyItem[] = Array.isArray(source.longLotsQueue)
             ? source.longLotsQueue.map((item: any, i: number) => ({
                   id: item.id || `lq-${i}`,
@@ -247,7 +242,6 @@ export const getSavedMalhaPackagesData = (op?: ProductionOrderData | null, stock
               })).filter((x: MalhaLotSupplyItem) => Boolean(x.lot))
             : [];
 
-        // Também incorporar eventuais lotes informados direto nas linhas dos pacotes
         packages.forEach((p, idx) => {
             if (p.longLot && !rawLongQ.some(q => q.lot === p.longLot)) {
                 rawLongQ.push({ id: `lq-pkg-${idx}`, lot: p.longLot, weight: p.longLotWeight || 0 });
@@ -314,8 +308,12 @@ export const saveMalhaPackagesData = async (op: ProductionOrderData, data: Malha
     return payload;
 };
 
-export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig) => {
-    const massaLinear = (techConfig.bitola ** 2) * 0.006162;
+// Constante física oficial do aço CA-60 da planilha: Massa Linear (kg/m) = Bitola(mm)^2 * 0.006162
+export const STEEL_LINEAR_MASS_CONSTANT = 0.006162;
+
+export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig, overrideBitola?: number) => {
+    const effectiveBitola = (overrideBitola && overrideBitola > 0) ? overrideBitola : techConfig.bitola;
+    const massaLinear = (effectiveBitola ** 2) * STEEL_LINEAR_MASS_CONSTANT;
     const longLinear = techConfig.longQnt * techConfig.longTam; // Ex: 25 * 6 = 150 m
     const transLinear = techConfig.transQnt * techConfig.transTam; // Ex: 60 * 2.45 = 147 m
     const totalLinear = longLinear + transLinear; // Ex: 297 m
@@ -325,6 +323,7 @@ export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig) => {
     const totalPesoUnit = longPesoUnit + transPesoUnit;
 
     return {
+        effectiveBitola,
         massaLinear,
         longLinear,
         transLinear,
@@ -335,7 +334,64 @@ export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig) => {
     };
 };
 
+/**
+ * Dado o Peso Real do Pacote (ex: 2.197 kg) e a Quantidade de Malhas no pacote (ex: 50 malhas),
+ * calcula:
+ * 1) A Massa Linear Real (kg/m) = PesoPacote / (QtdMalhas * MetrosLinearesPorMalha)
+ * 2) A Bitola Exata que deu no fio (mm) = sqrt(MassaLinearReal / 0.006162)
+ * 3) O Peso Longitudinal do pacote (kg) = PesoPacote * (LongLinear / TotalLinear)
+ * 4) O Peso Transversal do pacote (kg) = PesoPacote * (TransLinear / TotalLinear)
+ */
+export const calculateFromPackageWeight = (
+    packageWeightKg: number,
+    quantity: number,
+    techConfig: MalhaTechnicalConfig
+) => {
+    const basePhysics = calculateMalhaPhysics(techConfig);
+    const qty = Math.max(1, Number(quantity) || 50);
+    const hasRealWeight = Number(packageWeightKg) > 0;
+
+    if (hasRealWeight && basePhysics.totalLinear > 0) {
+        const wPkg = Number(packageWeightKg);
+        const unitMeshWeight = wPkg / qty; // Peso de 1 painel de malha
+        const realMassaLinear = unitMeshWeight / basePhysics.totalLinear; // kg/m
+        const realBitola = Math.sqrt(realMassaLinear / STEEL_LINEAR_MASS_CONSTANT); // mm
+        const longKgCons = wPkg * (basePhysics.longLinear / basePhysics.totalLinear);
+        const transKgCons = wPkg * (basePhysics.transLinear / basePhysics.totalLinear);
+
+        return {
+            hasRealWeight: true,
+            packageWeightKg: wPkg,
+            calculatedBitola: realBitola,
+            calculatedMassaLinear: realMassaLinear,
+            longKgCons,
+            transKgCons,
+            unitLongWeight: longKgCons / qty,
+            unitTransWeight: transKgCons / qty,
+            unitTotalWeight: unitMeshWeight
+        };
+    }
+
+    const longKgCons = qty * basePhysics.longPesoUnit;
+    const transKgCons = qty * basePhysics.transPesoUnit;
+    return {
+        hasRealWeight: false,
+        packageWeightKg: longKgCons + transKgCons,
+        calculatedBitola: techConfig.bitola,
+        calculatedMassaLinear: basePhysics.massaLinear,
+        longKgCons,
+        transKgCons,
+        unitLongWeight: basePhysics.longPesoUnit,
+        unitTransWeight: basePhysics.transPesoUnit,
+        unitTotalWeight: basePhysics.totalPesoUnit
+    };
+};
+
 export interface ComputedPackageRow extends MalhaPackageRow {
+    packageWeightKg: number;
+    hasRealWeight: boolean;
+    calculatedBitola: number;
+    calculatedMassaLinear: number;
     longKgCons: number;
     longPesoInicial: number; // Saldo restante após este pacote
     longSplits: MalhaPackageLotSplit[];
@@ -368,6 +424,8 @@ export const computeMalhaPackagesAndLots = (
     reserveLongLot: ConsumedLotSummaryRow | null;
     activeTransLot: ConsumedLotSummaryRow | null;
     reserveTransLot: ConsumedLotSummaryRow | null;
+    effectiveBitola: number;
+    effectiveMassaLinear: number;
     totalQuantity: number;
     totalLongCons: number;
     totalTransCons: number;
@@ -376,9 +434,11 @@ export const computeMalhaPackagesAndLots = (
     totalLotConsKg: number;
     totalLotSobraKg: number;
 } => {
-    const physics = calculateMalhaPhysics(techConfig);
+    // 1. Pré-calcular a conversão física de cada pacote (pelo Peso Real do Pacote na balança ou pelo teórico)
+    const pkgConversions = packages.map(pkg =>
+        calculateFromPackageWeight(Number(pkg.measuredPackageWeight) || 0, Number(pkg.quantity) || 50, techConfig)
+    );
 
-    // Mesclar fila de lotes abastecidos com eventuais lotes digitados na planilha
     const buildEffectiveQueue = (queue: MalhaLotSupplyItem[], dir: 'LONG' | 'TRANS'): MalhaLotSupplyItem[] => {
         const list: MalhaLotSupplyItem[] = queue.map(q => ({
             ...q,
@@ -404,8 +464,8 @@ export const computeMalhaPackagesAndLots = (
     const effLongQueue = buildEffectiveQueue(longLotsQueue, 'LONG');
     const effTransQueue = buildEffectiveQueue(transLotsQueue, 'TRANS');
 
-    // Simular consumo pacote a pacote em cascata FIFO (suportando 2 lotes num mesmo pacote: Ativo + Reserva!)
-    const simulateDirection = (queue: MalhaLotSupplyItem[], unitWeightKg: number, dir: 'LONG' | 'TRANS') => {
+    // 2. Simular abatimento em cascata FIFO (suportando 2 lotes num mesmo pacote: Ativo + Reserva)
+    const simulateDirection = (queue: MalhaLotSupplyItem[], dir: 'LONG' | 'TRANS') => {
         const lotTrackers = queue.map(q => ({
             id: q.id,
             lot: q.lot,
@@ -416,9 +476,9 @@ export const computeMalhaPackagesAndLots = (
 
         let currentIdx = 0;
 
-        const packageResults = packages.map((pkg) => {
-            const qty = Number(pkg.quantity) || 0;
-            const totalNeed = qty * unitWeightKg;
+        const packageResults = packages.map((_, pkgIdx) => {
+            const conv = pkgConversions[pkgIdx];
+            const totalNeed = dir === 'LONG' ? conv.longKgCons : conv.transKgCons;
             let needed = totalNeed;
             const splits: MalhaPackageLotSplit[] = [];
 
@@ -439,11 +499,10 @@ export const computeMalhaPackagesAndLots = (
                 const tracker = lotTrackers[currentIdx];
                 const hasNextLotWithWeight =
                     currentIdx + 1 < lotTrackers.length &&
-                    (lotTrackers[currentIdx + 1].kgEntra > 0 || lotTrackers.length > currentIdx + 1);
+                    lotTrackers[currentIdx + 1].kgEntra > 0;
 
                 if (tracker.remaining > 0.0001) {
                     if (tracker.remaining >= needed - 0.0001) {
-                        // O lote ativo cobre 100% do pacote (ou o que faltava dele)
                         tracker.cons += needed;
                         tracker.remaining -= needed;
                         const isExhausted = tracker.remaining <= 0.05;
@@ -458,8 +517,8 @@ export const computeMalhaPackagesAndLots = (
                         if (isExhausted && currentIdx + 1 < lotTrackers.length) {
                             currentIdx++;
                         }
-                    } else if (hasNextLotWithWeight && lotTrackers[currentIdx + 1].kgEntra > 0) {
-                        // O pacote consome o finalzinho do Lote Ativo e puxa a diferença automaticamente do Lote Reserva!
+                    } else if (hasNextLotWithWeight) {
+                        // O pacote consome o saldo final do Lote Ativo e puxa a diferença automaticamente do Lote Reserva!
                         const usedFromCurrent = tracker.remaining;
                         tracker.cons += usedFromCurrent;
                         tracker.remaining = 0;
@@ -473,7 +532,6 @@ export const computeMalhaPackagesAndLots = (
                         needed -= usedFromCurrent;
                         currentIdx++;
                     } else {
-                        // Não há Lote Reserva com peso cadastrado ainda: desconta do lote atual deixando saldo negativo para alertar
                         tracker.cons += needed;
                         tracker.remaining -= needed;
                         splits.push({
@@ -486,7 +544,6 @@ export const computeMalhaPackagesAndLots = (
                         needed = 0;
                     }
                 } else {
-                    // O lote atual está com saldo <= 0 (ex: peso ainda não informado ou já esgotado)
                     if (currentIdx + 1 < lotTrackers.length && lotTrackers[currentIdx + 1].remaining > 0) {
                         currentIdx++;
                         continue;
@@ -516,7 +573,6 @@ export const computeMalhaPackagesAndLots = (
             };
         });
 
-        // Determinar quem é CONSUMED, quem é ACTIVE (1º não esgotado) e quem é RESERVE (próximos)
         let foundActive = false;
         const statusList: ConsumedLotSummaryRow[] = lotTrackers.map((t, idx) => {
             const isExhausted = t.kgEntra > 0 && t.remaining <= 0.05 && idx < lotTrackers.length - 1;
@@ -544,14 +600,14 @@ export const computeMalhaPackagesAndLots = (
         return { packageResults, statusList };
     };
 
-    const longSim = simulateDirection(effLongQueue, physics.longPesoUnit, 'LONG');
-    const transSim = simulateDirection(effTransQueue, physics.transPesoUnit, 'TRANS');
+    const longSim = simulateDirection(effLongQueue, 'LONG');
+    const transSim = simulateDirection(effTransQueue, 'TRANS');
 
-    // Rastrear quais lotes já apareceram em linhas anteriores na visão de planilha para exibir o peso do lote na linha onde ele entrou
     const seenLongLots = new Set<string>();
     const seenTransLots = new Set<string>();
 
     const computedRows: ComputedPackageRow[] = packages.map((pkg, idx) => {
+        const conv = pkgConversions[idx];
         const lRes = longSim.packageResults[idx];
         const tRes = transSim.packageResults[idx];
 
@@ -563,6 +619,10 @@ export const computeMalhaPackagesAndLots = (
 
         return {
             ...pkg,
+            packageWeightKg: conv.packageWeightKg,
+            hasRealWeight: conv.hasRealWeight,
+            calculatedBitola: conv.calculatedBitola,
+            calculatedMassaLinear: conv.calculatedMassaLinear,
             longLot: newLongSplit ? newLongSplit.lot : (lRes.splits[0]?.lot || pkg.longLot || ''),
             longLotWeight: newLongSplit ? newLongSplit.lotInitialKg : (pkg.longLotWeight || 0),
             longKgCons: lRes.kgCons,
@@ -580,6 +640,21 @@ export const computeMalhaPackagesAndLots = (
     const totalLongCons = computedRows.reduce((acc, r) => acc + r.longKgCons, 0);
     const totalTransCons = computedRows.reduce((acc, r) => acc + r.transKgCons, 0);
     const totalWeightKg = totalLongCons + totalTransCons;
+
+    // Bitola efetiva ponderada pelos pacotes pesados (ou bitola padrão se ainda não houver pacote pesado)
+    const basePhysics = calculateMalhaPhysics(techConfig);
+    const weighedRows = computedRows.filter(r => r.hasRealWeight);
+    let effectiveBitola = techConfig.bitola;
+    let effectiveMassaLinear = basePhysics.massaLinear;
+
+    if (weighedRows.length > 0 && basePhysics.totalLinear > 0) {
+        const sumWeighedKg = weighedRows.reduce((acc, r) => acc + r.packageWeightKg, 0);
+        const sumWeighedQty = weighedRows.reduce((acc, r) => acc + (Number(r.quantity) || 50), 0);
+        if (sumWeighedQty > 0) {
+            effectiveMassaLinear = (sumWeighedKg / sumWeighedQty) / basePhysics.totalLinear;
+            effectiveBitola = Math.sqrt(effectiveMassaLinear / STEEL_LINEAR_MASS_CONSTANT);
+        }
+    }
 
     const consumedLots = [...longSim.statusList, ...transSim.statusList];
     const totalLotEntraKg = consumedLots.reduce((acc, l) => acc + l.kgEntra, 0);
@@ -600,6 +675,8 @@ export const computeMalhaPackagesAndLots = (
         reserveLongLot,
         activeTransLot,
         reserveTransLot,
+        effectiveBitola,
+        effectiveMassaLinear,
         totalQuantity,
         totalLongCons,
         totalTransCons,
@@ -688,7 +765,6 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
             return updated;
         });
 
-        // Se o gestor alterou o peso de um lote na linha da planilha, atualizar também na fila longLotsQueue / transLotsQueue
         const targetPkg = nextPackages.find(p => p.id === id);
         let nextLongQ = [...(reportData.longLotsQueue || [])];
         let nextTransQ = [...(reportData.transLotsQueue || [])];
@@ -755,10 +831,13 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
         });
     };
 
-    const physics = useMemo(() => calculateMalhaPhysics(reportData.techConfig), [reportData.techConfig]);
     const computed = useMemo(
         () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
         [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
+    );
+    const physics = useMemo(
+        () => calculateMalhaPhysics(reportData.techConfig, computed.effectiveBitola),
+        [reportData.techConfig, computed.effectiveBitola]
     );
 
     const dailyUpdates = useMemo(() => {
@@ -821,7 +900,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                 Relatório de Consumo por Lote & Pacotes (50 Malhas) • OP #{op.orderNumber}
                             </h2>
                             <p className="text-[11px] text-slate-400">
-                                Conversão automática Longitudinal + Transversal com suporte a Lote Ativo + Lote Reserva
+                                Pelo peso do pacote, o sistema calcula a bitola exata do fio e divide o peso Longitudinal e Transversal automaticamente
                             </p>
                         </div>
                     </div>
@@ -872,14 +951,8 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                     <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center border border-[#1F3864]">
                                         BITOLA (mm)
                                     </td>
-                                    <td className="px-2 py-1 text-center border border-slate-400 bg-amber-50/60 w-28">
-                                        <input
-                                            type="number"
-                                            step="0.05"
-                                            value={reportData.techConfig.bitola}
-                                            onChange={e => updateTechField('bitola', parseFloat(e.target.value) || 0)}
-                                            className="w-full text-center font-black text-slate-900 bg-transparent outline-none focus:bg-amber-100 rounded px-1"
-                                        />
+                                    <td className="px-2 py-1.5 text-center border border-slate-400 bg-emerald-50/70 w-32 font-mono font-black text-emerald-900">
+                                        {computed.effectiveBitola.toFixed(2).replace('.', ',')} mm
                                     </td>
                                     <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center w-28 border border-[#1F3864]">
                                         MASSA (kg/m)
@@ -1034,28 +1107,30 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                         <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                             <thead>
                                 <tr>
-                                    <th colSpan={12} className="bg-[#1F3864] text-white font-black uppercase py-2 px-3 text-center tracking-wider border border-[#1F3864]">
-                                        CONSUMÍVEIS POR LOTE (PACOTES DE 50 MALHAS)
+                                    <th colSpan={14} className="bg-[#1F3864] text-white font-black uppercase py-2 px-3 text-center tracking-wider border border-[#1F3864]">
+                                        CONSUMÍVEIS POR LOTE (PACOTES DE 50 MALHAS • CONVERSÃO AUTOMÁTICA PELO PESO DO PACOTE)
                                     </th>
                                 </tr>
                                 <tr className="bg-[#2F5597] text-white font-black uppercase text-[11px]">
-                                    <th colSpan={3} className="py-1 px-2 border border-slate-400 text-center">IDENTIFICAÇÃO DO PACOTE</th>
+                                    <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center">PACOTE DE 50 MALHAS & BITOLA REAL</th>
                                     <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center bg-[#1F4E79]">LONGITUDINAL</th>
                                     <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center bg-[#2E75B6]">TRANSVERSAL</th>
                                     <th className="py-1 px-1 border border-slate-400 text-center print:hidden w-8"></th>
                                 </tr>
                                 <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[10px]">
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24">LOTE (Etiqueta)</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-16">PACOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-16">QUNT.</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-28 bg-yellow-200/80">LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">PESO LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-28">PESO INICIAL (Saldo)</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-28">KG CONS.</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-28 bg-yellow-200/80">LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">PESO LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-28">PESO INICIAL (Saldo)</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-28">KG CONS.</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20">LOTE (Etiq.)</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-12">PCT</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-14">QUNT.</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-emerald-200/80">PESO PCT (kg)</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20 bg-emerald-100">BITOLA CALC.</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">LOTE</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20 bg-yellow-200/80">PESO LOTE</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">PESO INICIAL</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">KG CONS.</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">LOTE</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20 bg-yellow-200/80">PESO LOTE</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">PESO INICIAL</th>
+                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">KG CONS.</th>
                                     <th className="py-1.5 px-1 border border-slate-400 text-center print:hidden"></th>
                                 </tr>
                             </thead>
@@ -1087,6 +1162,21 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                         className="w-full text-center font-black text-slate-900 bg-transparent outline-none focus:bg-amber-100 rounded py-0.5"
                                                     />
                                                 </td>
+                                                {/* Peso do Pacote (Balança) */}
+                                                <td className="p-1 border border-slate-400 text-center bg-emerald-100/70">
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={row.measuredPackageWeight ?? ''}
+                                                        onChange={e => updatePackageRow(row.id, 'measuredPackageWeight', parseFloat(e.target.value) || null)}
+                                                        placeholder={row.packageWeightKg.toFixed(0)}
+                                                        className="w-full text-center font-black text-emerald-950 bg-transparent outline-none py-0.5"
+                                                    />
+                                                </td>
+                                                {/* Bitola Calculada Exata do Fio */}
+                                                <td className="p-1 border border-slate-400 text-center font-mono font-black text-emerald-800 bg-emerald-50/50">
+                                                    {row.calculatedBitola.toFixed(2).replace('.', ',')} mm
+                                                </td>
 
                                                 {/* LONGITUDINAL */}
                                                 <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
@@ -1116,10 +1206,10 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                 <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
                                                     row.longPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
                                                 }`}>
-                                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
-                                                    {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                    {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
 
                                                 {/* TRANSVERSAL */}
@@ -1150,10 +1240,10 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                 <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
                                                     row.transPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
                                                 }`}>
-                                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
-                                                    {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                                    {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
 
                                                 <td className="p-1 border border-slate-400 text-center print:hidden">
@@ -1171,8 +1261,8 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={12} className="py-6 text-center text-slate-400 italic">
-                                            Nenhum pacote confirmado ainda. Clique em "+ Pacote (50 pçs)" ou confirme os pacotes no app do operador.
+                                        <td colSpan={14} className="py-6 text-center text-slate-400 italic">
+                                            Nenhum pacote confirmado ainda. Confirme os pacotes com o peso no app do operador.
                                         </td>
                                     </tr>
                                 )}
@@ -1183,17 +1273,23 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                     <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
                                         {computed.totalQuantity}
                                     </td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
-                                        {computed.totalLongCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                        {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                                    </td>
+                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                        Ø {computed.effectiveBitola.toFixed(2).replace('.', ',')}
                                     </td>
                                     <td className="py-1.5 px-2 border border-slate-400"></td>
                                     <td className="py-1.5 px-2 border border-slate-400"></td>
                                     <td className="py-1.5 px-2 border border-slate-400"></td>
                                     <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
-                                        {computed.totalTransCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                        {computed.totalLongCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-1.5 px-2 border border-slate-400"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                        {computed.totalTransCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="py-1.5 px-1 border border-slate-400 print:hidden"></td>
                                 </tr>
@@ -1322,9 +1418,9 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
 };
 
 // ============================================================================
-// PAINEL DO OPERADOR NO APP (SIMPLES, INTUITIVO, SEM CARA DE PLANILHA!)
-// 1. Lote Ativo + Lote Reserva (Longitudinal & Transversal) com Peso e Barra de Saldo
-// 2. Fechamento de Pacote de 50 Malhas com 1 Toque (Desconto Automático em 1 ou 2 Lotes)
+// PAINEL DO OPERADOR NO APP:
+// 1. Lote Ativo + Lote Reserva (Longitudinal & Transversal) com Peso e Saldo
+// 2. Apontamento do Pacote (50 peças + Peso do Pacote) -> Calcula Bitola do Fio + Divide Peso Longitudinal e Transversal Automaticamente!
 // ============================================================================
 export const MalhaPackagesOperatorPanel: React.FC<{
     op: ProductionOrderData;
@@ -1336,8 +1432,9 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     const [showFullModal, setShowFullModal] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
-    // Estado para Fechar Novo Pacote de 50 Malhas
+    // Estado para Fechar Novo Pacote de 50 Malhas + Peso do Pacote
     const [newPkgQty, setNewPkgQty] = useState<number>(50);
+    const [newPkgWeight, setNewPkgWeight] = useState<string>('');
     const [newPkgTag, setNewPkgTag] = useState<string>('');
 
     // Estado para modal/painel rápido de seleção de lote (Ativo ou Reserva)
@@ -1390,17 +1487,21 @@ export const MalhaPackagesOperatorPanel: React.FC<{
             .slice(0, 20);
     }, [stock, reportData.techConfig.bitola, showAllStockGauges, pickerLotInput]);
 
-    const physics = useMemo(() => calculateMalhaPhysics(reportData.techConfig), [reportData.techConfig]);
     const computed = useMemo(
         () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
         [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
+    );
+
+    // Simulação em tempo real do pacote que o operador está preenchendo agora (50 peças + Peso do Pacote)
+    const livePreview = useMemo(
+        () => calculateFromPackageWeight(parseFloat(newPkgWeight.replace(',', '.')) || 0, Number(newPkgQty) || 50, reportData.techConfig),
+        [newPkgWeight, newPkgQty, reportData.techConfig]
     );
 
     const persistDataAndSyncActiveLots = async (nextData: MalhaPackagesReportData) => {
         setReportData(nextData);
         setSaveStatus('saving');
 
-        // Calcular quem ficou como Lote Ativo em cada direção para manter malhaActiveLots 100% sincronizado
         const sim = computeMalhaPackagesAndLots(nextData.packages, nextData.techConfig, nextData.longLotsQueue, nextData.transLotsQueue);
         const currentActiveLong = sim.activeLongLot?.lot || nextData.longLotsQueue[nextData.longLotsQueue.length - 1]?.lot || '';
         const currentActiveTrans = sim.activeTransLot?.lot || nextData.transLotsQueue[nextData.transLotsQueue.length - 1]?.lot || '';
@@ -1443,7 +1544,6 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         setSaveStatus('saved');
     };
 
-    // Atualizar apenas o peso de um lote já na fila (Ativo ou Reserva) direto no input numérico
     const handleUpdateLotWeightInQueue = (dir: 'LONGITUDINAL' | 'TRANSVERSAL', lotId: string, newWeight: number) => {
         if (dir === 'LONGITUDINAL') {
             const nextQ = reportData.longLotsQueue.map(item => item.id === lotId ? { ...item, weight: newWeight } : item);
@@ -1454,7 +1554,6 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         }
     };
 
-    // Abrir seletor para definir/trocar Lote Ativo ou Lote Reserva
     const openLotPicker = (dir: 'LONGITUDINAL' | 'TRANSVERSAL', slot: 'ACTIVE' | 'RESERVE') => {
         const currentLotObj = dir === 'LONGITUDINAL'
             ? (slot === 'ACTIVE' ? computed.activeLongLot : computed.reserveLongLot)
@@ -1490,7 +1589,6 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                 queue.push({ id: `q-${Date.now()}`, lot: cleanLot, weight: weightVal, addedAt: new Date().toISOString() });
             }
         } else {
-            // Slot RESERVE
             if (currentReserve) {
                 const idx = queue.findIndex(q => q.id === currentReserve.id);
                 if (idx >= 0) {
@@ -1513,15 +1611,15 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         setPickerTarget(null);
     };
 
-    // Confirmar fechamento de 1 pacote de 50 malhas com 1 clique (sem precisar digitar os lotes novamente!)
     const handleConfirmNewPackage = () => {
         const nextNum = reportData.packages.length + 1;
+        const parsedWeight = parseFloat(newPkgWeight.replace(',', '.'));
         const newPkg: MalhaPackageRow = {
             id: `mpkg-${Date.now()}`,
             packageCode: `p${nextNum}`,
             finishedLotNumber: newPkgTag.trim(),
             quantity: Number(newPkgQty) || 50,
-            measuredPackageWeight: null,
+            measuredPackageWeight: !isNaN(parsedWeight) && parsedWeight > 0 ? parsedWeight : null,
             longLot: '',
             longLotWeight: 0,
             transLot: '',
@@ -1535,10 +1633,11 @@ export const MalhaPackagesOperatorPanel: React.FC<{
             packages: [...reportData.packages, newPkg]
         });
         setNewPkgTag('');
+        setNewPkgWeight('');
         setNewPkgQty(50);
     };
 
-    const handleUpdatePackageTagOrQty = (id: string, field: 'finishedLotNumber' | 'quantity', value: any) => {
+    const handleUpdatePackageField = (id: string, field: 'finishedLotNumber' | 'quantity' | 'measuredPackageWeight', value: any) => {
         const nextPackages = reportData.packages.map(p => p.id === id ? { ...p, [field]: value } : p);
         persistDataAndSyncActiveLots({ ...reportData, packages: nextPackages });
     };
@@ -1551,17 +1650,14 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     };
 
     const nextPackageNumber = reportData.packages.length + 1;
-    const previewLongCons = (Number(newPkgQty) || 50) * physics.longPesoUnit;
-    const previewTransCons = (Number(newPkgQty) || 50) * physics.transPesoUnit;
 
     const renderDirectionSupplyCard = (dir: 'LONGITUDINAL' | 'TRANSVERSAL') => {
         const isLong = dir === 'LONGITUDINAL';
         const activeItem = isLong ? computed.activeLongLot : computed.activeTransLot;
         const reserveItem = isLong ? computed.reserveLongLot : computed.reserveTransLot;
         const consumedHistory = (isLong ? computed.longStatusList : computed.transStatusList).filter(x => x.roleStatus === 'CONSUMED');
-        const packageNeedKg = isLong ? previewLongCons : previewTransCons;
+        const packageNeedKg = isLong ? livePreview.longKgCons : livePreview.transKgCons;
 
-        // Verificar se o próximo pacote vai usar 2 lotes (Ativo + Reserva)
         const willSplitNextPackage =
             activeItem &&
             activeItem.kgEntra > 0 &&
@@ -1574,7 +1670,6 @@ export const MalhaPackagesOperatorPanel: React.FC<{
 
         return (
             <div className="p-3.5 sm:p-4 rounded-2xl border-2 border-slate-200 bg-white shadow-sm space-y-3 min-w-0 w-full">
-                {/* Título da Direção */}
                 <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
                     <div className="flex items-center gap-1.5">
                         <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${
@@ -1582,12 +1677,12 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         }`}>
                             {isLong ? '↔️ Fio Longitudinal' : '↕️ Fio Transversal'}
                         </span>
-                        <span className="text-[10px] font-mono font-bold text-slate-400">
-                            ({reportData.techConfig.bitola}mm)
+                        <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            Ø {computed.effectiveBitola.toFixed(2).replace('.', ',')}mm
                         </span>
                     </div>
                     <span className="text-[10px] font-mono font-bold text-slate-500">
-                        {packageNeedKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg / pct
+                        ~{packageNeedKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg / pct
                     </span>
                 </div>
 
@@ -1633,7 +1728,6 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 </div>
                             </div>
 
-                            {/* Barra de Saldo do Lote Ativo */}
                             {activeItem.kgEntra > 0 ? (
                                 <div className="space-y-1 pt-1">
                                     <div className="flex justify-between text-[10px] font-mono">
@@ -1655,7 +1749,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 </div>
                             ) : (
                                 <p className="text-[10px] font-bold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-lg">
-                                    👆 Digite o Peso do Lote {activeItem.lot} acima (ex: 2075 kg) para o sistema abater sozinho nos pacotes!
+                                    👆 Digite o Peso do Lote {activeItem.lot} acima (ex: 2075 kg) para o sistema abater sozinho!
                                 </p>
                             )}
                         </div>
@@ -1670,7 +1764,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     )}
                 </div>
 
-                {/* 2. SLOT LOTE RESERVA (PRÓXIMO A ENTRAR QUANDO O ATIVO ACABAR) */}
+                {/* 2. SLOT LOTE RESERVA (PRÓXIMO A ENTRAR) */}
                 <div className={`p-3 rounded-xl border-2 space-y-2 ${
                     willSplitNextPackage
                         ? 'bg-amber-50 border-amber-400 shadow-sm'
@@ -1693,7 +1787,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         <div className="p-2 rounded-lg bg-amber-200/70 border border-amber-400 text-[10px] font-bold text-amber-950 leading-snug">
                             ⚡ O Lote Ativo ({activeItem?.lot}) tem <strong>{activeItem?.sobra.toFixed(0)} kg</strong> e o próximo pacote precisa de <strong>{packageNeedKg.toFixed(0)} kg</strong>.
                             {reserveItem
-                                ? ` O sistema vai usar os ${activeItem?.sobra.toFixed(0)} kg finais do Lote ${activeItem?.lot} + ${(packageNeedKg - (activeItem?.sobra || 0)).toFixed(0)} kg do Reserva (Lote ${reserveItem.lot})!`
+                                ? ` Vai usar ${activeItem?.sobra.toFixed(0)} kg do Lote ${activeItem?.lot} + ${(packageNeedKg - (activeItem?.sobra || 0)).toFixed(0)} kg do Reserva (Lote ${reserveItem.lot})!`
                                 : ` Cadastre o Lote Reserva abaixo para abater os ${(packageNeedKg - (activeItem?.sobra || 0)).toFixed(0)} kg restantes!`}
                         </div>
                     )}
@@ -1724,15 +1818,14 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         </div>
                     ) : (
                         <p className="text-[10px] text-slate-500 italic">
-                            Nenhum lote reserva engatilhado. Clique em <strong>+ Lote Reserva</strong> para deixar o próximo rolo pronto para quando o ativo acabar.
+                            Nenhum lote reserva engatilhado. Clique em <strong>+ Lote Reserva</strong> para deixar o próximo rolo pronto.
                         </p>
                     )}
                 </div>
 
-                {/* Lotes já 100% consumidos nesta direção */}
                 {consumedHistory.length > 0 && (
                     <div className="pt-1 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-black uppercase text-slate-400">Lotes já finalizados (Sobra 0):</span>
+                        <span className="text-[9px] font-black uppercase text-slate-400">Lotes finalizados (Sobra 0):</span>
                         {consumedHistory.map(h => (
                             <span key={h.id} className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[9px] font-mono font-bold text-slate-600">
                                 Lote {h.lot} ({h.kgEntra.toFixed(0)}kg ✓)
@@ -1754,7 +1847,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                             <span>🔄 1. Lotes na Máquina (Ativo & Reserva)</span>
                         </h3>
                         <p className="text-[11px] text-slate-500">
-                            Você só aponta o lote e o peso aqui 1 vez. Quando 1 pacote precisar de 2 lotes, o sistema desconta do Ativo e puxa o resto do Reserva sozinho!
+                            Aponte apenas o Lote Ativo e o Reserva com seus pesos. O sistema abate automaticamente conforme você pesa os pacotes!
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1889,44 +1982,55 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                 </div>
             )}
 
-            {/* BLOCO 2: FECHAR PACOTE DE 50 MALHAS (1 CLIQUE - SEM REPETIR LOTE!) */}
+            {/* BLOCO 2: FECHAR PACOTE DE 50 MALHAS + PESO DO PACOTE -> CALCULA BITOLA E PESOS LONG/TRANS AUTOMATICAMENTE */}
             <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-sm sm:text-base font-black uppercase text-slate-800">
-                                📦 2. Fechar Pacotes de Malha (50 Peças)
+                                ⚖️ 2. Apontar Peso do Pacote (50 Malhas)
                             </h3>
                             <span className="text-xs font-mono font-black bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full">
-                                {reportData.packages.length} pacotes prontos • {computed.totalQuantity} malhas ({computed.totalWeightKg.toFixed(0)} kg)
+                                {reportData.packages.length} pacotes • {computed.totalQuantity} malhas • {computed.totalWeightKg.toFixed(0)} kg
                             </span>
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                            Não precisa apontar os lotes de novo: ao confirmar o pacote, o sistema já desconta dos lotes ativos (e reserva) automaticamente!
+                            Digite o <strong>Peso do Pacote</strong> que deu na balança: o sistema descobre sozinho a <strong>Bitola Real do fio (mm)</strong> e calcula quanto descontar do <strong>Longitudinal</strong> e do <strong>Transversal</strong>!
                         </p>
                     </div>
                 </div>
 
-                {/* Card de Ação Rápida: Fechar Próximo Pacote */}
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-[#0F2437] to-slate-900 text-white space-y-3 shadow-md">
+                {/* Card de Lançamento Rápido com Calculadora Ao Vivo */}
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-[#0F2437] to-slate-900 text-white space-y-3.5 shadow-md">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                             <span className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black font-mono text-sm uppercase">
                                 PACOTE P{nextPackageNumber}
                             </span>
                             <span className="text-xs font-bold text-slate-300">
-                                Pronto para bater o pacote?
+                                Informe o peso do pacote para converter automaticamente
                             </span>
-                        </div>
-                        <div className="text-[10px] font-mono text-amber-300">
-                            Abate: ↔️ {previewLongCons.toFixed(1)} kg | ↕️ {previewTransCons.toFixed(1)} kg
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 items-end">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-emerald-300 block mb-1">
+                                ⚖️ Peso do Pacote (kg) *
+                            </label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                step="0.1"
+                                value={newPkgWeight}
+                                onChange={e => setNewPkgWeight(e.target.value)}
+                                placeholder={`Ex: ${livePreview.packageWeightKg.toFixed(0)}`}
+                                className="w-full px-3 py-2.5 rounded-xl bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 font-mono font-black text-base text-center outline-none focus:border-emerald-300"
+                            />
+                        </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
-                                Qtd. Malhas no Pacote
+                                Qtd. Malhas
                             </label>
                             <input
                                 type="number"
@@ -1937,7 +2041,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
-                                Nº Etiqueta Pacote (Opcional)
+                                Nº Etiqueta (Opcional)
                             </label>
                             <input
                                 type="text"
@@ -1953,12 +2057,49 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                             className="col-span-2 sm:col-span-1 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
                         >
                             <span>✅</span>
-                            <span>Confirmar Pacote P{nextPackageNumber}</span>
+                            <span>Confirmar P{nextPackageNumber}</span>
                         </button>
+                    </div>
+
+                    {/* Faixa de Resultado Automático da Conversão (Bitola que deu no fio + Peso Longitudinal + Peso Transversal) */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center">
+                        <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                            <span className="text-[9px] font-black uppercase text-amber-300 block">
+                                📏 Bitola que deu no fio
+                            </span>
+                            <span className="text-sm sm:text-base font-black font-mono text-white">
+                                {livePreview.calculatedBitola.toFixed(2).replace('.', ',')} mm
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 block">
+                                {livePreview.calculatedMassaLinear.toFixed(5).replace('.', ',')} kg/m
+                            </span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-400/30">
+                            <span className="text-[9px] font-black uppercase text-amber-300 block">
+                                ↔️ Peso Longitudinal
+                            </span>
+                            <span className="text-sm sm:text-base font-black font-mono text-amber-200">
+                                {livePreview.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 block">
+                                ({livePreview.unitLongWeight.toFixed(2).replace('.', ',')} kg/malha)
+                            </span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-400/30">
+                            <span className="text-[9px] font-black uppercase text-cyan-300 block">
+                                ↕️ Peso Transversal
+                            </span>
+                            <span className="text-sm sm:text-base font-black font-mono text-cyan-200">
+                                {livePreview.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 block">
+                                ({livePreview.unitTransWeight.toFixed(2).replace('.', ',')} kg/malha)
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Lista de Cards Simples dos Pacotes Já Confirmados */}
+                {/* Lista de Cards dos Pacotes Já Confirmados */}
                 {computed.computedRows.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {computed.computedRows.map((row) => {
@@ -1970,23 +2111,23 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                     key={row.id}
                                     className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/70 space-y-2.5 flex flex-col justify-between"
                                 >
-                                    <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2 flex-wrap">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
                                                 {row.packageCode.toUpperCase()}
                                             </span>
                                             <span className="text-xs font-black text-slate-800">
-                                                {row.quantity} malhas
+                                                {row.quantity} pçs
                                             </span>
-                                            <span className="text-[10px] font-mono text-slate-500">
-                                                ({(row.longKgCons + row.transKgCons).toFixed(0)} kg)
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-mono font-black">
+                                                📏 Bitola: {row.calculatedBitola.toFixed(2).replace('.', ',')} mm
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <input
                                                 type="text"
                                                 value={row.finishedLotNumber}
-                                                onChange={e => handleUpdatePackageTagOrQty(row.id, 'finishedLotNumber', e.target.value)}
+                                                onChange={e => handleUpdatePackageField(row.id, 'finishedLotNumber', e.target.value)}
                                                 placeholder="Etiqueta..."
                                                 className="w-20 px-2 py-1 rounded-lg border border-slate-300 bg-white text-[11px] font-mono font-bold text-center text-slate-800 outline-none"
                                                 title="Etiqueta do pacote pronto"
@@ -1999,6 +2140,24 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                             >
                                                 ✕
                                             </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Campo para ajustar ou informar o Peso do Pacote na Balança */}
+                                    <div className="flex items-center justify-between gap-2 bg-emerald-50/70 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                                        <span className="text-[10px] font-black uppercase text-emerald-900">
+                                            ⚖️ Peso do Pacote (kg):
+                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={row.measuredPackageWeight ?? ''}
+                                                onChange={e => handleUpdatePackageField(row.id, 'measuredPackageWeight', parseFloat(e.target.value) || null)}
+                                                placeholder={row.packageWeightKg.toFixed(1)}
+                                                className="w-24 px-2 py-1 rounded-lg border border-emerald-400 bg-white font-mono font-black text-xs text-center text-slate-900 outline-none"
+                                            />
+                                            <span className="text-[10px] font-mono font-bold text-emerald-800">kg</span>
                                         </div>
                                     </div>
 
@@ -2063,7 +2222,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     </div>
                 ) : (
                     <div className="p-6 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400 text-xs">
-                        Nenhum pacote de 50 malhas fechado ainda. Confirme o <strong>Pacote P1</strong> no botão verde acima quando terminar o primeiro pacote!
+                        Nenhum pacote de 50 malhas fechado ainda. Digite o <strong>Peso do Pacote (kg)</strong> acima e confirme o <strong>Pacote P1</strong>!
                     </div>
                 )}
             </div>
