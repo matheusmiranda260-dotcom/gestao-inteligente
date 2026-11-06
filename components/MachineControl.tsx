@@ -18,6 +18,7 @@ import TrelicaWeldingHead, {
     ELECTRODE_POSITIONS_CONFIG,
     getLocalElectrodeHistory
 } from './TrelicaWeldingHead';
+import { MalhaPackagesOperatorPanel } from './MalhaConsumptionReportModal';
 
 
 const IdleActivityLogger: React.FC<{
@@ -5929,16 +5930,21 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                 </div>
                                             </div>
                                         </>
+                                    ) : activeMachine.startsWith('Malha') && activeOrder ? (
+                                        <>
+                                            <MalhaActiveLotsCard
+                                                machineName={activeMachine}
+                                                activeOrder={activeOrder}
+                                                stock={stock}
+                                            />
+                                            <MalhaPackagesOperatorPanel
+                                                op={activeOrder}
+                                                stock={stock}
+                                                shiftReports={shiftReports}
+                                            />
+                                        </>
                                     ) : (
                                         <>
-                                            {activeMachine.startsWith('Malha') && activeOrder && (
-                                                <MalhaActiveLotsCard
-                                                    machineName={activeMachine}
-                                                    activeOrder={activeOrder}
-                                                    stock={stock}
-                                                />
-                                            )}
-
                                             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-slate-100 gap-2">
                                                     <div className="flex items-center gap-3 flex-wrap">

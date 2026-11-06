@@ -24,6 +24,7 @@ import {
 import TrelicaSpoolStands from './TrelicaSpoolStands';
 import TrelicaWeldingHead, { getLocalMachineElectrodes, getLocalElectrodeHistory } from './TrelicaWeldingHead';
 import DailyProductionReportSheetModal from './DailyProductionReportSheetModal';
+import MalhaConsumptionReportModal from './MalhaConsumptionReportModal';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -11869,6 +11870,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
 
     const targetReportDateStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
     const machName = activeOp.scheduledMachine || (activeOp.machine as string) || 'Malha 1';
+    const [showMalhaPackagesReport, setShowMalhaPackagesReport] = useState(false);
 
     // Obter estatísticas dinâmicas fiéis do PCP para o dia ativo (Ritmo, Ciclo, Efetivo, Paradas, Produção)
     const activeDayStats = useMemo(() => {
@@ -11982,13 +11984,24 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                             <CalendarIcon className="w-5 h-5" />
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className="text-base font-black uppercase tracking-wider text-white">
                                     Paradas e Motivos • OP #{activeOp.orderNumber}
                                 </h3>
                                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
                                     {activeOp.scheduledMachine || activeOp.machine}
                                 </span>
+                                {machName.toLowerCase().includes('malha') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMalhaPackagesReport(true)}
+                                        className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.35)] transition-all cursor-pointer active:scale-95 border border-amber-300/60"
+                                        title="Abrir Planilha de Consumo por Lote e Pacotes de 50 Malhas (Conversão Longitudinal / Transversal)"
+                                    >
+                                        <span>📊</span>
+                                        <span>Planilha Lotes & Pacotes (50 pçs)</span>
+                                    </button>
+                                )}
                             </div>
                             <p className="text-xs text-slate-400 font-mono mt-0.5">
                                 {activeOp.trelicaModel ? `${activeOp.trelicaModel} • ` : activeOp.targetBitola ? `Bitola ${activeOp.targetBitola}mm • ` : ''}
@@ -12435,6 +12448,16 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     gauges={gauges}
                     employees={employees}
                     users={users}
+                />
+            )}
+
+            {showMalhaPackagesReport && (
+                <MalhaConsumptionReportModal
+                    isOpen={showMalhaPackagesReport}
+                    onClose={() => setShowMalhaPackagesReport(false)}
+                    op={activeOp}
+                    stock={stock}
+                    shiftReports={shiftReports}
                 />
             )}
         </div>
