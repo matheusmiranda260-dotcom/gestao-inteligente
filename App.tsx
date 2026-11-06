@@ -2589,6 +2589,21 @@ const App: React.FC = () => {
 
         const now = options?.customEndTime || new Date().toISOString();
 
+        // Trava de segurança contra relógio/data errados em outro computador:
+        // Se for auto-encerramento e o relógio local ('now') for anterior ao startTime do turno aberto, aborta imediatamente!
+        if (options?.autoClosed) {
+            const nowMs = new Date(now).getTime();
+            const isClockBehindShiftStart = (order.operatorLogs || []).some((l: any) => {
+                if (isLogEndedCheck(l)) return false;
+                const st = l.startTime || l.start_time;
+                return st && new Date(st).getTime() > nowMs;
+            });
+            if (isClockBehindShiftStart) {
+                console.warn(`[Watchdog Bloqueado] Relógio local (${now}) está atrasado em relação ao início do turno aberto da OP #${order.orderNumber}. Auto-encerramento cancelado.`);
+                return;
+            }
+        }
+
         // Cálculo seguro de quantidade final para evitar que encerramentos automáticos zerem a produção
         const calculateSafeFinalQty = (o: ProductionOrderData, passedQty?: number) => {
             const orderQty = Number(o.actualProducedQuantity) || 0;
