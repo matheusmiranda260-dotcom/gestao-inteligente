@@ -2961,6 +2961,15 @@ const App: React.FC = () => {
 
                 if (openLogs.length === 0) continue;
 
+                // Proteção contra relógio desajustado em outro dispositivo:
+                // Se algum log aberto tem startTime futuro em relação a 'now' (relógio local atrasado), não auto-encerrar!
+                const hasClockSkew = (order.operatorLogs || []).some((l: any) => {
+                    const st = l.startTime || l.start_time;
+                    if (!st) return false;
+                    return new Date(st).getTime() > (now.getTime() + 5 * 60 * 1000);
+                });
+                if (hasClockSkew) continue;
+
                 // 3. Avaliar a jornada atual da máquina no dia de HOJE
                 const shiftEval = checkMachineShiftStatus(machName, pcpShiftConfig, now, pcpHolidays);
 
@@ -3649,10 +3658,45 @@ const App: React.FC = () => {
             const prevQty = Number(currentOrder?.actualProducedQuantity) || 0;
             const deltaPieces = Math.max(0, quantity - prevQty);
 
-            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, {
+            const updates: Partial<ProductionOrderData> = {
                 actualProducedQuantity: quantity,
                 lastQuantityUpdate: now
-            });
+            };
+
+            // Auto-saneamento de operatorLogs: se houver logs fechados posicionados APÓS um log aberto,
+            // reordena cronologicamente os fechados antes do aberto e re-encadeia startQuantity/endQuantity.
+            const rawLogs: any[] = currentOrder?.operatorLogs || (currentOrder as any)?.operator_logs || [];
+            const firstOpenIdx = rawLogs.findIndex((l: any) => !l.endTime && !l.end_time);
+            const hasClosedAfterOpen = firstOpenIdx !== -1 && rawLogs.slice(firstOpenIdx + 1).some((l: any) => Boolean(l.endTime || l.end_time));
+            if (hasClosedAfterOpen) {
+                const sorted = [...rawLogs].sort((a: any, b: any) => {
+                    const aEnd = a.endTime ?? a.end_time ?? null;
+                    const bEnd = b.endTime ?? b.end_time ?? null;
+                    if (!aEnd !== !bEnd) return !aEnd ? 1 : -1;
+                    const aCr = Boolean(a.action?.includes('Criada no PCP') || a.operator === 'GHOST_ORDER_FLAG');
+                    const bCr = Boolean(b.action?.includes('Criada no PCP') || b.operator === 'GHOST_ORDER_FLAG');
+                    if (aCr !== bCr) return aCr ? -1 : 1;
+                    const tA = new Date(a.startTime || a.start_time || aEnd || 0).getTime() || 0;
+                    const tB = new Date(b.startTime || b.start_time || bEnd || 0).getTime() || 0;
+                    return tA - tB;
+                });
+                let acc = 0;
+                updates.operatorLogs = sorted.map((l: any) => {
+                    const hasEnd = Boolean(l.endTime ?? l.end_time);
+                    const sQ = Number(l.startQuantity ?? l.start_quantity ?? 0) || 0;
+                    const eQ = Number(l.endQuantity ?? l.end_quantity ?? 0) || 0;
+                    if (hasEnd) {
+                        const diff = Math.max(0, eQ - sQ);
+                        const newStart = acc;
+                        acc += diff;
+                        return { ...l, startQuantity: newStart, start_quantity: newStart, endQuantity: acc, end_quantity: acc };
+                    } else {
+                        return { ...l, startQuantity: acc, start_quantity: acc };
+                    }
+                });
+            }
+
+            const updatedOrder = await updateItem<ProductionOrderData>('production_orders', orderId, updates);
             setProductionOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
             showNotification('Contagem de peças atualizada.', 'success');
 

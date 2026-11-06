@@ -2572,7 +2572,20 @@ const MachineControl: React.FC<MachineControlProps> = ({
         const targetOrder = pendingShiftEnd ? (productionOrders.find(o => o.id === pendingShiftEnd)) : activeOrder;
 
         if (targetOrder && updateProducedQuantity) {
-            const startQty = Number(currentOperatorLog?.startQuantity) || 0;
+            const rawLogs: any[] = targetOrder.operatorLogs || (targetOrder as any).operator_logs || [];
+            const openIdx = rawLogs.findIndex((l: any) => !l.endTime && !l.end_time);
+            let trailingClosedPieces = 0;
+            if (openIdx !== -1) {
+                for (let k = openIdx + 1; k < rawLogs.length; k++) {
+                    if (rawLogs[k].endTime || rawLogs[k].end_time) {
+                        const tsQ = Number(rawLogs[k].startQuantity ?? rawLogs[k].start_quantity ?? 0) || 0;
+                        const teQ = Number(rawLogs[k].endQuantity ?? rawLogs[k].end_quantity ?? 0) || 0;
+                        trailingClosedPieces += Math.max(0, teQ - tsQ);
+                    }
+                }
+            }
+            const baseStartQty = Number(currentOperatorLog?.startQuantity ?? (currentOperatorLog as any)?.start_quantity ?? 0) || 0;
+            const startQty = baseStartQty + trailingClosedPieces;
             const currentTotal = Number(targetOrder.actualProducedQuantity) || 0;
 
             let newTotal = 0;
@@ -3165,16 +3178,31 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 />
             )}
             {showCompletionModal && activeOrder && <CompletionModal order={activeOrder} onClose={() => setShowCompletionModal(false)} onSubmit={handleCompleteProduction} />}
-            {showQuantityPrompt && promptOrder && (
-                <QuantityPromptModal
-                    onClose={() => setShowQuantityPrompt(false)}
-                    onSubmit={handleUpdateQuantity}
-                    currentQuantity={Math.max(0, (promptOrder.actualProducedQuantity || 0) - (currentOperatorLog?.startQuantity || 0))}
-                    shiftStartQuantity={Number(currentOperatorLog?.startQuantity) || 0}
-                    machineName={activeMachine}
-                    order={promptOrder}
-                />
-            )}
+            {showQuantityPrompt && promptOrder && (() => {
+                const rawPromptLogs: any[] = promptOrder.operatorLogs || (promptOrder as any).operator_logs || [];
+                const openPromptIdx = rawPromptLogs.findIndex((l: any) => !l.endTime && !l.end_time);
+                let trailingClosed = 0;
+                if (openPromptIdx !== -1) {
+                    for (let k = openPromptIdx + 1; k < rawPromptLogs.length; k++) {
+                        if (rawPromptLogs[k].endTime || rawPromptLogs[k].end_time) {
+                            const tsQ = Number(rawPromptLogs[k].startQuantity ?? rawPromptLogs[k].start_quantity ?? 0) || 0;
+                            const teQ = Number(rawPromptLogs[k].endQuantity ?? rawPromptLogs[k].end_quantity ?? 0) || 0;
+                            trailingClosed += Math.max(0, teQ - tsQ);
+                        }
+                    }
+                }
+                const effectiveStart = (Number(currentOperatorLog?.startQuantity ?? (currentOperatorLog as any)?.start_quantity ?? 0) || 0) + trailingClosed;
+                return (
+                    <QuantityPromptModal
+                        onClose={() => setShowQuantityPrompt(false)}
+                        onSubmit={handleUpdateQuantity}
+                        currentQuantity={Math.max(0, (promptOrder.actualProducedQuantity || 0) - effectiveStart)}
+                        shiftStartQuantity={effectiveStart}
+                        machineName={activeMachine}
+                        order={promptOrder}
+                    />
+                );
+            })()}
 
             {/* Modal de Bloqueio por Falta de Lotes de Eletrodos na Treliça */}
             {showTrelicaBlockModal && trelicaValidationBlock && (

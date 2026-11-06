@@ -980,28 +980,58 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 updates.actualProducedQuantity = newTotalQty;
             }
 
-            let currentLogs = targetOrder.operatorLogs ? [...targetOrder.operatorLogs] : [];
+            const getLogStart = (l: any) => l?.startTime || l?.start_time || '';
+            const getLogEnd = (l: any) => l?.endTime ?? l?.end_time ?? null;
+            const getLogStartQty = (l: any) => Number(l?.startQuantity ?? l?.start_quantity ?? 0) || 0;
+            const getLogEndQty = (l: any) => Number(l?.endQuantity ?? l?.end_quantity ?? 0) || 0;
+            const isCreationLog = (l: any) => Boolean(l?.action?.includes('Criada no PCP') || l?.operator === 'GHOST_ORDER_FLAG');
+
+            // Garante que todos os logs fechados fiquem em ordem cronológica ANTES de qualquer log aberto (endTime == null)
+            const sortLogsChronologically = (logs: any[]) => {
+                return [...logs].sort((a, b) => {
+                    const aOpen = !getLogEnd(a);
+                    const bOpen = !getLogEnd(b);
+                    if (aOpen !== bOpen) return aOpen ? 1 : -1;
+                    const aCreation = isCreationLog(a);
+                    const bCreation = isCreationLog(b);
+                    if (aCreation !== bCreation) return aCreation ? -1 : 1;
+                    const tA = new Date(getLogStart(a) || getLogEnd(a) || 0).getTime() || 0;
+                    const tB = new Date(getLogStart(b) || getLogEnd(b) || 0).getTime() || 0;
+                    return tA - tB;
+                });
+            };
+
+            let currentLogs = sortLogsChronologically(
+                (targetOrder.operatorLogs || (targetOrder as any).operator_logs || []).map((l: any) => ({ ...l }))
+            );
 
             if (details?.mode === 'shift' && details.shiftQty !== undefined) {
                 const shiftQty = Math.max(0, details.shiftQty);
                 const targetDateStr = details.dayStats?.dateStr || formatDateString(new Date());
                 const isTodayTarget = details.dayStats?.isToday ?? (targetDateStr === formatDateString(new Date()));
 
-                // 1. Identificar logs vinculados à data selecionada (início ou fim na data)
-                const matchingIndices: number[] = [];
-                currentLogs.forEach((l: any, idx: number) => {
-                    const s = getIsoDateStr(l.startTime);
-                    const e = getIsoDateStr(l.endTime);
-                    if (s === targetDateStr || e === targetDateStr) {
-                        matchingIndices.push(idx);
-                    }
-                });
+                // 1. Identificar logs vinculados à data selecionada (prioriza data de início para evitar duplicidade)
+                const findMatchingIndices = (logs: any[]) => {
+                    const indices: number[] = [];
+                    logs.forEach((l: any, idx: number) => {
+                        if (isCreationLog(l)) return;
+                        const s = getIsoDateStr(getLogStart(l));
+                        const e = getIsoDateStr(getLogEnd(l));
+                        const logDate = s || e;
+                        if (logDate === targetDateStr) {
+                            indices.push(idx);
+                        }
+                    });
+                    return indices;
+                };
 
-                // Se não há nenhum log nessa data, cria um novo
+                let matchingIndices = findMatchingIndices(currentLogs);
+
+                // Se não há nenhum log nessa data, cria um novo e reordena cronologicamente
                 if (matchingIndices.length === 0) {
-                    const openIdx = currentLogs.findIndex((l: any) => !l.endTime);
+                    const openIdx = currentLogs.findIndex((l: any) => !getLogEnd(l));
                     if (isTodayTarget && openIdx !== -1) {
-                        matchingIndices.push(openIdx);
+                        matchingIndices = [openIdx];
                     } else if (isTodayTarget) {
                         currentLogs.push({
                             operator: details.operatorName || 'Operador',
@@ -1009,7 +1039,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             endTime: null,
                             startQuantity: 0
                         });
-                        matchingIndices.push(currentLogs.length - 1);
+                        currentLogs = sortLogsChronologically(currentLogs);
+                        matchingIndices = findMatchingIndices(currentLogs);
                     } else {
                         currentLogs.push({
                             operator: details.operatorName || 'Operador',
@@ -1018,61 +1049,86 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             startQuantity: 0,
                             endQuantity: shiftQty
                         });
-                        matchingIndices.push(currentLogs.length - 1);
+                        currentLogs = sortLogsChronologically(currentLogs);
+                        matchingIndices = findMatchingIndices(currentLogs);
                     }
                 }
 
                 // 2. Distribuir a nova meta de peças da data
-                let remainingToDistribute = shiftQty;
-                matchingIndices.forEach(i => {
-                    const log = currentLogs[i];
-                    if (log.endTime) {
-                        const originalDiff = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
-                        const allocated = Math.min(remainingToDistribute, originalDiff);
-                        currentLogs[i] = { ...log, _targetDelta: allocated };
-                        remainingToDistribute -= allocated;
-                    }
-                });
-
-                const openIdxOnDay = matchingIndices.find(i => !currentLogs[i].endTime);
+                const openIdxOnDay = matchingIndices.find(i => !getLogEnd(currentLogs[i]));
                 if (openIdxOnDay !== undefined) {
-                    currentLogs[openIdxOnDay] = { ...currentLogs[openIdxOnDay], _targetDelta: remainingToDistribute };
-                    remainingToDistribute = 0;
-                } else if (remainingToDistribute > 0 && matchingIndices.length > 0) {
-                    const lastClosedIdx = matchingIndices[matchingIndices.length - 1];
-                    currentLogs[lastClosedIdx]._targetDelta = (currentLogs[lastClosedIdx]._targetDelta || 0) + remainingToDistribute;
+                    // Se há um turno aberto no dia, zera eventuais logs fechados do mesmo dia e concentra o total do dia no turno aberto
+                    // para que o startQuantity do turno aberto corresponda exatamente ao saldo do início do dia!
+                    matchingIndices.forEach(i => {
+                        if (i !== openIdxOnDay) {
+                            currentLogs[i] = { ...currentLogs[i], _targetDelta: 0 };
+                        }
+                    });
+                    currentLogs[openIdxOnDay] = { ...currentLogs[openIdxOnDay], _targetDelta: shiftQty };
+                } else {
+                    let remainingToDistribute = shiftQty;
+                    matchingIndices.forEach(i => {
+                        const log = currentLogs[i];
+                        if (getLogEnd(log)) {
+                            const originalDiff = Math.max(0, getLogEndQty(log) - getLogStartQty(log));
+                            const allocated = Math.min(remainingToDistribute, originalDiff);
+                            currentLogs[i] = { ...log, _targetDelta: allocated };
+                            remainingToDistribute -= allocated;
+                        }
+                    });
+
+                    if (remainingToDistribute > 0 && matchingIndices.length > 0) {
+                        const lastClosedIdx = matchingIndices[matchingIndices.length - 1];
+                        currentLogs[lastClosedIdx]._targetDelta = (currentLogs[lastClosedIdx]._targetDelta || 0) + remainingToDistribute;
+                    }
                 }
 
-                // 3. Re-encadear todos os logs sequencialmente para manter total e deltas 100% íntegros
+                // 3. Re-encadear todos os logs sequencialmente (fechados em ordem cronológica -> aberto no final)
                 let runningAccumulator = 0;
-                const newLogs = currentLogs.map((log: any, idx: number) => {
+                const newLogs = currentLogs.map((log: any) => {
                     let pieces = 0;
+                    const hasEnd = Boolean(getLogEnd(log));
                     if (log._targetDelta !== undefined) {
                         pieces = log._targetDelta;
                         delete log._targetDelta;
-                    } else if (log.endTime) {
-                        pieces = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                    } else if (hasEnd) {
+                        pieces = Math.max(0, getLogEndQty(log) - getLogStartQty(log));
                     } else {
-                        // Log aberto que não pertence à data (fallback)
+                        // Log aberto que não pertence à data editada: preserva exclusivamente a produção já apontada nele
                         const prevTot = isTrefila 
                             ? (Number(targetOrder.actualProducedWeight) || Number(targetOrder.totalProducedWeight) || 0)
                             : (Number(targetOrder.actualProducedQuantity) || 0);
-                        pieces = Math.max(0, prevTot - (Number(log.startQuantity) || 0));
+                        // Se havia logs fechados fora de ordem após o log aberto originalmente, descontá-los para não inflar o turno aberto
+                        const originalLogs: any[] = targetOrder.operatorLogs || (targetOrder as any).operator_logs || [];
+                        const origOpenIdx = originalLogs.findIndex((ol: any) => !getLogEnd(ol));
+                        let trailingClosedPieces = 0;
+                        if (origOpenIdx !== -1) {
+                            for (let k = origOpenIdx + 1; k < originalLogs.length; k++) {
+                                if (getLogEnd(originalLogs[k])) {
+                                    trailingClosedPieces += Math.max(0, getLogEndQty(originalLogs[k]) - getLogStartQty(originalLogs[k]));
+                                }
+                            }
+                        }
+                        const cleanPrevTot = Math.max(0, prevTot - trailingClosedPieces);
+                        pieces = Math.max(0, cleanPrevTot - getLogStartQty(log));
                     }
 
                     const startQ = runningAccumulator;
                     runningAccumulator += pieces;
 
-                    if (log.endTime) {
+                    if (hasEnd) {
                         return {
                             ...log,
                             startQuantity: startQ,
-                            endQuantity: runningAccumulator
+                            start_quantity: startQ,
+                            endQuantity: runningAccumulator,
+                            end_quantity: runningAccumulator
                         };
                     } else {
                         return {
                             ...log,
-                            startQuantity: startQ
+                            startQuantity: startQ,
+                            start_quantity: startQ
                         };
                     }
                 });
@@ -1093,27 +1149,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     updates.actualProducedQuantity = newTotalQty;
                 }
 
-                const openLogIdx = currentLogs.findIndex((l: any) => !l.endTime);
+                const openLogIdx = currentLogs.findIndex((l: any) => !getLogEnd(l));
                 if (openLogIdx !== -1) {
                     let runningAccumulator = 0;
                     const newLogs = currentLogs.map((log: any, idx: number) => {
                         if (idx === openLogIdx) {
+                            const safeStart = Math.min(runningAccumulator, newTotalQty);
                             return {
                                 ...log,
-                                startQuantity: runningAccumulator
+                                startQuantity: safeStart,
+                                start_quantity: safeStart
                             };
                         } else {
-                            const p = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                            const p = Math.max(0, getLogEndQty(log) - getLogStartQty(log));
                             const sQ = runningAccumulator;
                             runningAccumulator += p;
                             return {
                                 ...log,
                                 startQuantity: sQ,
-                                endQuantity: runningAccumulator
+                                start_quantity: sQ,
+                                endQuantity: runningAccumulator,
+                                end_quantity: runningAccumulator
                             };
                         }
                     });
                     updates.operatorLogs = newLogs;
+                } else {
+                    updates.operatorLogs = currentLogs;
                 }
             } else if (details?.updatedLogs && details.updatedLogs.length > 0) {
                 updates.operatorLogs = details.updatedLogs;
@@ -1268,36 +1330,59 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 updates.quantityToProduce = data.newQuantityToProduce;
             }
 
-            // 3. Atualizar Logs e Turnos
-            let currentLogs = targetOrder.operatorLogs ? [...targetOrder.operatorLogs] : [];
+            // 3. Atualizar Logs e Turnos (ordenando turnos fechados cronologicamente antes de qualquer turno aberto)
+            let currentLogs = (targetOrder.operatorLogs || (targetOrder as any).operator_logs || []).map((l: any, origIdx: number) => ({ ...l, _origIdx: origIdx }));
+            currentLogs.sort((a: any, b: any) => {
+                const aEnd = a.endTime ?? a.end_time ?? null;
+                const bEnd = b.endTime ?? b.end_time ?? null;
+                const aOpen = !aEnd;
+                const bOpen = !bEnd;
+                if (aOpen !== bOpen) return aOpen ? 1 : -1;
+                const aCreation = Boolean(a.action?.includes('Criada no PCP') || a.operator === 'GHOST_ORDER_FLAG');
+                const bCreation = Boolean(b.action?.includes('Criada no PCP') || b.operator === 'GHOST_ORDER_FLAG');
+                if (aCreation !== bCreation) return aCreation ? -1 : 1;
+                const tA = new Date(a.startTime || a.start_time || aEnd || 0).getTime() || 0;
+                const tB = new Date(b.startTime || b.start_time || bEnd || 0).getTime() || 0;
+                return tA - tB;
+            });
             let runningAccumulator = 0;
 
             if (currentLogs.length > 0) {
-                const newLogs = currentLogs.map((log: any, idx: number) => {
-                    if (log.endTime) {
-                        const editedShift = data.updatedFinalizedShifts.find(s => s.logIndex === idx);
+                const newLogs = currentLogs.map((log: any) => {
+                    const origIdx = log._origIdx;
+                    const cleanLog = { ...log };
+                    delete cleanLog._origIdx;
+                    const hasEnd = Boolean(cleanLog.endTime ?? cleanLog.end_time);
+                    const sQty = Number(cleanLog.startQuantity ?? cleanLog.start_quantity ?? 0) || 0;
+                    const eQty = Number(cleanLog.endQuantity ?? cleanLog.end_quantity ?? 0) || 0;
+
+                    if (hasEnd) {
+                        const editedShift = data.updatedFinalizedShifts.find(s => s.logIndex === origIdx);
                         const shiftQty = editedShift !== undefined
                             ? Math.max(0, editedShift.pieces)
-                            : Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                            : Math.max(0, eQty - sQty);
                         
                         const startQ = runningAccumulator;
                         runningAccumulator += shiftQty;
                         return {
-                            ...log,
+                            ...cleanLog,
                             startQuantity: startQ,
-                            endQuantity: runningAccumulator
+                            start_quantity: startQ,
+                            endQuantity: runningAccumulator,
+                            end_quantity: runningAccumulator
                         };
                     } else {
                         // Turno aberto em andamento
                         const liveQty = data.activeShiftPieces !== undefined 
                             ? Math.max(0, data.activeShiftPieces)
-                            : Math.max(0, (isTrefila ? Number(targetOrder.actualProducedWeight) : Number(targetOrder.actualProducedQuantity) || 0) - (Number(log.startQuantity) || 0));
+                            : Math.max(0, (isTrefila ? Number(targetOrder.actualProducedWeight) : Number(targetOrder.actualProducedQuantity) || 0) - sQty);
                         
                         const startQ = runningAccumulator;
                         runningAccumulator += liveQty;
                         return {
-                            ...log,
-                            startQuantity: startQ
+                            ...cleanLog,
+                            startQuantity: startQ,
+                            start_quantity: startQ
                         };
                     }
                 });
@@ -3974,11 +4059,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return acc;
         }, 0);
 
-        // 4. Logs de operador desta data
+        // 4. Logs de operador desta data (prioriza startTime para não duplicar caso endTime caia em outro dia)
         const dayLogs = rawLogs.filter(l => {
             const s = getIsoDateStr(l.startTime || l.start_time);
             const e = getIsoDateStr(l.endTime || l.end_time);
-            return s === dateStr || e === dateStr || (isEvaluatingActiveMonday && (s === saturdayStr || s === sundayStr || s === todayStr || e === saturdayStr || e === sundayStr || e === todayStr));
+            const logDate = s || e;
+            return logDate === dateStr || (isEvaluatingActiveMonday && (logDate === saturdayStr || logDate === sundayStr || logDate === todayStr));
         });
         const logOperators = dayLogs.map(l => formatShortName(l.operator)).filter(Boolean)[0] || '';
 
@@ -3986,6 +4072,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const totalOverall = isTrefila 
             ? (Number(op.actualProducedWeight || (op as any).actual_produced_weight || op.totalProducedWeight || (op as any).total_produced_weight) || 0) 
             : (Number(op.actualProducedQuantity || (op as any).actual_produced_quantity || (op as any).current_quantity || (op as any).total_overall) || 0);
+
+        // Se existir qualquer log fechado posicionado APÓS um log aberto no array, calcular a diferença para não inflar o turno aberto
+        const firstOpenIdx = rawLogs.findIndex((l: any) => !l.endTime && !l.end_time);
+        let trailingClosedPiecesAfterOpen = 0;
+        if (firstOpenIdx !== -1) {
+            for (let k = firstOpenIdx + 1; k < rawLogs.length; k++) {
+                const tl = rawLogs[k];
+                if (tl.endTime || tl.end_time) {
+                    const tsQ = Number(tl.startQuantity ?? tl.start_quantity ?? 0) || 0;
+                    const teQ = Number(tl.endQuantity ?? tl.end_quantity ?? 0) || 0;
+                    trailingClosedPiecesAfterOpen += Math.max(0, teQ - tsQ);
+                }
+            }
+        }
 
         // Produção isolada dos logs desta data específica
         const dayLogsPcs = dayLogs.reduce((acc: number, l: any) => {
@@ -3995,7 +4095,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             if (!hasEnd) {
                 if (sQty !== undefined) {
-                    return acc + Math.max(0, totalOverall - sQty);
+                    return acc + Math.max(0, totalOverall - trailingClosedPiecesAfterOpen - sQty);
                 }
                 return acc;
             } else if (eQty !== undefined && sQty !== undefined) {
@@ -4017,7 +4117,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             const sQty = openLog ? (openLog.startQuantity !== undefined ? Number(openLog.startQuantity) : (openLog.start_quantity !== undefined ? Number(openLog.start_quantity) : undefined)) : undefined;
             let liveShiftPcs = 0;
             if (openLog && sQty !== undefined) {
-                liveShiftPcs = Math.max(0, totalOverall - sQty);
+                liveShiftPcs = Math.max(0, totalOverall - trailingClosedPiecesAfterOpen - sQty);
             }
             // Evita duplicação: se já existe relatório de turno gerado para a data, ele consolida os pacotes
             const isolatedProduction = reportsDayQty > 0 
@@ -12381,8 +12481,22 @@ const AdjustQuantityModal: React.FC<{
         : (order.quantityToProduce || (isTrelica ? 3500 : 5000));
 
     // Turno ativo do operador (se houver)
-    const activeLogIndex = (order.operatorLogs || []).findIndex((l: any) => !l.endTime);
-    const activeLog = activeLogIndex !== -1 ? order.operatorLogs![activeLogIndex] : null;
+    const rawModalLogs: any[] = order.operatorLogs || (order as any).operator_logs || [];
+    const activeLogIndex = rawModalLogs.findIndex((l: any) => !l.endTime && !l.end_time);
+    const activeLog = activeLogIndex !== -1 ? rawModalLogs[activeLogIndex] : null;
+
+    // Se existir log fechado após o log aberto no array, descontar do cálculo do turno aberto
+    let trailingClosedAfterActive = 0;
+    if (activeLogIndex !== -1) {
+        for (let k = activeLogIndex + 1; k < rawModalLogs.length; k++) {
+            const tl = rawModalLogs[k];
+            if (tl.endTime || tl.end_time) {
+                const tsQ = Number(tl.startQuantity ?? tl.start_quantity ?? 0) || 0;
+                const teQ = Number(tl.endQuantity ?? tl.end_quantity ?? 0) || 0;
+                trailingClosedAfterActive += Math.max(0, teQ - tsQ);
+            }
+        }
+    }
 
     // Nome do operador
     const formatName = (name?: string) => {
@@ -12399,8 +12513,8 @@ const AdjustQuantityModal: React.FC<{
         || 'Operador';
 
     // Determinar a quantidade de produção base deste turno
-    const logStartQty = Number(activeLog?.startQuantity) || 0;
-    const computedActiveShiftQty = Math.max(0, currentTotal - logStartQty);
+    const logStartQty = Number(activeLog?.startQuantity ?? (activeLog as any)?.start_quantity ?? 0) || 0;
+    const computedActiveShiftQty = Math.max(0, currentTotal - trailingClosedAfterActive - logStartQty);
     const shiftBaseQty = context?.shiftProduced !== undefined 
         ? context.shiftProduced 
         : computedActiveShiftQty;
@@ -12429,18 +12543,21 @@ const AdjustQuantityModal: React.FC<{
 
     const isShiftMode = mode === 'shift';
 
-    // Soma de todas as peças registradas nos turnos da OP para garantir consistência
+    // Soma de todas as peças registradas nos turnos da OP para garantir consistência (sem duplicar logs fora de ordem)
     const sumLogsTotal = useMemo(() => {
         let sum = 0;
-        (order.operatorLogs || []).forEach((l: any) => {
-            if (l.endTime) {
-                sum += Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+        rawModalLogs.forEach((l: any) => {
+            const hasEnd = Boolean(l.endTime || l.end_time);
+            const sQ = Number(l.startQuantity ?? l.start_quantity ?? 0) || 0;
+            const eQ = Number(l.endQuantity ?? l.end_quantity ?? 0) || 0;
+            if (hasEnd) {
+                sum += Math.max(0, eQ - sQ);
             } else {
-                sum += Math.max(0, currentTotal - (Number(l.startQuantity) || 0));
+                sum += Math.max(0, currentTotal - trailingClosedAfterActive - sQ);
             }
         });
         return sum > 0 ? sum : currentTotal;
-    }, [order, currentTotal]);
+    }, [rawModalLogs, currentTotal, trailingClosedAfterActive]);
 
     // Cálculos dinâmicos
     // O Gestor pode reduzir a quantidade, portanto o mínimo permitido é 0
