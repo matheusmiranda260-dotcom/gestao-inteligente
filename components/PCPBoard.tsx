@@ -2225,7 +2225,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const liveMachines = new Set<string>();
 
         scheduledOrders.forEach(op => {
-            const isCompleted = op.status === 'completed' || op.status === 'Finalizado';
+            const isCompleted = op.status === 'completed' || op.status === 'Finalizado' || op.status === 'Concluída';
             const isLive = op.status === 'in_progress';
             const w = op.totalWeight || op.quantityToProduce || 0;
 
@@ -3478,11 +3478,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         setSelectedOP(op);
         setScheduleMachine(op.scheduledMachine || (op.machine as string));
         setScheduleStartDate(op.plannedStartDate || mondayStr);
-        const hasStarted = hasProductionStarted(op);
-        const elapsed = hasStarted ? countWorkingDaysBetween(op.plannedStartDate || mondayStr, todayStr) : 1;
-        const currentEffectiveEnd = (hasStarted && op.plannedEndDate && op.plannedEndDate < todayStr) ? todayStr : (op.plannedEndDate || op.plannedStartDate || todayStr);
-        const currentDays = countWorkingDaysBetween(op.plannedStartDate || mondayStr, currentEffectiveEnd);
-        setScheduleDuration(Math.max(elapsed, currentDays, op.estimatedDurationDays || 1));
+        setScheduleDuration(Math.max(1, op.estimatedDurationDays || 1));
     };
 
     // Salva o reagendamento
@@ -3490,9 +3486,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (!selectedOP) return;
 
         let endDateStr = calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration);
-        if (hasProductionStarted(selectedOP) && endDateStr < todayStr) {
-            endDateStr = todayStr;
-        }
 
         const updates: Partial<ProductionOrderData> = {
             scheduledMachine: scheduleMachine,
@@ -3791,34 +3784,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             showNotification?.('Perfil de visualização: alteração no cronograma desabilitada.', 'warning');
             return;
         }
-        if (!op.plannedStartDate) return;
-        
-        const hasStarted = hasProductionStarted(op);
-
-        // Data de término efetiva atual (se a OP já está em produção e o término agendado anteriormente venceu no passado, a base mínima é hoje)
-        const currentEffectiveEnd = (hasStarted && op.plannedEndDate && op.plannedEndDate < todayStr)
-            ? todayStr
-            : (op.plannedEndDate || op.plannedStartDate || todayStr);
-
-        let newEndStr: string;
-
-        if (durationDelta > 0) {
-            // Estende +X dia(s) útil(eis) além do término efetivo atual
-            newEndStr = shiftWorkingDay(currentEffectiveEnd, durationDelta);
-        } else {
-            // Reduz prazo (-1 dia útil)
-            if (hasStarted && currentEffectiveEnd <= todayStr) {
-                showNotification?.(`A OP já possui produção iniciada até a data atual (${formatFriendlyDate(todayStr)}). Não é possível reduzir o prazo para antes de hoje.`, 'warning');
-                return;
-            }
-            newEndStr = shiftWorkingDay(currentEffectiveEnd, -1);
-            if (hasStarted && newEndStr < todayStr) {
-                newEndStr = todayStr;
-            }
+        if (!op.plannedStartDate) {
+            showNotification?.('Esta OP não possui data de início definida.', 'warning');
+            return;
         }
 
-        const newDuration = Math.max(1, countWorkingDaysBetween(op.plannedStartDate, newEndStr));
-        
+        const currentDuration = Math.max(1, op.estimatedDurationDays || 1);
+        const newDuration = Math.max(1, currentDuration + durationDelta);
+
+        if (newDuration === currentDuration && durationDelta < 0) {
+            showNotification?.('A duração mínima de uma ordem é 1 dia útil.', 'info');
+            return;
+        }
+
+        const newEndStr = calculateEndDateByWorkDays(op.plannedStartDate, newDuration);
+
         const updates: Partial<ProductionOrderData> = {
             estimatedDurationDays: newDuration,
             plannedEndDate: newEndStr
@@ -3830,13 +3810,122 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 setDrawerOP(prev => prev ? { ...prev, ...updates } : null);
             }
             if (durationDelta > 0) {
-                showNotification?.(`OP #${op.orderNumber} estendida até ${formatFriendlyDate(newEndStr)} (+${durationDelta} dia útil).`, 'success');
+                showNotification?.(`OP #${op.orderNumber}: Duração estendida para ${newDuration}d (até ${formatFriendlyDate(newEndStr)}).`, 'success');
             } else {
-                showNotification?.(`Prazo da OP #${op.orderNumber} reduzido para ${formatFriendlyDate(newEndStr)}.`, 'info');
+                showNotification?.(`OP #${op.orderNumber}: Duração reduzida para ${newDuration}d (até ${formatFriendlyDate(newEndStr)}).`, 'info');
             }
         } catch (error) {
             console.error('Erro ao ajustar duração:', error);
             showNotification?.('Erro ao atualizar duração da OP.', 'error');
+        }
+    };
+
+    // Permite definir diretamente a quantidade de dias da OP
+    const handleDirectSetDuration = async (op: ProductionOrderData) => {
+        if (isViewer) return;
+        const currentDays = Math.max(1, op.estimatedDurationDays || 1);
+        const input = window.prompt(
+            `Alterar duração da OP #${op.orderNumber}:\n\n` +
+            `Informe a quantidade de dias úteis de produção:`,
+            String(currentDays)
+        );
+        if (input === null) return;
+        const parsed = parseInt(input.trim(), 10);
+        if (isNaN(parsed) || parsed < 1) {
+            showNotification?.('Por favor, informe um número válido de dias (mínimo 1).', 'warning');
+            return;
+        }
+
+        const startDate = op.plannedStartDate || todayStr;
+        const newEndStr = calculateEndDateByWorkDays(startDate, parsed);
+        const updates: Partial<ProductionOrderData> = {
+            estimatedDurationDays: parsed,
+            plannedEndDate: newEndStr
+        };
+
+        try {
+            await updateProductionOrder(op.id, updates);
+            if (drawerOP?.id === op.id) {
+                setDrawerOP(prev => prev ? { ...prev, ...updates } : null);
+            }
+            showNotification?.(`OP #${op.orderNumber}: Duração definida para ${parsed} dia(s) (término: ${formatFriendlyDate(newEndStr)}).`, 'success');
+        } catch (error: any) {
+            console.error('Erro ao definir duração:', error);
+            showNotification?.('Erro ao salvar nova duração.', 'error');
+        }
+    };
+
+    // Encerrar / Concluir Ordem diretamente no PCP (libera a máquina)
+    const handleCompleteOP = async (op: ProductionOrderData) => {
+        if (isViewer) {
+            showNotification?.('Perfil de visualização: ação desabilitada.', 'warning');
+            return;
+        }
+
+        const isAlreadyCompleted = op.status === 'completed' || op.status === 'Finalizado' || op.status === 'Concluída';
+
+        if (isAlreadyCompleted) {
+            const confirmReopen = window.confirm(`A OP #${op.orderNumber} já está concluída.\n\nDeseja reabrir esta ordem de produção?`);
+            if (confirmReopen) {
+                try {
+                    await updateProductionOrder(op.id, {
+                        status: 'in_progress',
+                        endTime: undefined
+                    });
+                    showNotification?.(`OP #${op.orderNumber} reaberta com sucesso.`, 'info');
+                    if (drawerOP?.id === op.id) {
+                        setDrawerOP(prev => prev ? { ...prev, status: 'in_progress', endTime: undefined } : null);
+                    }
+                } catch (err: any) {
+                    showNotification?.(`Erro ao reabrir OP: ${err.message || err}`, 'error');
+                }
+            }
+            return;
+        }
+
+        const confirmClose = window.confirm(
+            `Deseja encerrar e finalizar a OP #${op.orderNumber}?\n\n` +
+            `• Status passará para: CONCLUÍDA\n` +
+            `• A máquina será liberada no PCP para novas ordens\n` +
+            `• Apontamentos e paradas em aberto serão finalizados`
+        );
+        if (!confirmClose) return;
+
+        try {
+            const now = new Date().toISOString();
+            const effectiveEnd = todayStr;
+
+            // Fecha paradas e logs em aberto
+            const newDowntimes = (op.downtimeEvents || []).map(dt => !dt.resumeTime ? { ...dt, resumeTime: now } : dt);
+            const newLogs = (op.operatorLogs || []).map(l => !l.endTime ? { ...l, endTime: now, endQuantity: op.actualProducedQuantity } : l);
+
+            // Ajusta o término planejado para hoje se a OP estava agendada além de hoje, recalculando a duração real
+            let newDuration = op.estimatedDurationDays || 1;
+            let newPlannedEnd = op.plannedEndDate || effectiveEnd;
+            if (op.plannedStartDate) {
+                if (effectiveEnd >= op.plannedStartDate) {
+                    newDuration = countWorkingDaysBetween(op.plannedStartDate, effectiveEnd);
+                    newPlannedEnd = effectiveEnd;
+                }
+            }
+
+            const updates: Partial<ProductionOrderData> = {
+                status: 'completed',
+                endTime: now,
+                plannedEndDate: newPlannedEnd,
+                estimatedDurationDays: newDuration,
+                downtimeEvents: newDowntimes,
+                operatorLogs: newLogs
+            };
+
+            await updateProductionOrder(op.id, updates);
+            if (drawerOP?.id === op.id) {
+                setDrawerOP(prev => prev ? { ...prev, ...updates } : null);
+            }
+            showNotification?.(`OP #${op.orderNumber} encerrada com sucesso! A máquina foi liberada no PCP.`, 'success');
+        } catch (error: any) {
+            console.error('Erro ao encerrar OP:', error);
+            showNotification?.(`Erro ao encerrar ordem: ${error.message || error}`, 'error');
         }
     };
 
@@ -6173,7 +6262,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 {/* Pill de Duração / Extensão */}
                                                                 <div 
                                                                     className="flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs text-slate-700 select-none"
-                                                                    title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}.` : "Duração estimada em dias úteis"}
+                                                                    title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Clique no número para digitar a duração.` : "Duração estimada em dias úteis. Clique no número para digitar a duração."}
                                                                 >
                                                                     <span className="text-[9px] text-slate-600 font-bold flex items-center gap-0.5">
                                                                         <span>⏱️</span>
@@ -6185,15 +6274,21 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         <div className="flex items-center gap-0.5">
                                                                             <button 
                                                                                 onClick={() => handleAdjustDuration(op, -1)}
-                                                                                className="w-3.5 h-3.5 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
-                                                                                title={hasProductionStarted(op) ? "Reduzir extensão" : "Diminuir duração"}
+                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                                title="Diminuir duração (-1 dia)"
                                                                             >
                                                                                 -
                                                                             </button>
-                                                                            <span className="font-black text-xs text-slate-900 px-0.5 font-mono">{op.estimatedDurationDays || 1}d</span>
+                                                                            <span 
+                                                                                onClick={() => handleDirectSetDuration(op)}
+                                                                                className="font-black text-xs text-slate-900 hover:text-blue-600 px-1 font-mono cursor-pointer hover:underline"
+                                                                                title="Clique para digitar a duração em dias"
+                                                                            >
+                                                                                {op.estimatedDurationDays || 1}d
+                                                                            </span>
                                                                             <button 
                                                                                 onClick={() => handleAdjustDuration(op, 1)}
-                                                                                className="w-3.5 h-3.5 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
                                                                                 title="Estender duração (+1 dia)"
                                                                             >
                                                                                 +
@@ -6229,6 +6324,25 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         </div>
                                                                     </div>
                                                                 </div>
+
+                                                                {/* Botão de Encerrar Ordem diretamente na barra da OP */}
+                                                                {!isViewer && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleCompleteOP(op);
+                                                                        }}
+                                                                        className={`flex items-center gap-1 px-2 py-0.5 rounded border shadow-xs text-[10px] font-black transition-all active:scale-95 cursor-pointer shrink-0 ${
+                                                                            prog.isCompleted
+                                                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                                                                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border-rose-300'
+                                                                        }`}
+                                                                        title={prog.isCompleted ? "OP Concluída (Clique para reabrir se necessário)" : "Encerrar Ordem de Produção (libera a máquina no PCP)"}
+                                                                    >
+                                                                        <span>{prog.isCompleted ? '✅' : '🏁'}</span>
+                                                                        <span className="hidden md:inline">{prog.isCompleted ? 'Concluída' : 'Encerrar'}</span>
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -9973,16 +10087,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <div className="flex items-center gap-3 bg-[#0A1D2A] border border-white/10 rounded-xl p-1 justify-between">
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            if (isAlreadyStarted) {
-                                                const elapsed = countWorkingDaysBetween(selectedOP.plannedStartDate || scheduleStartDate, todayStr);
-                                                if (scheduleDuration <= elapsed) {
-                                                    showNotification?.(`Não é possível reduzir para menos de ${elapsed} dia(s), pois a produção já decorreu até hoje.`, 'warning');
-                                                    return;
-                                                }
-                                            }
-                                            setScheduleDuration(prev => Math.max(1, prev - 1));
-                                        }}
+                                        onClick={() => setScheduleDuration(prev => Math.max(1, prev - 1))}
                                         className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
                                     >
                                         -
@@ -10296,9 +10401,39 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <strong className="text-slate-900">{drawerOP.plannedStartDate || 'Não agendado'}</strong>
                             </div>
 
-                            <div className="flex justify-between py-1">
+                            <div className="flex justify-between items-center py-1">
                                 <span className="text-slate-500">Duração Estimada:</span>
-                                <strong className="text-slate-900">{drawerOP.estimatedDurationDays || 1} dia(s)</strong>
+                                <div className="flex items-center gap-1.5">
+                                    <strong className="text-slate-900">{drawerOP.estimatedDurationDays || 1} dia(s)</strong>
+                                    {!isViewer && (
+                                        <div className="flex items-center gap-1 ml-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAdjustDuration(drawerOP, -1)}
+                                                className="w-5 h-5 rounded bg-slate-200 hover:bg-rose-100 text-slate-700 hover:text-rose-700 text-xs font-black flex items-center justify-center transition-all cursor-pointer"
+                                                title="Diminuir 1 dia de duração"
+                                            >
+                                                -
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAdjustDuration(drawerOP, 1)}
+                                                className="w-5 h-5 rounded bg-slate-200 hover:bg-emerald-100 text-slate-700 hover:text-emerald-700 text-xs font-black flex items-center justify-center transition-all cursor-pointer"
+                                                title="Aumentar 1 dia de duração"
+                                            >
+                                                +
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDirectSetDuration(drawerOP)}
+                                                className="text-[10px] bg-slate-200 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold transition-all cursor-pointer"
+                                                title="Digitar quantidade de dias"
+                                            >
+                                                Alterar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -10367,6 +10502,26 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <PrinterIcon className="w-4 h-4 text-cyan-400" />
                                 Imprimir Ordem de Produção (Ficha A4)
                             </button>
+
+                            {/* Encerrar / Finalizar OP (Liberar Máquina no PCP) */}
+                            {!isViewer && (() => {
+                                const isCompleted = drawerOP.status === 'completed' || drawerOP.status === 'Finalizado' || drawerOP.status === 'Concluída';
+                                return (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCompleteOP(drawerOP)}
+                                        className={`w-full font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all uppercase tracking-wider ${
+                                            isCompleted
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                                                : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-rose-600/20'
+                                        }`}
+                                        title={isCompleted ? "OP Concluída. Clique para reabrir a ordem se necessário." : "Encerrar esta OP, finalizar apontamentos em aberto e liberar a máquina no PCP"}
+                                    >
+                                        <span>{isCompleted ? '✅' : '🏁'}</span>
+                                        <span>{isCompleted ? 'OP Concluída (Clique para Reabrir)' : 'Encerrar e Finalizar Ordem'}</span>
+                                    </button>
+                                );
+                            })()}
 
                             {/* Ações de Pausa e Retomada para Liberação de Máquina */}
                             {!isViewer && (() => {

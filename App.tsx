@@ -3230,6 +3230,28 @@ const App: React.FC = () => {
                     }
                 }
             }
+        } else if (orderToComplete.machine && orderToComplete.machine.startsWith('Malha')) {
+            // Malha - Encerramento limpo sem alterar estoque bruto conforme especificado
+            let fullQty = Number(finalData.actualProducedQuantity || 0);
+            if (fullQty <= 0) {
+                fullQty = Number(orderToComplete.actualProducedQuantity || 0);
+            }
+            if (fullQty <= 0) {
+                fullQty = Number(orderToComplete.quantityToProduce || 0);
+            }
+
+            let actualWeight = Number(orderToComplete.actualProducedWeight || 0);
+            if (actualWeight <= 0 && orderToComplete.weighedPackages?.length) {
+                actualWeight = orderToComplete.weighedPackages.reduce((sum, pkg) => sum + (pkg.weight || 0), 0);
+            }
+
+            updates = {
+                status: 'completed',
+                endTime: now,
+                downtimeEvents: newEvents,
+                actualProducedQuantity: fullQty,
+                actualProducedWeight: actualWeight,
+            };
         } else { // Treliça
             try {
                 // Determine actual production quantity
