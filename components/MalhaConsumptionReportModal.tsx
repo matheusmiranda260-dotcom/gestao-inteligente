@@ -1436,6 +1436,11 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     const [newPkgQty, setNewPkgQty] = useState<number>(50);
     const [newPkgWeight, setNewPkgWeight] = useState<string>('');
     const [newPkgTag, setNewPkgTag] = useState<string>('');
+    const [validationError, setValidationError] = useState<{
+        message: string;
+        missingDir?: 'LONGITUDINAL' | 'TRANSVERSAL';
+        missingSlot?: 'ACTIVE' | 'RESERVE';
+    } | null>(null);
 
     // Estado para modal/painel rápido de seleção de lote (Ativo ou Reserva)
     const [pickerTarget, setPickerTarget] = useState<{
@@ -1545,6 +1550,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     };
 
     const handleUpdateLotWeightInQueue = (dir: 'LONGITUDINAL' | 'TRANSVERSAL', lotId: string, newWeight: number) => {
+        setValidationError(null);
         if (dir === 'LONGITUDINAL') {
             const nextQ = reportData.longLotsQueue.map(item => item.id === lotId ? { ...item, weight: newWeight } : item);
             persistDataAndSyncActiveLots({ ...reportData, longLotsQueue: nextQ });
@@ -1609,17 +1615,98 @@ export const MalhaPackagesOperatorPanel: React.FC<{
 
         persistDataAndSyncActiveLots(nextData);
         setPickerTarget(null);
+        setValidationError(null);
     };
 
     const handleConfirmNewPackage = () => {
-        const nextNum = reportData.packages.length + 1;
         const parsedWeight = parseFloat(newPkgWeight.replace(',', '.'));
+        if (isNaN(parsedWeight) || parsedWeight <= 0) {
+            setValidationError({
+                message: '⚠️ Informe o Peso do Pacote (kg) que deu na balança antes de confirmar!'
+            });
+            return;
+        }
+
+        const activeLong = computed.activeLongLot;
+        const reserveLong = computed.reserveLongLot;
+        const activeTrans = computed.activeTransLot;
+        const reserveTrans = computed.reserveTransLot;
+
+        // 1. Verificar se existe Lote Ativo Longitudinal com peso informado
+        if (!activeLong || !activeLong.lot || activeLong.kgEntra <= 0) {
+            setValidationError({
+                message: '🚫 Informe o LOTE ATIVO LONGITUDINAL e o seu Peso (kg) antes de fechar o pacote!',
+                missingDir: 'LONGITUDINAL',
+                missingSlot: 'ACTIVE'
+            });
+            return;
+        }
+
+        // 2. Verificar se existe Lote Ativo Transversal com peso informado
+        if (!activeTrans || !activeTrans.lot || activeTrans.kgEntra <= 0) {
+            setValidationError({
+                message: '🚫 Informe o LOTE ATIVO TRANSVERSAL e o seu Peso (kg) antes de fechar o pacote!',
+                missingDir: 'TRANSVERSAL',
+                missingSlot: 'ACTIVE'
+            });
+            return;
+        }
+
+        const neededLong = livePreview.longKgCons;
+        const neededTrans = livePreview.transKgCons;
+
+        // 3. Verificar se o saldo do Lote Ativo Longitudinal dá para abater ou se exige Lote Reserva Longitudinal
+        if (neededLong > activeLong.sobra + 0.05) {
+            const deficitLong = neededLong - activeLong.sobra;
+            if (!reserveLong || !reserveLong.lot || reserveLong.kgEntra <= 0) {
+                setValidationError({
+                    message: `🚫 SALDO INSUFICIENTE NO FIO LONGITUDINAL! O Lote Ativo (${activeLong.lot}) só tem ${activeLong.sobra.toFixed(1)} kg restantes e este pacote precisa de ${neededLong.toFixed(1)} kg (faltam ${deficitLong.toFixed(1)} kg). Selecione o LOTE RESERVA Longitudinal e informe o peso dele antes de continuar!`,
+                    missingDir: 'LONGITUDINAL',
+                    missingSlot: 'RESERVE'
+                });
+                return;
+            }
+            const totalAvailableLong = activeLong.sobra + reserveLong.sobra;
+            if (neededLong > totalAvailableLong + 0.05) {
+                setValidationError({
+                    message: `🚫 PESO INSUFICIENTE NO FIO LONGITUDINAL! Somando o Lote Ativo (${activeLong.sobra.toFixed(1)} kg) + Lote Reserva ${reserveLong.lot} (${reserveLong.sobra.toFixed(1)} kg) temos ${totalAvailableLong.toFixed(1)} kg, mas o pacote precisa de ${neededLong.toFixed(1)} kg. Verifique o peso do Lote Reserva!`,
+                    missingDir: 'LONGITUDINAL',
+                    missingSlot: 'RESERVE'
+                });
+                return;
+            }
+        }
+
+        // 4. Verificar se o saldo do Lote Ativo Transversal dá para abater ou se exige Lote Reserva Transversal
+        if (neededTrans > activeTrans.sobra + 0.05) {
+            const deficitTrans = neededTrans - activeTrans.sobra;
+            if (!reserveTrans || !reserveTrans.lot || reserveTrans.kgEntra <= 0) {
+                setValidationError({
+                    message: `🚫 SALDO INSUFICIENTE NO FIO TRANSVERSAL! O Lote Ativo (${activeTrans.lot}) só tem ${activeTrans.sobra.toFixed(1)} kg restantes e este pacote precisa de ${neededTrans.toFixed(1)} kg (faltam ${deficitTrans.toFixed(1)} kg). Selecione o LOTE RESERVA Transversal e informe o peso dele antes de continuar!`,
+                    missingDir: 'TRANSVERSAL',
+                    missingSlot: 'RESERVE'
+                });
+                return;
+            }
+            const totalAvailableTrans = activeTrans.sobra + reserveTrans.sobra;
+            if (neededTrans > totalAvailableTrans + 0.05) {
+                setValidationError({
+                    message: `🚫 PESO INSUFICIENTE NO FIO TRANSVERSAL! Somando o Lote Ativo (${activeTrans.sobra.toFixed(1)} kg) + Lote Reserva ${reserveTrans.lot} (${reserveTrans.sobra.toFixed(1)} kg) temos ${totalAvailableTrans.toFixed(1)} kg, mas o pacote precisa de ${neededTrans.toFixed(1)} kg. Verifique o peso do Lote Reserva!`,
+                    missingDir: 'TRANSVERSAL',
+                    missingSlot: 'RESERVE'
+                });
+                return;
+            }
+        }
+
+        setValidationError(null);
+        const nextNum = reportData.packages.length + 1;
         const newPkg: MalhaPackageRow = {
             id: `mpkg-${Date.now()}`,
             packageCode: `p${nextNum}`,
             finishedLotNumber: newPkgTag.trim(),
             quantity: Number(newPkgQty) || 50,
-            measuredPackageWeight: !isNaN(parsedWeight) && parsedWeight > 0 ? parsedWeight : null,
+            measuredPackageWeight: parsedWeight,
             longLot: '',
             longLotWeight: 0,
             transLot: '',
@@ -2060,6 +2147,38 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                             <span>Confirmar P{nextPackageNumber}</span>
                         </button>
                     </div>
+
+                    {/* Alerta de Bloqueio quando faltar Lote Reserva ou Peso */}
+                    {validationError && (
+                        <div className="p-3.5 rounded-xl bg-rose-950/90 border-2 border-rose-500 text-rose-100 space-y-2.5 animate-fade-in">
+                            <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-black leading-relaxed text-rose-200">
+                                    {validationError.message}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setValidationError(null)}
+                                    className="text-xs font-bold text-rose-300 hover:text-white px-1.5 shrink-0"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            {validationError.missingDir && validationError.missingSlot && (
+                                <button
+                                    type="button"
+                                    onClick={() => openLotPicker(validationError.missingDir!, validationError.missingSlot!)}
+                                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                    <span>🟡</span>
+                                    <span>
+                                        {validationError.missingSlot === 'RESERVE'
+                                            ? `+ Selecionar Lote Reserva (${validationError.missingDir}) Agora`
+                                            : `+ Selecionar Lote Ativo (${validationError.missingDir}) Agora`}
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     {/* Faixa de Resultado Automático da Conversão (Bitola que deu no fio + Peso Longitudinal + Peso Transversal) */}
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center">
