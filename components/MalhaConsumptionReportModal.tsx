@@ -1470,6 +1470,11 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         return map;
     }, [stock]);
 
+    const computed = useMemo(
+        () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
+        [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
+    );
+
     // Conjunto de todos os lotes já cadastrados/utilizados nesta OP (Ativos, Reservas ou já Finalizados com Sobra 0)
     const usedLotCodesMap = useMemo(() => {
         const map = new Map<string, string>(); // lotCodeLower -> descrição de onde está sendo usado
@@ -1520,11 +1525,6 @@ export const MalhaPackagesOperatorPanel: React.FC<{
             .sort((a, b) => String(b.internalLot).localeCompare(String(a.internalLot), undefined, { numeric: true }))
             .slice(0, 20);
     }, [stock, reportData.techConfig.bitola, showAllStockGauges, pickerLotInput, usedLotCodesMap]);
-
-    const computed = useMemo(
-        () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
-        [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
-    );
 
     // Simulação em tempo real do pacote que o operador está preenchendo agora (50 peças + Peso do Pacote)
     const livePreview = useMemo(
