@@ -148,12 +148,12 @@ export const resolveMachineShiftConfig = (
             : (defaultForMach?.shiftCount || 1);
 
         return {
-            workDays: custom.workDays || globalConfig?.workDays || [1, 2, 3, 4, 5],
-            autoStartShift: custom.autoStartShift === true, // Apenas se explicitamente true
-            autoEndShift: custom.autoEndShift !== undefined ? custom.autoEndShift : (globalConfig?.autoEndShift !== false),
-            autoEndTimeoutMin: custom.autoEndTimeoutMin || globalConfig?.autoEndTimeoutMin || 5,
-            requireManagerAuthForOvertime: custom.requireManagerAuthForOvertime !== undefined ? custom.requireManagerAuthForOvertime : (globalConfig?.requireManagerAuthForOvertime !== false),
             ...custom,
+            workDays: (Array.isArray(custom.workDays) && custom.workDays.length > 0) ? custom.workDays : (globalConfig?.workDays || [1, 2, 3, 4, 5]),
+            autoStartShift: custom.autoStartShift === true, // Apenas se explicitamente true
+            autoEndShift: custom.autoEndShift !== undefined ? Boolean(custom.autoEndShift) : (globalConfig?.autoEndShift !== false),
+            autoEndTimeoutMin: Number(custom.autoEndTimeoutMin) || Number(globalConfig?.autoEndTimeoutMin) || 5,
+            requireManagerAuthForOvertime: custom.requireManagerAuthForOvertime !== undefined ? Boolean(custom.requireManagerAuthForOvertime) : (globalConfig?.requireManagerAuthForOvertime !== false),
             shiftCount: resolvedShiftCount,
             shift2Start: resolvedShiftCount === 2 ? (custom.shift2Start || defaultForMach?.shift2Start || '14:48') : undefined,
             shift2End: resolvedShiftCount === 2 ? (custom.shift2End || defaultForMach?.shift2End || '23:36') : undefined,

@@ -683,10 +683,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return null;
         }
 
-        // Se o expediente já encerrou na configuração do PCP (com tolerância expirada) e não há autorização de hora extra por gestor
+        // Se o expediente já encerrou na configuração do PCP (com tolerância expirada) e não há autorização de hora extra pós-turno por gestor
         const shiftEval = checkMachineShiftStatus(machName, shiftConfig, liveNow);
         if (shiftEval.autoEndShift && !shiftEval.inShiftWindow && shiftEval.isOvertime && !shiftEval.isAutoEndCountdown) {
-            if (!openLog.managerAuthorized) {
+            const postShiftGraceCutoffMs = (shiftEval.shiftEndMs || 0) - 15 * 60 * 1000;
+            const logStartMs = openLog.startTime ? new Date(openLog.startTime).getTime() : 0;
+            const isPostShiftOvertimeAuthorized = Boolean(
+                openLog.managerAuthorized && (
+                    (openLog as any).overtimeExtendedAt ||
+                    (openLog as any).overtime_extended_at ||
+                    (postShiftGraceCutoffMs > 0 && logStartMs >= postShiftGraceCutoffMs)
+                )
+            );
+            if (!isPostShiftOvertimeAuthorized) {
                 return null;
             }
         }
@@ -4002,7 +4011,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             const machName = op.scheduledMachine || (op.machine as string);
             const shiftEval = machName ? checkMachineShiftStatus(machName, shiftConfig, liveNow) : null;
             const openLogs = (op.operatorLogs || []).filter((l: any) => !l.endTime && l.operator && l.operator !== 'GHOST_ORDER_FLAG');
-            const hasManagerAuth = openLogs.some((l: any) => Boolean(l.managerAuthorized));
+            const postShiftGraceCutoffMs = (shiftEval?.shiftEndMs || 0) - 15 * 60 * 1000;
+            const hasManagerAuth = openLogs.some((l: any) => {
+                if (!l.managerAuthorized && !(l as any).manager_authorized) return false;
+                if ((l as any).overtimeExtendedAt || (l as any).overtime_extended_at) return true;
+                const st = l.startTime || (l as any).start_time;
+                const startMs = st ? new Date(st).getTime() : 0;
+                return postShiftGraceCutoffMs > 0 && startMs >= postShiftGraceCutoffMs;
+            });
 
             if (shiftEval && shiftEval.autoEndShift && !shiftEval.inShiftWindow && shiftEval.isOvertime && !shiftEval.isAutoEndCountdown && !hasManagerAuth) {
                 isOffline = true;

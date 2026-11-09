@@ -2472,8 +2472,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return;
         }
 
-        const isOt = isForceOvertime || !shiftEvaluation.inShiftWindow;
-        const mgrAuth = managerAuthUser || (isOt ? (isGestor ? currentUser?.username : (isForceOvertime ? 'gestor' : undefined)) : undefined);
+        // Apenas marcar como hora extra (isOvertime) se realmente for hora extra pós-turno/feriado/folga (não entrada antecipada matinal)
+        const isOt = Boolean(shiftEvaluation.isOvertime);
+        const needsEarlyOrOtAuth = !shiftEvaluation.inShiftWindow;
+        const mgrAuth = managerAuthUser || (needsEarlyOrOtAuth ? (isGestor ? currentUser?.username : (isForceOvertime ? 'gestor' : undefined)) : undefined);
 
         // Check for ANY active downtime event from previous shift (not just the last array element)
         const openEvent = (activeOrder.downtimeEvents || []).find(e =>
@@ -2814,26 +2816,37 @@ const MachineControl: React.FC<MachineControlProps> = ({
         return !!currentOperatorLog && !currentOperatorLog.endTime;
     }, [currentOperatorLog]);
 
-    // Sincronizar estado de hora extra/autorização APENAS se houver turno ABERTO com autorização explícita do gestor
+    // Sincronizar estado de hora extra/autorização APENAS se houver turno ABERTO com autorização explícita de hora extra pós-turno
     useEffect(() => {
         const isOpenLog = Boolean(currentOperatorLog && !currentOperatorLog.endTime);
+        const postShiftGraceCutoffMs = (shiftEvaluation.shiftEndMs || 0) - 15 * 60 * 1000;
+        const logStartMs = currentOperatorLog?.startTime ? new Date(currentOperatorLog.startTime).getTime() : 0;
+        const isPostShiftOrExtendedLog = Boolean(
+            (currentOperatorLog as any)?.overtimeExtendedAt ||
+            (currentOperatorLog as any)?.overtime_extended_at ||
+            (postShiftGraceCutoffMs > 0 && logStartMs >= postShiftGraceCutoffMs) ||
+            shiftEvaluation.isHoliday ||
+            shiftEvaluation.isWorkDay === false
+        );
         const hasManagerAuth = Boolean(
-            isOpenLog && (
+            isOpenLog && isPostShiftOrExtendedLog && (
                 currentOperatorLog?.managerAuthorized ||
-                (currentOperatorLog as any)?.manager_authorized
+                (currentOperatorLog as any)?.manager_authorized ||
+                currentOperatorLog?.isOvertime ||
+                (currentOperatorLog as any)?.is_overtime
             )
         );
         if (isOpenLog && hasManagerAuth) {
             if (!authorizedOvertimeForCurrentShift) {
                 setAuthorizedOvertimeForCurrentShift(true);
             }
-        } else if (!isOpenLog) {
-            // Se NÃO há turno aberto no momento, limpa autorização para que o próximo início exija a senha do gestor
+        } else if (!isOpenLog || (shiftEvaluation.inShiftWindow && !shiftEvaluation.isOvertime && !(currentOperatorLog as any)?.overtimeExtendedAt)) {
+            // Se NÃO há turno aberto ou estamos dentro do expediente regular sem extensão pós-turno, limpa autorização
             if (authorizedOvertimeForCurrentShift) {
                 setAuthorizedOvertimeForCurrentShift(false);
             }
         }
-    }, [currentOperatorLog, authorizedOvertimeForCurrentShift]);
+    }, [currentOperatorLog, authorizedOvertimeForCurrentShift, shiftEvaluation.shiftEndMs, shiftEvaluation.inShiftWindow, shiftEvaluation.isOvertime, shiftEvaluation.isHoliday, shiftEvaluation.isWorkDay]);
 
     const currentMachineStatus = useMemo(() => {
         if (!isAnyActiveShift) {
@@ -3101,13 +3114,22 @@ const MachineControl: React.FC<MachineControlProps> = ({
             return;
         }
 
-        // Se o operador já teve hora extra autorizada nesta sessão de turno, descarta contagem de fechamento
+        // Se o operador já teve hora extra pós-turno autorizada nesta sessão de turno, descarta contagem de fechamento
+        const postShiftGraceCutoffMs = (shiftEvaluation.shiftEndMs || 0) - 15 * 60 * 1000;
+        const logStartMs = currentOperatorLog?.startTime ? new Date(currentOperatorLog.startTime).getTime() : 0;
+        const isPostShiftOrExtendedLog = Boolean(
+            (currentOperatorLog as any)?.overtimeExtendedAt ||
+            (currentOperatorLog as any)?.overtime_extended_at ||
+            (postShiftGraceCutoffMs > 0 && logStartMs >= postShiftGraceCutoffMs)
+        );
         const isAuthorizedLog = Boolean(
             authorizedOvertimeForCurrentShift ||
-            currentOperatorLog?.managerAuthorized ||
-            (currentOperatorLog as any)?.manager_authorized ||
-            currentOperatorLog?.isOvertime ||
-            (currentOperatorLog as any)?.is_overtime
+            (isPostShiftOrExtendedLog && (
+                currentOperatorLog?.managerAuthorized ||
+                (currentOperatorLog as any)?.manager_authorized ||
+                currentOperatorLog?.isOvertime ||
+                (currentOperatorLog as any)?.is_overtime
+            ))
         );
 
         if (isAuthorizedLog) {
@@ -3124,6 +3146,17 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 setShowAutoEndCountdownModal(true);
             } else {
                 setShowAutoEndCountdownModal(false);
+                // Quando o cronômetro de tolerância esgota (00:00), dispara o encerramento automático imediatamente
+                const triggerKey = `${activeOrder.id}_${currentOperatorLog?.startTime || ''}_${shiftStatus.shiftName}`;
+                if (autoEndShiftTriggeredRef.current !== triggerKey && endOperatorShift) {
+                    autoEndShiftTriggeredRef.current = triggerKey;
+                    const pkgPieces = (activeOrder.weighedPackages || []).reduce((acc: number, p: any) => acc + (Number(p.quantity) || 200), 0);
+                    const finalQty = Math.max(Number(activeOrder.actualProducedQuantity) || 0, pkgPieces);
+                    endOperatorShift(activeOrder.id, finalQty, {
+                        autoClosed: true,
+                        observation: `Encerramento automático por fim do ${shiftStatus.shiftName} (${shiftStatus.shiftLabel}). Horário limite atingido (${shiftStatus.workEnd} + ${shiftStatus.autoEndTimeoutMin}m de tolerância). Quantidade registrada: ${finalQty}.`
+                    });
+                }
             }
         } else {
             setShowAutoEndCountdownModal(false);
@@ -4220,7 +4253,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                     }
                     onSuccess={() => {
                         setShowManagerAuthForOvertimeStart(false);
-                        setAuthorizedOvertimeForCurrentShift(true);
+                        // Apenas autoriza extensão pós-turno se realmente já estivermos em hora extra pós-turno/feriado (não entrada antecipada matinal)
+                        if (shiftEvaluation.isOvertime) {
+                            setAuthorizedOvertimeForCurrentShift(true);
+                        }
                         if (pendingResumeAfterAuth) {
                             setPendingResumeAfterAuth(false);
                             if (logResumeProduction && activeOrder) {
@@ -4252,6 +4288,22 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         setShowManagerAuthForOvertimeExtend(false);
                         setAuthorizedOvertimeForCurrentShift(true);
                         setShowAutoEndCountdownModal(false);
+                        // Persistir a autorização de extensão em hora extra no log aberto para sincronizar com o Watchdog global (App.tsx)
+                        if (activeOrder && updateProductionOrder) {
+                            const nowIso = new Date().toISOString();
+                            const updatedLogs = (activeOrder.operatorLogs || []).map((l: any) => {
+                                if (!l.endTime && l.operator && l.operator !== 'GHOST_ORDER_FLAG') {
+                                    return {
+                                        ...l,
+                                        isOvertime: true,
+                                        managerAuthorized: l.managerAuthorized || 'gestor',
+                                        overtimeExtendedAt: nowIso
+                                    };
+                                }
+                                return l;
+                            });
+                            updateProductionOrder(activeOrder.id, { operatorLogs: updatedLogs });
+                        }
                     }}
                     onCancel={() => setShowManagerAuthForOvertimeExtend(false)}
                 />

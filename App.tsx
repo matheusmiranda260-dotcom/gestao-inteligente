@@ -2991,14 +2991,22 @@ const App: React.FC = () => {
                 // Se a máquina possui autoEndShift ativo e o horário do turno encerrou + tolerância esgotada
                 // REGRA CRÍTICA: Não auto-encerrar compulsoriamente se for feriado ou folga com operador trabalhando
                 if (shiftEval.autoEndShift && shiftEval.isOvertime && !shiftEval.inShiftWindow && !shiftEval.isAutoEndCountdown && !shiftEval.isHoliday && shiftEval.isWorkDay !== false) {
-                    const hasManagerOvertime = openLogs.some(l => 
-                        Boolean(
+                    const postShiftGraceCutoffMs = (shiftEval.shiftEndMs || 0) - 15 * 60 * 1000;
+                    const hasManagerOvertime = openLogs.some(l => {
+                        const hasOvertimeFlags = Boolean(
                             l.managerAuthorized || 
                             (l as any).manager_authorized || 
                             l.isOvertime || 
                             (l as any).is_overtime
-                        )
-                    );
+                        );
+                        if (!hasOvertimeFlags) return false;
+                        // Se foi explicitamente estendido para hora extra no fim do turno
+                        if ((l as any).overtimeExtendedAt || (l as any).overtime_extended_at) return true;
+                        // Ou se o turno foi iniciado já próximo ou após o fim do expediente (hora extra pós-turno)
+                        const st = l.startTime || (l as any).start_time;
+                        const startMs = st ? new Date(st).getTime() : 0;
+                        return postShiftGraceCutoffMs > 0 && startMs >= postShiftGraceCutoffMs;
+                    });
                     if (hasManagerOvertime) continue;
 
                     const lockKey = `${order.id}_${todayStr}_${shiftEval.shiftName}`;
