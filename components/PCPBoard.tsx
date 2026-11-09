@@ -7814,5 +7814,5835 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     value={createMachine}
                                                     onChange={(e) => setCreateMachine(e.target.value)}
                                                     className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
-                       
-... [truncated for diff preview]
+                                                >
+                                                    <option value="Treliça 1">Treliça 1</option>
+                                                    <option value="Treliça 2">Treliça 2</option>
+                                                </select>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Número da Ordem</label>
+                                            <input
+                                                type="text"
+                                                value={createOrderNumber}
+                                                onChange={(e) => setCreateOrderNumber(e.target.value)}
+                                                placeholder="Ex: TL-4520"
+                                                autoComplete="off"
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-emerald-500/50 focus:bg-[#07131B] focus:text-white text-white font-bold"
+                                            />
+                                        </div>
+
+                                        {/* Ordem Fantasma Treliça */}
+                                        <div className="flex flex-col gap-1 p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="isTrelicaGhostOrderPCP"
+                                                    checked={isTrelicaGhostOrder}
+                                                    onChange={(e) => setIsTrelicaGhostOrder(e.target.checked)}
+                                                    className="h-4 w-4 rounded border-slate-700 bg-[#07131B] text-amber-500 focus:ring-amber-500 cursor-pointer"
+                                                />
+                                                <label htmlFor="isTrelicaGhostOrderPCP" className="text-xs font-bold text-amber-400 cursor-pointer">
+                                                    Ordem Fantasma (Não reservar rolos de CA-60)
+                                                </label>
+                                            </div>
+                                            <p className="text-[9px] text-amber-300/80 pl-6 leading-tight">
+                                                A seleção dos lotes continua obrigatória para garantir o cálculo preciso de peso, tempos e calibração da OP.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modelo da Treliça</label>
+                                            <select
+                                                value={selectedTrelicaCod}
+                                                onChange={(e) => setSelectedTrelicaCod(e.target.value)}
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                            >
+                                                {trelicaModels.map(m => (
+                                                    <option key={m.cod} value={m.cod}>
+                                                        {m.modelo} - {m.tamanho}m (Sup: {m.superior} | Inf: {m.inferior} | Sen: {m.senozoide})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantidade a Produzir (peças)</label>
+                                            <input
+                                                type="number"
+                                                value={trelicaQuantity}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value);
+                                                    setTrelicaQuantity(val);
+                                                }}
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                            />
+                                        </div>
+
+                                        {/* ========================================================== */}
+                                        {/* ESQUEMA OPERACIONAL DE TEMPOS, VELOCIDADE E SETUP */}
+                                        {/* ========================================================== */}
+                                        <div className="bg-[#07131B] p-3 rounded-xl border border-emerald-500/20 flex flex-col gap-2.5">
+                                            <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                                                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+                                                    ⏱️ Parâmetros Operacionais da Máquina
+                                                </span>
+                                                <span className="text-[9px] font-mono text-slate-400">
+                                                    {trelicaProductionCalculations.totalMeters.toLocaleString('pt-BR')} m totais
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Velocidade</label>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            step="0.5"
+                                                            min="1"
+                                                            value={trelicaSpeed}
+                                                            onChange={(e) => setTrelicaSpeed(Math.max(1, Number(e.target.value)))}
+                                                            className="w-full bg-[#0A1822] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-black text-emerald-400 focus:outline-none focus:border-emerald-500"
+                                                        />
+                                                        <span className="absolute right-1.5 text-[8px] text-slate-500 font-bold pointer-events-none">m/min</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Tempo Setup</label>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            step="5"
+                                                            min="0"
+                                                            value={trelicaSetupTimeMin}
+                                                            onChange={(e) => setTrelicaSetupTimeMin(Math.max(0, Number(e.target.value)))}
+                                                            className="w-full bg-[#0A1822] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-black text-amber-400 focus:outline-none focus:border-amber-500"
+                                                        />
+                                                        <span className="absolute right-1.5 text-[8px] text-slate-500 font-bold pointer-events-none">min</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Meta Diária</label>
+                                                        {trelicaDailyTargetOverride !== null && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setTrelicaDailyTargetOverride(null)}
+                                                                className="text-[7px] text-cyan-400 hover:underline font-bold"
+                                                                title="Resetar para meta automática calculada"
+                                                            >
+                                                                auto
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={trelicaProductionCalculations.dailyPieces}
+                                                            onChange={(e) => setTrelicaDailyTargetOverride(Math.max(1, Number(e.target.value)))}
+                                                            className="w-full bg-[#0A1822] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-black text-cyan-400 focus:outline-none focus:border-cyan-500"
+                                                        />
+                                                        <span className="absolute right-1.5 text-[8px] text-slate-500 font-bold pointer-events-none">pçs</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Detalhamento dos Tempos */}
+                                            <div className="grid grid-cols-3 gap-1.5 py-1 text-center bg-white/[0.02] p-1.5 rounded-lg border border-white/5 font-mono text-[10px]">
+                                                <div>
+                                                    <span className="text-slate-400 block text-[8px] uppercase">Solda / Corrida</span>
+                                                    <strong className="text-emerald-400 block mt-0.5">
+                                                        {formatDurationHoursMin(trelicaProductionCalculations.runMinutes)}
+                                                    </strong>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        ~{(trelicaProductionCalculations.runMinutes / 60).toFixed(1)}h
+                                                    </span>
+                                                </div>
+                                                <div className="border-x border-white/5">
+                                                    <span className="text-slate-400 block text-[8px] uppercase">Setup Inicial</span>
+                                                    <strong className="text-amber-400 block mt-0.5">
+                                                        {trelicaSetupTimeMin}m
+                                                    </strong>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        preparação
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block text-[8px] uppercase">Total Estimado</span>
+                                                    <strong className="text-cyan-400 block mt-0.5">
+                                                        {formatDurationHoursMin(trelicaProductionCalculations.totalMinutes)}
+                                                    </strong>
+                                                    <span className="text-[8px] text-slate-500">
+                                                        ~{trelicaProductionCalculations.totalHours.toFixed(1)}h
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-[10px] text-slate-400 px-1 pt-1 border-t border-white/5">
+                                                <span>Ritmo Diário:</span>
+                                                <strong className="text-emerald-300 font-mono">
+                                                    ~{trelicaProductionCalculations.dailyPieces} pçs/dia ({trelicaProductionCalculations.dailyKg.toFixed(0)} kg/dia)
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        {/* Agendamento */}
+                                        <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-2">
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Início</label>
+                                                <input
+                                                    type="date"
+                                                    value={createStartDate}
+                                                    onChange={(e) => setCreateStartDate(e.target.value)}
+                                                    className="w-full bg-[#07131B] border border-white/10 rounded-xl py-1.5 px-2.5 text-xs text-white"
+                                                />
+                                            </div>
+
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duração (dias)</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTempShiftConfig({ ...shiftConfig });
+                                                            setIsWorkHoursModalOpen(true);
+                                                        }}
+                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:text-white transition-all text-[9px] font-mono cursor-pointer active:scale-95"
+                                                        title="Configurar jornada de trabalho diária (início, almoço e fim)"
+                                                    >
+                                                        <ClockIcon className="w-2.5 h-2.5" />
+                                                        <span>{dailyShiftDetails.totalWorkHours.toFixed(1)}h/dia</span>
+                                                        <span className="text-[8px] opacity-75">⚙️</span>
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-[#07131B] border border-white/10 rounded-xl p-1 justify-between">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCreateDuration(prev => Math.max(1, prev - 1))}
+                                                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <span className="text-xs font-bold text-white">{createDuration}d</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCreateDuration(prev => prev + 1)}
+                                                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* ========================================================== */}
+                                    {/* Coluna Direita: Seleção Completa de Lotes de CA-60 */}
+                                    {/* ========================================================== */}
+                                    <div className="lg:col-span-7 flex flex-col gap-3 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-2">
+                                            <div>
+                                                <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5">
+                                                    <ClipboardListIcon className="w-4 h-4 text-emerald-400" />
+                                                    2. Seleção de Rolos de CA-60 (Matéria-Prima)
+                                                </h4>
+                                                <p className="text-[10px] text-slate-400">
+                                                    Marque os rolos em estoque para cada arame 
+                                                    <strong className="text-amber-400 font-normal"> (obrigatório inclusive em Ordens Fantasma)</strong>
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {hasAnyLotsSelected && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleClearAllTrelicaLots}
+                                                        className="text-[10px] text-slate-400 hover:text-red-400 underline font-bold"
+                                                    >
+                                                        Desmarcar todos
+                                                    </button>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAutoSelectTrelicaLots}
+                                                    className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                                                    title="Seleciona automaticamente rolos compatíveis para todas as posições"
+                                                >
+                                                    ⚡ Auto-Selecionar Lotes
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoadSpoolStandsToOrder}
+                                                    className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+                                                    title={`Carregar as bobinas atualmente montadas nos 5 porta-rolos da ${createMachine}`}
+                                                >
+                                                    📥 Aproveitar Rolos da {createMachine}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* BANNER DE DETECÇÃO INTELIGENTE DE BOBINAS MONTADAS NA MÁQUINA */}
+                                        {compatibleStandsForNewOp.length > 0 && (
+                                            <div className="bg-gradient-to-r from-blue-950/80 via-[#0A1D2B] to-emerald-950/60 p-3 rounded-2xl border border-emerald-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-base shadow flex-shrink-0">
+                                                        💡
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+                                                            <span>SETUP INTELIGENTE: {compatibleStandsForNewOp.length} BOBINA(S) MONTADAS NA {createMachine}!</span>
+                                                            <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold">
+                                                                Bitolas Compatíveis ✓
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-300 mt-0.5">
+                                                            Os porta-rolos já estão abastecidos com {compatibleStandsForNewOp.map(s => `${(s.role_name ? s.role_name.replace('Porta-Rolo ', '') : s.role_type)}: Lote #${s.current_lot_number || s.current_lot_id || '--'} (⌀${s.current_gauge || '--'}mm)`).join(' • ')}. Deseja aproveitar estas bobinas nesta OP para evitar setup de troca de rolo?
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLoadSpoolStandsToOrder}
+                                                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs transition active:scale-95 shadow-md flex items-center gap-1.5 flex-shrink-0"
+                                                >
+                                                    <span>⚡</span>
+                                                    <span>Aproveitar {compatibleStandsForNewOp.length} Bobinas Montadas</span>
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Cartões de Status / Tabs para Superior, Inferiores e Senozoides */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTrelicaLotTab('superior')}
+                                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                                    activeTrelicaLotTab === 'superior'
+                                                        ? 'bg-cyan-500/15 border-cyan-500/50 shadow-md shadow-cyan-500/10'
+                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black uppercase text-cyan-400">Superior (1x)</span>
+                                                    {isSupDone && <span className="text-[9px]">✅</span>}
+                                                </div>
+                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.superior} mm</div>
+                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
+                                                    <span>{trelicaSuperiorLots.length} rolo(s)</span>
+                                                    <strong className={isSupDone ? 'text-emerald-400' : 'text-amber-400'}>
+                                                        {selectedSupWeight.toFixed(0)}/{requiredTrelicaWeights.sup.toFixed(0)}kg
+                                                    </strong>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTrelicaLotTab('inferior')}
+                                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                                    activeTrelicaLotTab === 'inferior'
+                                                        ? 'bg-emerald-500/15 border-emerald-500/50 shadow-md shadow-emerald-500/10'
+                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black uppercase text-emerald-400">Inferiores (2x)</span>
+                                                    {isInfDone && <span className="text-[9px]">✅</span>}
+                                                </div>
+                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.inferior} mm</div>
+                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
+                                                    <span>{(trelicaInferiorLeftLots.length + trelicaInferiorRightLots.length)} rolo(s)</span>
+                                                    <strong className={isInfDone ? 'text-emerald-400' : 'text-amber-400'}>
+                                                        {(selectedInf1Weight + selectedInf2Weight).toFixed(0)}/{requiredTrelicaWeights.inf.toFixed(0)}kg
+                                                    </strong>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveTrelicaLotTab('senozoide')}
+                                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                                    activeTrelicaLotTab === 'senozoide'
+                                                        ? 'bg-purple-500/15 border-purple-500/50 shadow-md shadow-purple-500/10'
+                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black uppercase text-purple-400">Senozoides (2x)</span>
+                                                    {isSenDone && <span className="text-[9px]">✅</span>}
+                                                </div>
+                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.senozoide} mm</div>
+                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
+                                                    <span>{(trelicaSenozoideLeftLots.length + trelicaSenozoideRightLots.length)} rolo(s)</span>
+                                                    <strong className={isSenDone ? 'text-emerald-400' : 'text-amber-400'}>
+                                                        {(selectedSen1Weight + selectedSen2Weight).toFixed(0)}/{requiredTrelicaWeights.sen.toFixed(0)}kg
+                                                    </strong>
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        {/* Barra de Filtro de Busca de Lotes */}
+                                        <div className="flex items-center justify-between gap-3 bg-[#07131B] p-2 rounded-xl border border-white/5">
+                                            <input
+                                                type="text"
+                                                value={trelicaLotSearch}
+                                                onChange={(e) => setTrelicaLotSearch(e.target.value)}
+                                                placeholder="🔍 Filtrar rolos por lote interno..."
+                                                className="w-full bg-transparent border-none text-xs text-white placeholder-slate-500 focus:outline-none"
+                                            />
+                                            <div className="flex items-center gap-2 whitespace-nowrap pl-2 border-l border-white/10">
+                                                <input
+                                                    type="checkbox"
+                                                    id="trelicaShowAllGauges"
+                                                    checked={trelicaShowAllGauges}
+                                                    onChange={(e) => setTrelicaShowAllGauges(e.target.checked)}
+                                                    className="h-3.5 w-3.5 rounded border-slate-700 bg-[#07131B] text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                                />
+                                                <label htmlFor="trelicaShowAllGauges" className="text-[10px] text-slate-400 font-bold cursor-pointer">
+                                                    Exibir todas as bitolas
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* Conteúdo da Tab Ativa: BANZO SUPERIOR */}
+                                        {activeTrelicaLotTab === 'superior' && (
+                                            <div className="flex flex-col gap-2">
+                                                {renderLotTable(
+                                                    `Banzo Superior (1x)`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.superior} mm`,
+                                                    requiredTrelicaWeights.sup,
+                                                    selectedSupWeight,
+                                                    supCandidates,
+                                                    trelicaSuperiorLots,
+                                                    'sup'
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Conteúdo da Tab Ativa: BANZOS INFERIORES (LADO 1 E LADO 2) */}
+                                        {activeTrelicaLotTab === 'inferior' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {renderLotTable(
+                                                    `Inferior - Lado 1`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.inferior} mm`,
+                                                    requiredTrelicaWeights.infSide,
+                                                    selectedInf1Weight,
+                                                    inf1Candidates,
+                                                    trelicaInferiorLeftLots,
+                                                    'inf1'
+                                                )}
+                                                {renderLotTable(
+                                                    `Inferior - Lado 2`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.inferior} mm`,
+                                                    requiredTrelicaWeights.infSide,
+                                                    selectedInf2Weight,
+                                                    inf2Candidates,
+                                                    trelicaInferiorRightLots,
+                                                    'inf2'
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Conteúdo da Tab Ativa: SENOZOIDES (LADO 1 E LADO 2) */}
+                                        {activeTrelicaLotTab === 'senozoide' && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {renderLotTable(
+                                                    `Senozoide - Lado 1`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.senozoide} mm`,
+                                                    requiredTrelicaWeights.senSide,
+                                                    selectedSen1Weight,
+                                                    sen1Candidates,
+                                                    trelicaSenozoideLeftLots,
+                                                    'sen1'
+                                                )}
+                                                {renderLotTable(
+                                                    `Senozoide - Lado 2`,
+                                                    `Bitola nominal: ${selectedTrelicaModel?.senozoide} mm`,
+                                                    requiredTrelicaWeights.senSide,
+                                                    selectedSen2Weight,
+                                                    sen2Candidates,
+                                                    trelicaSenozoideRightLots,
+                                                    'sen2'
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Resumo Geral de Matéria-Prima Treliça */}
+                                        <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 mt-auto flex flex-col gap-1.5">
+                                            <div className="flex justify-between text-xs text-slate-300">
+                                                <span>Peso Teórico Total da Produção:</span>
+                                                <span className="font-black text-white">
+                                                    {requiredTrelicaWeights.total.toFixed(2)} kg
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">Total Alocado nos Rolos Selecionados:</span>
+                                                <span className={`font-black ${isAllLotsReady ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                    {totalSelectedTrelicaWeight.toFixed(2)} kg
+                                                </span>
+                                            </div>
+
+                                            <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px]">
+                                                {isAllLotsReady ? (
+                                                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                                        ✓ Todos os 5 arames devidamente abastecidos (+{(totalSelectedTrelicaWeight - requiredTrelicaWeights.total).toFixed(1)} kg extra)
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-amber-400 font-bold flex items-center gap-1">
+                                                        ⚠️ Seleção incompleta ou abaixo da meta (verifique as 3 abas acima)
+                                                    </span>
+                                                )}
+
+                                                <span className="text-slate-500 font-mono">
+                                                    {(trelicaSuperiorLots.length + trelicaInferiorLeftLots.length + trelicaInferiorRightLots.length + trelicaSenozoideLeftLots.length + trelicaSenozoideRightLots.length)} rolo(s) marcados
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* ========================================================== */}
+                        {/* FLUXO 3: MALHA (Regras idênticas a ProductionOrderMalha.tsx) */}
+                        {/* ========================================================== */}
+                        {createCategory === 'Malha' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                <div className="flex flex-col gap-3.5 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
+                                    <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider border-b border-white/5 pb-2">
+                                        1. Parâmetros da Malha
+                                    </h4>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Máquina Destino</label>
+                                        <div className="w-full bg-[#07131B] border border-purple-500/30 rounded-xl py-2 px-3 text-xs text-purple-400 font-black flex items-center justify-between">
+                                            <span>Malha 1</span>
+                                            <span className="text-[9px] text-purple-400/90 bg-purple-500/15 px-2 py-0.5 rounded font-mono uppercase tracking-wider">Fixada</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Número da Ordem</label>
+                                        <input
+                                            type="text"
+                                            value={createOrderNumber}
+                                            onChange={(e) => setCreateOrderNumber(e.target.value)}
+                                            placeholder="Ex: ML-1025"
+                                            autoComplete="off"
+                                            className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 focus:bg-[#07131B] focus:text-white text-white font-bold"
+                                        />
+                                    </div>
+
+                                     <div className="flex flex-col gap-1">
+                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                             <span>Modelo da Malha (Gestão de Lotes)</span>
+                                             {selectedMalhaModelObj?.productCode && (
+                                                 <span className="text-[9px] text-purple-400 font-mono font-bold bg-purple-500/10 px-1.5 py-0.5 rounded">
+                                                     Cód. {selectedMalhaModelObj.productCode}
+                                                 </span>
+                                             )}
+                                         </label>
+                                         <select
+                                             value={malhaModel}
+                                             onChange={(e) => {
+                                                 const val = e.target.value;
+                                                 setMalhaModel(val);
+                                                 const found = availableMalhaModels.find(m => m.description === val || m.productCode === val || m.id === val);
+                                                 if (found && found.gauge) {
+                                                     const rawG = found.gauge.replace('mm', '').replace(',', '.').trim();
+                                                     setMalhaBitola(rawG as Bitola);
+                                                 }
+                                             }}
+                                             className="w-full bg-[#07131B] border border-purple-500/30 rounded-xl py-2 px-3 text-xs text-white font-bold focus:outline-none focus:border-purple-400"
+                                         >
+                                             <option value="">Selecione um modelo de malha cadastrado...</option>
+                                             {availableMalhaModels.map(m => {
+                                                 const parts = [];
+                                                 if (m.productCode) parts.push(`[Cód. ${m.productCode}]`);
+                                                 parts.push(m.description);
+                                                 if (m.gauge) parts.push(`(${m.gauge})`);
+                                                 if (m.meshSpacing) parts.push(`[${m.meshSpacing}]`);
+                                                 if (m.panelDimensions) parts.push(`• ${m.panelDimensions}m`);
+                                                 if (m.peso_peca) parts.push(`• ${m.peso_peca} kg/pç`);
+                                                 return (
+                                                     <option key={m.id || m.productCode || m.description} value={m.description}>
+                                                         {parts.join(' ')}
+                                                     </option>
+                                                 );
+                                             })}
+                                         </select>
+
+                                         {selectedMalhaModelObj && (
+                                             <div className="mt-1 bg-purple-950/30 border border-purple-500/20 rounded-lg p-2 text-[10px] text-slate-300 flex flex-col gap-1">
+                                                 <div className="flex items-center justify-between text-purple-300 font-semibold">
+                                                     <span>{selectedMalhaModelObj.description}</span>
+                                                     {selectedMalhaModelObj.peso_peca && (
+                                                         <span className="font-mono text-white font-bold">{selectedMalhaModelObj.peso_peca} kg/pç</span>
+                                                     )}
+                                                 </div>
+                                                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-400 text-[9px]">
+                                                     {selectedMalhaModelObj.gauge && <span>Bitola: <strong className="text-slate-200">{selectedMalhaModelObj.gauge}</strong></span>}
+                                                     {selectedMalhaModelObj.meshSpacing && <span>Espaçamento: <strong className="text-slate-200">{selectedMalhaModelObj.meshSpacing}</strong></span>}
+                                                     {selectedMalhaModelObj.panelDimensions && <span>Painel: <strong className="text-slate-200">{selectedMalhaModelObj.panelDimensions}m</strong></span>}
+                                                     {selectedMalhaModelObj.peso_peca && (
+                                                         <span>Peso Total Estimado: <strong className="text-purple-300 font-mono">{(malhaPieces * parseFloat(selectedMalhaModelObj.peso_peca.replace(',', '.'))).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg</strong></span>
+                                                     )}
+                                                 </div>
+                                             </div>
+                                         )}
+                                     </div>
+                                 </div>
+
+                                <div className="flex flex-col gap-3.5 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
+                                    <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider border-b border-white/5 pb-2">
+                                        2. Quantidade e Agendamento
+                                    </h4>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantidade de Painéis (peças)</label>
+                                        <input
+                                            type="number"
+                                            value={malhaPieces}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value);
+                                                setMalhaPieces(val);
+                                                setCreateDuration(Math.max(1, Math.ceil(val / CAPACITY_DEFAULTS['Malha 1'])));
+                                            }}
+                                            className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bitola do Arame (CA-60)</label>
+                                        <select
+                                            value={malhaBitola}
+                                            onChange={(e) => setMalhaBitola(e.target.value as Bitola)}
+                                            className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
+                                        >
+                                            {availableTrefilaGauges.map(g => (
+                                                <option key={g} value={g}>{g} mm</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-2 mt-auto">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Início</label>
+                                            <input
+                                                type="date"
+                                                value={createStartDate}
+                                                onChange={(e) => setCreateStartDate(e.target.value)}
+                                                className="w-full bg-[#07131B] border border-white/10 rounded-xl py-1.5 px-2.5 text-xs text-white"
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex justify-between items-center">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Duração (dias)</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTempShiftConfig({ ...shiftConfig });
+                                                        setIsWorkHoursModalOpen(true);
+                                                    }}
+                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-white transition-all text-[9px] font-mono cursor-pointer active:scale-95"
+                                                    title="Configurar jornada de trabalho diária (início, almoço e fim)"
+                                                >
+                                                    <ClockIcon className="w-2.5 h-2.5" />
+                                                    <span>{dailyShiftDetails.totalWorkHours.toFixed(1)}h/dia</span>
+                                                    <span className="text-[8px] opacity-75">⚙️</span>
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-2 bg-[#07131B] border border-white/10 rounded-xl p-1 justify-between">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCreateDuration(prev => Math.max(1, prev - 1))}
+                                                    className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
+                                                >
+                                                    -
+                                                </button>
+                                                <span className="text-xs font-bold text-white">{createDuration}d</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCreateDuration(prev => prev + 1)}
+                                                    className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Alerta de Erro caso a gravação falhe ou validação não passe */}
+                        {createOrderError && (
+                            <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl text-red-300 text-xs flex items-center gap-2 animate-fade">
+                                <span className="text-base shrink-0">⚠️</span>
+                                <span className="font-semibold">{createOrderError}</span>
+                            </div>
+                        )}
+
+                        {/* Botões do Rodapé do Modal: Apenas Cancelar e Confirmar Programação no PCP */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-3 border-t border-white/10">
+                            <button
+                                type="button"
+                                disabled={isSavingOrder}
+                                onClick={() => setIsCreateModalOpen(false)}
+                                className="sm:w-1/3 bg-white/5 hover:bg-white/10 disabled:opacity-40 border border-white/5 rounded-xl py-3 text-xs font-bold text-slate-400 hover:text-white transition-all text-center uppercase tracking-wider"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSavingOrder}
+                                onClick={() => handleSaveNewOrder('confirm')}
+                                className="flex-1 bg-gradient-to-r from-[#00E5FF] to-[#00B4D8] hover:brightness-110 disabled:opacity-50 text-slate-950 font-black rounded-xl py-3 text-xs transition-all shadow-lg shadow-[#00E5FF]/20 text-center active:scale-95 uppercase tracking-wider flex items-center justify-center gap-2"
+                            >
+                                {isSavingOrder ? (
+                                    <>
+                                        <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                                        <span>Programando OP...</span>
+                                    </>
+                                ) : (
+                                    <span>Programar OP no PCP</span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Sucesso: Exibido SOMENTE após a OP estar programada e criada no PCP */}
+            {createdOPSuccessModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-4">
+                    <div className="w-full max-w-md pcp-glass-card rounded-2xl border border-white/15 p-6 flex flex-col gap-4 text-slate-100 shadow-2xl">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                                <CheckCircleIcon className="w-7 h-7" />
+                            </div>
+                            <div>
+                                <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest">PCP • Programada</span>
+                                <h3 className="text-lg font-black text-white">OP #{createdOPSuccessModal.orderNumber} Programada!</h3>
+                                <p className="text-xs text-slate-400">{createdOPSuccessModal.machine}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300 space-y-1.5">
+                            <div className="flex items-center gap-2 text-[#00E5FF] font-bold">
+                                <span>📋</span>
+                                <span>Ordem criada e programada no PCP com sucesso!</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-tight">
+                                A OP agora está agendada no PCP. Escolha a ação desejada:
+                            </p>
+                        </div>
+
+                        {/* Ações após a OP estar programada no PCP */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const modalData = createdOPSuccessModal;
+                                    setCreatedOPSuccessModal(null);
+                                    handleGoToProduction(modalData.opData);
+                                }}
+                                className="w-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 font-black rounded-xl py-3 text-xs transition shadow-lg shadow-cyan-500/20 text-center active:scale-95 uppercase tracking-wider flex items-center justify-center gap-1.5"
+                                title={`Enviar para a máquina ${createdOPSuccessModal.machine}`}
+                            >
+                                <PlayIcon className="w-4 h-4 text-slate-950 fill-slate-950" />
+                                Enviar p/ Máquina
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const modalData = createdOPSuccessModal;
+                                    setCreatedOPSuccessModal(null);
+                                    handlePrintOP(modalData.opData);
+                                }}
+                                className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-black rounded-xl py-3 text-xs transition text-center active:scale-95 uppercase tracking-wider flex items-center justify-center gap-1.5"
+                            >
+                                <PrinterIcon className="w-4 h-4" />
+                                Imprimir Ficha A4
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setCreatedOPSuccessModal(null)}
+                            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl py-2.5 text-xs font-bold text-slate-400 hover:text-white transition text-center uppercase tracking-wider"
+                        >
+                            Concluir e Ver no Quadro PCP
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* SUB-JANELA / MODAL: CONFIGURAÇÃO DA JORNADA DE TRABALHO & FERIADOS */}
+            {/* ========================================================================= */}
+            {isWorkHoursModalOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-3 sm:p-4">
+                    <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/15 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[90vh] overflow-hidden">
+                        
+                        {/* Cabeçalho */}
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl bg-[#00E5FF]/15 text-[#00E5FF] flex items-center justify-center border border-[#00E5FF]/30">
+                                    <ClockIcon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">
+                                        Jornada & Feriados da Produção
+                                    </h3>
+                                    <p className="text-[11px] text-cyan-300/80 font-medium">
+                                        Configuração central salva no Supabase (sincronizada em todos os computadores)
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => setIsWorkHoursModalOpen(false)} 
+                                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Abas de Navegação */}
+                        <div className="flex items-center gap-2 border-b border-white/10 pb-2 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setActiveShiftTab('hours')}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                                    activeShiftTab === 'hours'
+                                        ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                }`}
+                            >
+                                <ClockIcon className="w-4 h-4" />
+                                <span>Horários do Turno</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveShiftTab('holidays')}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                                    activeShiftTab === 'holidays'
+                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                }`}
+                            >
+                                <CalendarIcon className="w-4 h-4" />
+                                <span>Feriados & Folgas ({holidays.length})</span>
+                            </button>
+                        </div>
+
+                        {/* Conteúdo da Aba 1: Horários do Turno */}
+                        {activeShiftTab === 'hours' && (
+                            <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+                                {/* Sub-Seletor de Escopo: Geral Fábrica ou Máquina Específica */}
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-white/10 scrollbar-thin">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedMachineShiftTab('GLOBAL')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                            selectedMachineShiftTab === 'GLOBAL'
+                                                ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                        }`}
+                                    >
+                                        <span>🏢 Geral (Fábrica)</span>
+                                    </button>
+                                    {MACHINES.map(m => {
+                                        const isCustom = Boolean(tempShiftConfig.machineConfigs?.[m.name]);
+                                        const isSelected = selectedMachineShiftTab === m.name;
+                                        return (
+                                            <button
+                                                key={m.name}
+                                                type="button"
+                                                onClick={() => setSelectedMachineShiftTab(m.name)}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                                                    isSelected
+                                                        ? 'bg-cyan-500/25 text-[#00E5FF] border border-[#00E5FF]/50 shadow-sm'
+                                                        : isCustom
+                                                            ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30'
+                                                            : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                                                }`}
+                                            >
+                                                <span>{m.name}</span>
+                                                {isCustom && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Jornada personalizada" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Banner e Atalhos Rápidos por Máquina */}
+                                {selectedMachineShiftTab !== 'GLOBAL' && (
+                                    <div className="flex items-center justify-between bg-[#0B1D2A] p-2.5 rounded-xl border border-white/10 text-xs gap-2 flex-wrap">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse shrink-0" />
+                                            <span className="font-bold text-slate-200 truncate">
+                                                Configurando: <strong className="text-[#00E5FF]">{selectedMachineShiftTab}</strong>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {selectedMachineShiftTab.startsWith('Trefila') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateCurrentTabConfig({ workStart: '07:45', workEnd: '17:33', noLunch: true, shiftCount: 1 })}
+                                                    className="px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 text-[10px] font-black uppercase tracking-wider transition active:scale-95"
+                                                >
+                                                    ⚡ Aplicar 07:45 às 17:33 (Sem Almoço)
+                                                </button>
+                                            )}
+                                            {selectedMachineShiftTab.startsWith('Treliça') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateCurrentTabConfig({ workStart: '05:00', workEnd: '14:44', noLunch: false, lunchStart: '11:30', lunchEnd: '12:30', shiftCount: 2, shift2Start: '14:00', shift2End: '23:59' })}
+                                                    className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider transition active:scale-95"
+                                                >
+                                                    ⚡ 2 Turnos Treliça (A e B)
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Entradas de Horários */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    {/* Pergunta 1: Hora Início */}
+                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-[11px] flex items-center justify-center">1</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Hora de Início</span>
+                                                <span className="text-[9px] text-slate-400">Início das máquinas</span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={currentTabConfig.workStart || '07:00'}
+                                            onChange={(e) => updateCurrentTabConfig({ workStart: e.target.value })}
+                                            style={{ colorScheme: 'dark' }}
+                                            className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                        />
+                                    </div>
+
+                                    {/* Fim do Turno */}
+                                    <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-cyan-500/20 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-[#00E5FF] font-bold text-[11px] flex items-center justify-center">2</span>
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Fim do Turno</span>
+                                                <span className="text-[9px] text-slate-400">Término da produção</span>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={currentTabConfig.workEnd || '17:00'}
+                                            onChange={(e) => updateCurrentTabConfig({ workEnd: e.target.value })}
+                                            style={{ colorScheme: 'dark' }}
+                                            className="bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                        />
+                                    </div>
+
+                                    {/* Toggle: Sem Parada de Almoço */}
+                                    <div className="sm:col-span-2 bg-[#08131B] p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
+                                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox"
+                                                checked={Boolean(currentTabConfig.noLunch)}
+                                                onChange={(e) => updateCurrentTabConfig({ noLunch: e.target.checked })}
+                                                className="w-4 h-4 rounded text-[#00E5FF] focus:ring-0 bg-[#0B1D2A] border-white/20 accent-[#00E5FF]"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Sem Parada de Almoço (Turno Contínuo)</span>
+                                                <span className="text-[10px] text-slate-400">Máquina opera em regime contínuo sem intervalo de refeição</span>
+                                            </div>
+                                        </label>
+                                        {Boolean(currentTabConfig.noLunch) && (
+                                            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                                Contínuo
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Horários de Almoço (se houver intervalo) */}
+                                    {!currentTabConfig.noLunch && (
+                                        <>
+                                            {/* Parada Almoço (Início) */}
+                                            <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">3</span>
+                                                    <div>
+                                                        <span className="text-xs font-bold text-amber-300 block">Almoço (Início)</span>
+                                                        <span className="text-[9px] text-slate-400">Pausa para refeição</span>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="time"
+                                                    value={currentTabConfig.lunchStart || '12:00'}
+                                                    onChange={(e) => updateCurrentTabConfig({ lunchStart: e.target.value })}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+
+                                            {/* Retorno Almoço */}
+                                            <div className="flex items-center justify-between bg-[#08131B] p-2.5 rounded-xl border border-white/5 hover:border-amber-500/20 transition-all">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[11px] flex items-center justify-center">4</span>
+                                                    <div>
+                                                        <span className="text-xs font-bold text-amber-300 block">Retorno Almoço</span>
+                                                        <span className="text-[9px] text-slate-400">Fim da refeição</span>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="time"
+                                                    value={currentTabConfig.lunchEnd || '13:00'}
+                                                    onChange={(e) => updateCurrentTabConfig({ lunchEnd: e.target.value })}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Configuração de 2 Turnos */}
+                                    <div className="sm:col-span-2 bg-[#08131B] p-3 rounded-xl border border-white/5 space-y-2.5">
+                                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={currentTabConfig.shiftCount === 2}
+                                                onChange={(e) => updateCurrentTabConfig({ 
+                                                    shiftCount: e.target.checked ? 2 : 1, 
+                                                    shift2Start: e.target.checked ? (currentTabConfig.shift2Start || '14:00') : undefined, 
+                                                    shift2End: e.target.checked ? (currentTabConfig.shift2End || '23:59') : undefined 
+                                                })}
+                                                className="w-4 h-4 rounded text-emerald-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-emerald-400"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-slate-200 block">Operar em 2 Turnos (Turno A e Turno B)</span>
+                                                <span className="text-[10px] text-slate-400">Habilita revezamento de turnos diários para esta máquina</span>
+                                            </div>
+                                        </label>
+
+                                        {currentTabConfig.shiftCount === 2 && (
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 animate-fade">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-emerald-400 block mb-1">Início do Turno B</span>
+                                                    <input
+                                                        type="time"
+                                                        value={currentTabConfig.shift2Start || '14:00'}
+                                                        onChange={(e) => updateCurrentTabConfig({ shift2Start: e.target.value })}
+                                                        style={{ colorScheme: 'dark' }}
+                                                        className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-emerald-400 block mb-1">Término do Turno B</span>
+                                                    <input
+                                                        type="time"
+                                                        value={currentTabConfig.shift2End || '23:59'}
+                                                        onChange={(e) => updateCurrentTabConfig({ shift2End: e.target.value })}
+                                                        style={{ colorScheme: 'dark' }}
+                                                        className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Automações Inteligentes e Segurança */}
+                                <div className="bg-[#08131B] p-3.5 rounded-xl border border-white/10 space-y-2.5">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-[#00E5FF] block">
+                                        ⚙️ Automações e Segurança de Turno
+                                    </span>
+                                    
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentTabConfig.autoStartShift !== false}
+                                            onChange={(e) => updateCurrentTabConfig({ autoStartShift: e.target.checked })}
+                                            className="w-4 h-4 rounded text-[#00E5FF] focus:ring-0 bg-[#0B1D2A] border-white/20 accent-[#00E5FF] mt-0.5"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-200 block">Iniciar turno automaticamente no horário programado</span>
+                                            <span className="text-[10px] text-slate-400 leading-tight block">
+                                                O sistema abre a contabilidade do turno pontualmente e exibe "Aguardando Check-in do Operador"
+                                            </span>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentTabConfig.autoEndShift !== false}
+                                            onChange={(e) => updateCurrentTabConfig({ autoEndShift: e.target.checked })}
+                                            className="w-4 h-4 rounded text-amber-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-amber-400 mt-0.5"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-amber-300 block">Encerramento automático com timer de 5 minutos</span>
+                                            <span className="text-[10px] text-slate-400 leading-tight block">
+                                                No término do turno, exibe contagem regressiva de 5 min na máquina e fecha com o último relato caso o operador não finalize
+                                            </span>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={currentTabConfig.requireManagerAuthForOvertime !== false}
+                                            onChange={(e) => updateCurrentTabConfig({ requireManagerAuthForOvertime: e.target.checked })}
+                                            className="w-4 h-4 rounded text-rose-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-rose-400 mt-0.5"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-rose-300 block">Exigir senha do gestor para iniciar/estender em Hora Extra</span>
+                                            <span className="text-[10px] text-slate-400 leading-tight block">
+                                                Bloqueia logins fora da jornada da máquina sem senha de gestor
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* Card de Cálculo em Tempo Real */}
+                                <div className="bg-[#0B1D2A] p-3.5 rounded-xl border border-cyan-500/30 space-y-2.5">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                                Tempo Útil Calculado ({selectedMachineShiftTab === 'GLOBAL' ? 'Padrão' : selectedMachineShiftTab}):
+                                            </span>
+                                            <span className="text-[11px] text-slate-300">
+                                                Carga horária líquida trabalhada
+                                            </span>
+                                        </div>
+                                        <div className="text-right font-mono">
+                                            <span className="text-xl font-black text-[#00E5FF] block">
+                                                {formatMinutesToHoursMinutes(tempShiftDetails.totalWorkMinutes)}
+                                            </span>
+                                            <span className="text-[10px] text-cyan-300/90 font-bold">
+                                                {tempShiftDetails.totalWorkHours.toFixed(2).replace('.', ',')} horas / dia
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {!tempShiftDetails.isValid && (
+                                        <div className="text-[10px] text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                                            ⚠️ {tempShiftDetails.errorMessage}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Conteúdo da Aba 2: Feriados & Folgas */}
+                        {activeShiftTab === 'holidays' && (
+                            <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+                                {/* Seletor dos Dias de Expediente da Semana */}
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5">
+                                    <span className="text-xs font-bold text-white block mb-1">
+                                        Dias de Expediente da Fábrica
+                                    </span>
+                                    <p className="text-[10px] text-slate-400 mb-2">
+                                        Selecione os dias da semana em que as máquinas operam (dias desmarcados não contam na duração das OPs):
+                                    </p>
+                                    <div className="grid grid-cols-5 gap-1.5">
+                                        {[
+                                            { day: 1, label: 'Segunda' },
+                                            { day: 2, label: 'Terça' },
+                                            { day: 3, label: 'Quarta' },
+                                            { day: 4, label: 'Quinta' },
+                                            { day: 5, label: 'Sexta' }
+                                        ].map(({ day, label }) => {
+                                            const isChecked = (tempShiftConfig.workDays || [1, 2, 3, 4, 5]).includes(day);
+                                            return (
+                                                <label 
+                                                    key={day}
+                                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center cursor-pointer select-none transition-all ${
+                                                        isChecked 
+                                                            ? 'bg-cyan-500/15 border-[#00E5FF]/40 text-[#00E5FF] font-black' 
+                                                            : 'bg-white/5 border-white/5 text-slate-500 hover:text-slate-300'
+                                                    }`}
+                                                >
+                                                    <input 
+                                                        type="checkbox"
+                                                        className="hidden"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            const currentDays = tempShiftConfig.workDays || [1, 2, 3, 4, 5];
+                                                            const newDays = e.target.checked
+                                                                ? [...currentDays, day].sort()
+                                                                : currentDays.filter(d => d !== day);
+                                                            if (newDays.length === 0) {
+                                                                showNotification?.('Mantenha ao menos 1 dia de expediente na semana.', 'error');
+                                                                return;
+                                                            }
+                                                            setTempShiftConfig(prev => ({ ...prev, workDays: newDays }));
+                                                        }}
+                                                    />
+                                                    <span className="text-xs">{label}</span>
+                                                    <span className="text-[9px] mt-0.5 opacity-80">{isChecked ? '✓ Trabalha' : 'Folga'}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Formulário para Cadastrar Novo Feriado */}
+                                <form onSubmit={handleAddHoliday} className="bg-[#0B1D2A] p-3 rounded-xl border border-rose-500/30 flex flex-col gap-2">
+                                    <div className="flex items-center gap-1.5 text-xs font-black uppercase text-rose-300 tracking-wider">
+                                        <PlusIcon className="w-4 h-4 text-rose-400" />
+                                        <span>Adicionar Feriado / Dia Sem Produção</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                        <div className="sm:col-span-5">
+                                            <input 
+                                                type="date"
+                                                value={newHolidayDate}
+                                                onChange={(e) => setNewHolidayDate(e.target.value)}
+                                                style={{ colorScheme: 'dark' }}
+                                                className="w-full bg-[#08131B] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:outline-none focus:border-rose-400"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-7 flex items-center gap-2">
+                                            <input 
+                                                type="text"
+                                                placeholder="Ex: Feriado Tiradentes, Manutenção"
+                                                value={newHolidayDesc}
+                                                onChange={(e) => setNewHolidayDesc(e.target.value)}
+                                                className="w-full bg-[#08131B] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-rose-400"
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={isAddingHoliday}
+                                                className="px-3 py-1.5 bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider rounded-lg transition-all active:scale-95 whitespace-nowrap shadow-sm"
+                                            >
+                                                {isAddingHoliday ? 'Salvando...' : '+ Cadastrar'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+
+                                {/* Lista de Feriados Cadastrados */}
+                                <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400 px-1">
+                                        <span>Feriados Cadastrados ({holidays.length})</span>
+                                        <span>Ação</span>
+                                    </div>
+
+                                    {holidays.length === 0 ? (
+                                        <div className="text-center py-6 border border-dashed border-white/10 rounded-xl text-xs text-slate-500 font-medium">
+                                            Nenhum feriado cadastrado. Cadastre acima para que o PCP pule os dias automaticamente.
+                                        </div>
+                                    ) : (
+                                        holidays.map(h => {
+                                            const parts = h.date ? h.date.split('-') : [];
+                                            const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : h.date;
+                                            
+                                            // Dia da semana do feriado
+                                            const d = new Date(h.date + 'T00:00:00');
+                                            const weekDayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][d.getDay()] || '';
+
+                                            return (
+                                                <div 
+                                                    key={h.id} 
+                                                    className="flex items-center justify-between bg-[#08131B] p-2 rounded-xl border border-white/5 hover:border-white/15 transition-all text-xs"
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <span className="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 font-mono font-black text-[11px] shrink-0">
+                                                            {formattedDate}
+                                                        </span>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-bold text-white truncate text-xs">
+                                                                {h.description}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400">
+                                                                {weekDayName}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteHoliday(h.id, h.description)}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+                                                        title="Excluir feriado"
+                                                    >
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Rodapé e Ações */}
+                        <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-white/10 shrink-0">
+                            <div className="flex items-center gap-1.5 text-[10px] text-cyan-300/80 font-mono font-bold">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span>Supabase Sincronizado</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsWorkHoursModalOpen(false)}
+                                    className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition-colors"
+                                >
+                                    Fechar
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isSavingShift}
+                                    onClick={handleSaveShiftConfig}
+                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#00B4D8] hover:brightness-110 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-[#00E5FF]/20 active:scale-95 transition-all flex items-center gap-1.5"
+                                >
+                                    {isSavingShift ? (
+                                        <span>Salvando...</span>
+                                    ) : (
+                                        <>
+                                            <CheckCircleIcon className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                                            <span>Salvar Jornada</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL EXCLUSIVO: CONFIGURAÇÃO DE TURNOS DA MÁQUINA SELECIONADA */}
+            {/* ========================================================================= */}
+            {machineShiftModalTarget && machineShiftModalDraft && (
+                <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-3 sm:p-4">
+                    <div className="w-full max-w-2xl sm:max-w-3xl pcp-glass-card rounded-2xl border border-cyan-500/40 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[92vh] overflow-y-auto">
+                        {/* Cabeçalho */}
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-[#00E5FF] flex items-center justify-center border border-cyan-500/40 shrink-0">
+                                    <CogIcon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                            Configuração da Máquina
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-md text-xs font-black uppercase tracking-wider bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40">
+                                            {machineShiftModalTarget}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 font-medium">
+                                        Comandos da OP ativa, ferramentas, turnos e paradas vinculadas no banco
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setMachineShiftModalTarget(null);
+                                    setMachineShiftModalDraft(null);
+                                }}
+                                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10 cursor-pointer"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Abas de Navegação do Modal: OP vs Equipamento vs Turnos vs Paradas */}
+                        {(() => {
+                            const isTrelica = Boolean(machineShiftModalTarget && machineShiftModalTarget.toLowerCase().includes('treli'));
+                            return (
+                                <div className={`grid ${isTrelica ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-1.5 p-1 bg-[#08131B] rounded-xl border border-white/10 shrink-0`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMachineShiftModalTab('op')}
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                            machineShiftModalTab === 'op'
+                                                ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>📋 OP & Ações</span>
+                                    </button>
+
+                                    {isTrelica && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMachineShiftModalTab('equipment')}
+                                            className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                                machineShiftModalTab === 'equipment'
+                                                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40 shadow-sm'
+                                                    : 'text-slate-400 hover:text-white'
+                                            }`}
+                                        >
+                                            <span>⚡ Rolos & Solda</span>
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMachineShiftModalTab('shifts')}
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                            machineShiftModalTab === 'shifts'
+                                                ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>☀️ Turnos</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setMachineShiftModalTab('downtimes')}
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                            machineShiftModalTab === 'downtimes'
+                                                ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40 shadow-sm'
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>🛑 Paradas</span>
+                                        {localDowntimeConfigs.filter(c => {
+                                            const mType = machineShiftModalTarget?.split(' ')[0] || '';
+                                            return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
+                                        }).length > 0 && (
+                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-rose-200">
+                                                {localDowntimeConfigs.filter(c => {
+                                                    const mType = machineShiftModalTarget?.split(' ')[0] || '';
+                                                    return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
+                                                }).length}
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            );
+                        })()}
+
+                        {/* ABA: OP & COMANDOS DE PRODUÇÃO */}
+                        {machineShiftModalTab === 'op' && (() => {
+                            const machineOrders = productionOrders.filter(o => 
+                                (o.scheduledMachine === machineShiftModalTarget || o.machine === machineShiftModalTarget) &&
+                                o.status !== 'completed' && o.status !== 'cancelled'
+                            );
+                            const activeOP = machineOrders.find(o => o.status === 'in_progress' || (o.status as string) === 'em_producao') || machineOrders[0];
+
+                            if (!activeOP) {
+                                return (
+                                    <div className="py-8 px-4 rounded-2xl bg-[#08131B] border border-white/10 text-center flex flex-col items-center gap-3 animate-fade">
+                                        <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl">
+                                            📋
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-white font-black text-sm">
+                                                Nenhuma OP agendada ou em andamento em {machineShiftModalTarget}
+                                            </h4>
+                                            <p className="text-xs text-slate-400">
+                                                Programe uma nova ordem de produção na grade do PCP para habilitar os comandos de máquina.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMachineShiftModalTarget(null);
+                                                handleOpenCreateModal(machineShiftModalTarget);
+                                            }}
+                                            className="mt-2 px-4 py-2 rounded-xl bg-[#00E5FF] hover:bg-[#00cce6] text-black font-black text-xs uppercase tracking-wider transition flex items-center gap-2 cursor-pointer shadow-lg active:scale-95"
+                                        >
+                                            <PlusIcon className="w-4 h-4" />
+                                            <span>Programar Nova OP</span>
+                                        </button>
+                                    </div>
+                                );
+                            }
+
+                            const prog = getOPProgress(activeOP);
+                            const title = activeOP.orderNumber || activeOP.id.slice(0, 6);
+                            let trefilaSubtitle = '';
+                            if (activeOP.machine?.startsWith('Trefila')) {
+                                let pCode = activeOP.productCode || '';
+                                let pDesc = activeOP.productDescription || '';
+                                if (!pDesc || !pCode) {
+                                    const cleanTarget = String(activeOP.targetBitola || '').replace('mm', '').trim();
+                                    const matched = gauges.find((g: any) => {
+                                        const mat = (g.materialType || '').toLowerCase();
+                                        const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                        if (!isCa60) return false;
+                                        const gClean = String(g.gauge || '').replace('mm', '').trim();
+                                        return g.gauge === activeOP.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                                    });
+                                    if (matched) {
+                                        if (!pCode) pCode = matched.productCode || (matched as any).code || '';
+                                        if (!pDesc) pDesc = matched.description || (matched as any).gaugeDescription || '';
+                                    }
+                                }
+                                if (pDesc) {
+                                    trefilaSubtitle = pCode && !pDesc.startsWith(pCode) ? `${pCode} - ${pDesc}` : pDesc;
+                                } else {
+                                    trefilaSubtitle = `Bitola ${activeOP.targetBitola || 'N/A'}mm`;
+                                }
+                            }
+
+                            const subtitle = activeOP.productName || (
+                                activeOP.machine?.startsWith('Trefila') ? trefilaSubtitle :
+                                activeOP.machine?.startsWith('Treliça') ? `${activeOP.trelicaModel || 'Treliça'} • ${activeOP.tamanho || ''}m` :
+                                activeOP.machine?.startsWith('Malha') ? `${activeOP.malhaModel || 'Malha'} (${activeOP.tamanho || ''})` :
+                                'Ordem de Produção'
+                            );
+                            const isLive = prog.isLive;
+                            const isPending = prog.isPending;
+
+                            return (
+                                <div className="space-y-3.5 animate-fade">
+                                    {/* Card Principal da OP */}
+                                    <div className="p-3.5 rounded-2xl bg-[#06121B] border border-white/10 relative overflow-hidden shadow-inner">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-base font-black text-white flex items-center flex-wrap gap-1">
+                                                        <span>#{title}#</span>
+                                                        {subtitle && <span className="text-xs text-slate-300 font-bold ml-1 tracking-normal truncate flex-1 min-w-0">{subtitle}</span>}
+                                                    </span>
+                                                    {isLive && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 animate-pulse">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                            EM PRODUÇÃO
+                                                        </span>
+                                                    )}
+                                                    {isPending && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase bg-amber-500/25 text-amber-200 px-2 py-0.5 rounded border border-amber-500/50">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                                            AGENDADA
+                                                        </span>
+                                                    )}
+                                                    {activeOP.operator && (
+                                                        <span className="text-[10px] font-bold text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                                                            👷 {activeOP.operator}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                                <span className="text-xs font-mono font-black text-[#00E5FF] block">
+                                                    {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    Progresso: {prog.pct}%
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Barra de Progresso */}
+                                        <div className="w-full bg-black/40 rounded-full h-2 mt-2.5 overflow-hidden border border-white/10">
+                                            <div 
+                                                className={`h-full transition-all duration-300 ${isLive ? 'bg-gradient-to-r from-cyan-500 to-emerald-400' : 'bg-amber-400'}`}
+                                                style={{ width: `${Math.min(100, prog.pct)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Grid dos 6 Botões de Comando */}
+                                    <div className="space-y-1.5">
+                                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block">
+                                            Comandos de Produção da Máquina:
+                                        </span>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {/* 1. Editar OP em Produção */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    setEditingInProgressOP(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <PencilIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-purple-200 block group-hover:text-purple-100">
+                                                        Editar OP em Produção
+                                                    </span>
+                                                    <span className="text-[10px] text-purple-300/70 font-medium block leading-tight mt-0.5">
+                                                        Nome, meta, lotes e turnos finalizados
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 2. Diagnóstico de Produção */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    setDiagnosticOP(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <ClipboardListIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-amber-200 block group-hover:text-amber-100">
+                                                        Diagnóstico de Produção
+                                                    </span>
+                                                    <span className="text-[10px] text-amber-300/70 font-medium block leading-tight mt-0.5">
+                                                        Planejado vs Realizado, velocidade e ritmo
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 3. Abrir Painel da Máquina */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    handleGoToProduction(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <PlayIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-emerald-200 block group-hover:text-emerald-100">
+                                                        Abrir Painel da Máquina
+                                                    </span>
+                                                    <span className="text-[10px] text-emerald-300/70 font-medium block leading-tight mt-0.5">
+                                                        Apontamento e painel ao vivo do operador
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 4. Imprimir Ficha de Produção */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePrintOP(activeOP)}
+                                                className="p-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <PrinterIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-cyan-200 block group-hover:text-cyan-100">
+                                                        Imprimir Ficha de Produção (A4)
+                                                    </span>
+                                                    <span className="text-[10px] text-cyan-300/70 font-medium block leading-tight mt-0.5">
+                                                        Ficha técnica com código de barras e especificações
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 5. Reagendar */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMachineShiftModalTarget(null);
+                                                    openScheduleModal(activeOP);
+                                                }}
+                                                className="p-3 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <CalendarIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-sky-200 block group-hover:text-sky-100">
+                                                        Reagendar OP
+                                                    </span>
+                                                    <span className="text-[10px] text-sky-300/70 font-medium block leading-tight mt-0.5">
+                                                        Mudar data, máquina ou duração em dias
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            {/* 6. Desagendar */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleRemoveSchedule(activeOP.id);
+                                                }}
+                                                className="p-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-400/60 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                    <XIcon className="w-4 h-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-black text-rose-200 block group-hover:text-rose-100">
+                                                        Desagendar OP
+                                                    </span>
+                                                    <span className="text-[10px] text-rose-300/70 font-medium block leading-tight mt-0.5">
+                                                        Retirar a OP do cronograma da grade do PCP
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Outras OPs na Fila se houver */}
+                                    {machineOrders.length > 1 && (
+                                        <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2.5">
+                                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block">
+                                                Outras OPs Agendadas nesta Máquina ({machineOrders.length - 1}):
+                                            </span>
+                                            <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                                                {machineOrders.filter(o => o.id !== activeOP.id).map(queuedOp => (
+                                                    <div key={queuedOp.id} className="p-2 rounded-xl bg-[#08131B] border border-white/5 flex items-center justify-between gap-2 text-xs">
+                                                        <div className="min-w-0 truncate">
+                                                            <span className="font-bold text-white">#{queuedOp.orderNumber}</span>
+                                                            <span className="text-slate-400 text-[10px] ml-2 truncate">
+                                                                {(() => {
+                                                                    let qSub = queuedOp.productName || queuedOp.productDescription;
+                                                                    if (!qSub && (queuedOp.machine?.startsWith('Trefila') || (queuedOp as any).scheduledMachine?.startsWith('Trefila'))) {
+                                                                        const cleanTarget = String(queuedOp.targetBitola || '').replace('mm', '').trim();
+                                                                        const matched = gauges.find((g: any) => {
+                                                                            const mat = (g.materialType || '').toLowerCase();
+                                                                            const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                                                                            if (!isCa60) return false;
+                                                                            const gClean = String(g.gauge || '').replace('mm', '').trim();
+                                                                            return g.gauge === queuedOp.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                                                                        });
+                                                                        if (matched) {
+                                                                            const c = queuedOp.productCode || matched.productCode || (matched as any).code;
+                                                                            const d = matched.description || (matched as any).gaugeDescription;
+                                                                            qSub = d ? (c && !d.startsWith(c) ? `[${c}] ${d}` : d) : undefined;
+                                                                        }
+                                                                    }
+                                                                    return qSub || (queuedOp.targetBitola ? `Bitola ${queuedOp.targetBitola}mm` : '') || queuedOp.trelicaModel || queuedOp.malhaModel;
+                                                                })()}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => { setMachineShiftModalTarget(null); setEditingInProgressOP(queuedOp); }}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-purple-300 cursor-pointer"
+                                                                title="Editar OP"
+                                                            >
+                                                                <PencilIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => { setMachineShiftModalTarget(null); handleGoToProduction(queuedOp); }}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-emerald-300 cursor-pointer"
+                                                                title="Abrir no Painel"
+                                                            >
+                                                                <PlayIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handlePrintOP(queuedOp)}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-cyan-300 cursor-pointer"
+                                                                title="Imprimir Ficha"
+                                                            >
+                                                                <PrinterIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handleRemoveSchedule(queuedOp.id)}
+                                                                className="p-1 rounded bg-white/5 hover:bg-white/10 text-rose-400 cursor-pointer"
+                                                                title="Desagendar"
+                                                            >
+                                                                <XIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ABA: ROLOS & SOLDA (EXCLUSIVO TRELIÇA) */}
+                        {machineShiftModalTab === 'equipment' && Boolean(machineShiftModalTarget && machineShiftModalTarget.toLowerCase().includes('treli')) && (
+                            <div className="space-y-4 animate-fade">
+                                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-[#081822] to-amber-950/30 border border-cyan-500/30 flex items-center justify-between gap-3">
+                                    <div>
+                                        <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>⚡ Equipamento & Solda:</span>
+                                            <span className="text-cyan-300">{machineShiftModalTarget}</span>
+                                        </h4>
+                                        <p className="text-[11px] text-slate-300">
+                                            Gêmeo digital dos 5 desbobinadores e controle técnico da cabeça de solda
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewSpoolStandsMachine(machineShiftModalTarget)}
+                                        className="px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                                        title="Expandir Porta-Rolos em Tela Cheia"
+                                    >
+                                        <span>⛶ Tela Cheia</span>
+                                    </button>
+                                </div>
+
+                                {/* 1. Gêmeo Digital dos 5 Porta-Rolos */}
+                                <div className="p-3 rounded-2xl bg-[#06121B] border border-white/10">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>🧲 Porta-Rolos (5 Posições)</span>
+                                        </span>
+                                        <span className="text-[10px] text-cyan-400 font-mono">
+                                            1 Superior • 2 Senozóides • 2 Inferiores
+                                        </span>
+                                    </div>
+                                    <div 
+                                        onClick={() => setViewSpoolStandsMachine(machineShiftModalTarget)}
+                                        className="cursor-pointer hover:border-cyan-500/40 transition-all rounded-xl"
+                                        title="Clique para gerenciar bobinas e estoque"
+                                    >
+                                        <TrelicaSpoolStands 
+                                            machineName={machineShiftModalTarget} 
+                                            isCompact={true} 
+                                            stock={stock} 
+                                            productionOrders={productionOrders}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 2. Botão/Card Comando Solda */}
+                                <div className="p-3.5 rounded-2xl bg-[#06121B] border border-amber-500/30 flex items-center justify-between gap-3 hover:border-amber-400/60 transition-all">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-lg shrink-0">
+                                            ⚡
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h5 className="text-xs font-black text-amber-200 uppercase tracking-wider">
+                                                Comando da Cabeça de Solda
+                                            </h5>
+                                            <p className="text-[11px] text-slate-300 mt-0.5">
+                                                Calibração de eletrodos (Sup, Esq, Dir), desgaste, pressão pneumática e relatórios
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setViewWeldingHeadMachine(machineShiftModalTarget);
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer"
+                                    >
+                                        <span>Abrir Painel Solda</span>
+                                        <span>➔</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ABA 1: TURNOS & HORÁRIOS */}
+                        {machineShiftModalTab === 'shifts' && (
+                            <div className="space-y-4 animate-fade">
+                                {/* Atalhos Rápidos por Tipo de Máquina */}
+                                {machineShiftModalTarget.toLowerCase().includes('trefila') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMachineShiftModalDraft(prev => prev ? ({
+                                                ...prev,
+                                                shiftCount: 1,
+                                                workStart: '07:45',
+                                                workEnd: '17:33',
+                                                noLunch: true
+                                            }) : null);
+                                        }}
+                                        className="w-full py-2 px-3 rounded-xl bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                                    >
+                                        <span>⚡ Aplicar Padrão Trefila: 07:45 às 17:33 (1 Turno Contínuo)</span>
+                                    </button>
+                                )}
+                                {machineShiftModalTarget.toLowerCase().includes('treli') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMachineShiftModalDraft(prev => prev ? ({
+                                                ...prev,
+                                                shiftCount: 2,
+                                                workStart: '05:00',
+                                                workEnd: '14:44',
+                                                noLunch: false,
+                                                lunchStart: '11:30',
+                                                lunchEnd: '12:30',
+                                                shift2Start: '14:48',
+                                                shift2End: '23:36'
+                                            }) : null);
+                                        }}
+                                        className="w-full py-2 px-3 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                                    >
+                                        <span>⚡ Aplicar Padrão Treliça: 2 Turnos (A: 05:00-14:44 | B: 14:48-23:36)</span>
+                                    </button>
+                                )}
+
+                                {/* Seletor de Quantidade de Turnos */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                                        Quantidade de Turnos desta Máquina:
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shiftCount: 1 }) : null)}
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                                                machineShiftModalDraft.shiftCount === 1
+                                                    ? 'bg-cyan-500/25 border-[#00E5FF] text-white shadow-[0_0_12px_rgba(0,229,255,0.25)]'
+                                                    : 'bg-[#08131B] border-white/10 text-slate-400 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase text-white flex items-center gap-1.5">
+                                                    ☀️ 1º Turno (Único)
+                                                </span>
+                                                {machineShiftModalDraft.shiftCount === 1 && (
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 leading-tight">
+                                                Máquina opera em turno único (relatório oculta Turno B)
+                                            </span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shiftCount: 2 }) : null)}
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                                                machineShiftModalDraft.shiftCount === 2
+                                                    ? 'bg-emerald-500/25 border-emerald-400 text-white shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                                                    : 'bg-[#08131B] border-white/10 text-slate-400 hover:border-white/20'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase text-emerald-300 flex items-center gap-1.5">
+                                                    ⚡ 2 Turnos (A e B)
+                                                </span>
+                                                {machineShiftModalDraft.shiftCount === 2 && (
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981]" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 leading-tight">
+                                                Máquina opera com revezamento de Turno A e Turno B
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bloco: Horários do 1º Turno (Turno A) */}
+                                <div className="bg-[#08131B] p-3.5 rounded-xl border border-white/10 space-y-3">
+                                    <span className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                                        ☀️ Horários do 1º Turno {machineShiftModalDraft.shiftCount === 2 ? '(Turno A)' : ''}
+                                    </span>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 block mb-1">Hora de Início</label>
+                                            <input
+                                                type="time"
+                                                value={machineShiftModalDraft.workStart || '07:00'}
+                                                onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, workStart: e.target.value }) : null)}
+                                                style={{ colorScheme: 'dark' }}
+                                                className="w-full bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 block mb-1">Hora de Término</label>
+                                            <input
+                                                type="time"
+                                                value={machineShiftModalDraft.workEnd || '17:00'}
+                                                onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, workEnd: e.target.value }) : null)}
+                                                style={{ colorScheme: 'dark' }}
+                                                className="w-full bg-[#0B1D2A] border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-[#00E5FF] text-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Almoço */}
+                                    <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(machineShiftModalDraft.noLunch)}
+                                            onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, noLunch: e.target.checked }) : null)}
+                                            className="w-4 h-4 rounded text-[#00E5FF] focus:ring-0 bg-[#0B1D2A] border-white/20 accent-[#00E5FF]"
+                                        />
+                                        <span className="text-xs font-bold text-slate-300">Sem intervalo de almoço (Turno Contínuo)</span>
+                                    </label>
+
+                                    {!machineShiftModalDraft.noLunch && (
+                                        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-white/5 animate-fade">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-amber-300 block mb-1">Início Almoço</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.lunchStart || '12:00'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, lunchStart: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-amber-300 block mb-1">Retorno Almoço</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.lunchEnd || '13:00'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, lunchEnd: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-bold font-mono focus:outline-none focus:border-amber-400 text-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Bloco: Horários do 2º Turno (Turno B) */}
+                                {machineShiftModalDraft.shiftCount === 2 && (
+                                    <div className="bg-[#08131B] p-3.5 rounded-xl border border-emerald-500/30 space-y-3 animate-fade">
+                                        <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                            🌙 Horários do 2º Turno (Turno B)
+                                        </span>
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Início do Turno B</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.shift2Start || '14:48'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shift2Start: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1">Término do Turno B</label>
+                                                <input
+                                                    type="time"
+                                                    value={machineShiftModalDraft.shift2End || '23:36'}
+                                                    onChange={(e) => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shift2End: e.target.value }) : null)}
+                                                    style={{ colorScheme: 'dark' }}
+                                                    className="w-full bg-[#0B1D2A] border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none focus:border-emerald-400 text-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Rodapé com botões de ação */}
+                                <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-white/10 shrink-0">
+                                    <div className="flex items-center gap-1.5 text-[10px] text-cyan-300 font-mono">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span>Banco Supabase Vinculado</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMachineShiftModalTarget(null);
+                                                setMachineShiftModalDraft(null);
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs transition cursor-pointer"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveMachineShiftModal}
+                                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                        >
+                                            💾 Salvar Turnos da {machineShiftModalTarget}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ABA 2: PROGRAMAR PARADAS NA MÁQUINA */}
+                        {machineShiftModalTab === 'downtimes' && (() => {
+                            const machType = machineShiftModalTarget.split(' ')[0]; // 'Trefila', 'Treliça', 'Malha', 'Desbobinadeira'
+                            const machineReasons = localDowntimeConfigs.filter(c => {
+                                if (!c.machineType || c.machineType === 'Geral') return true;
+                                return c.machineType.toLowerCase().includes(machType.toLowerCase()) || machType.toLowerCase().includes(c.machineType.toLowerCase());
+                            });
+
+                            return (
+                                <div className="space-y-4 animate-fade">
+                                    <div className="p-3 bg-rose-500/10 border border-rose-500/25 rounded-xl flex items-start gap-2.5 text-xs text-rose-200">
+                                        <span className="text-base shrink-0">🛑</span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="font-bold text-rose-300 uppercase tracking-wide text-[11px]">
+                                                Paradas Programadas • {machineShiftModalTarget}
+                                            </span>
+                                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                Os motivos cadastrados abaixo aparecem <strong>em tempo real no App do Operador</strong> desta máquina para apontamento e registro de paradas.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Formulário de Adicionar Nova Parada */}
+                                    <div className="bg-[#08131B] p-3.5 rounded-xl border border-white/10 space-y-2.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-300 block">
+                                            + Cadastrar Novo Motivo de Parada no Banco
+                                        </label>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Ex: Troca de Rolo, Falha Mecânica, Quebra de Fio..."
+                                                value={newDowntimeReason}
+                                                onChange={(e) => setNewDowntimeReason(e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') handleAddMachineDowntime(); }}
+                                                className="flex-1 bg-[#0B1D2A] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-rose-400"
+                                            />
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="240"
+                                                    value={newDowntimeThreshold}
+                                                    onChange={(e) => setNewDowntimeThreshold(Number(e.target.value))}
+                                                    title="Tolerância em minutos"
+                                                    className="w-16 bg-[#0B1D2A] border border-white/15 rounded-lg px-2 py-1.5 text-xs font-bold font-mono text-center text-rose-300 focus:outline-none focus:border-rose-400"
+                                                />
+                                                <span className="text-[10px] text-slate-400 font-bold">min</span>
+                                                <button
+                                                    type="button"
+                                                    disabled={isSavingDowntime || !newDowntimeReason.trim()}
+                                                    onClick={handleAddMachineDowntime}
+                                                    className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shrink-0"
+                                                >
+                                                    {isSavingDowntime ? 'Salvando...' : '+ Salvar'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Botão de Atalho para Restaurar Padrões */}
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] font-bold text-slate-400">
+                                            Motivos Vinculados ({machineReasons.length})
+                                        </span>
+                                        <button
+                                            type="button"
+                                            disabled={isSavingDowntime}
+                                            onClick={handleSeedDefaultMachineDowntimes}
+                                            className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <span>⚡ Sincronizar Motivos Padrão de {machType} no Banco</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Lista de Motivos Cadastrados */}
+                                    <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
+                                        {machineReasons.length === 0 ? (
+                                            <div className="text-center py-6 border border-dashed border-white/10 rounded-xl text-xs text-slate-400 font-medium flex flex-col items-center gap-2">
+                                                <span>Nenhum motivo específico cadastrado no banco para {machineShiftModalTarget}.</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSeedDefaultMachineDowntimes}
+                                                    className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-[#00E5FF] hover:bg-cyan-500/30 border border-cyan-500/40 font-bold text-xs"
+                                                >
+                                                    ⚡ Inserir Motivos Padrão Agora
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            machineReasons.map(c => (
+                                                <div
+                                                    key={c.id}
+                                                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all text-xs ${
+                                                        c.isActive
+                                                            ? 'bg-[#08131B] border-white/10 hover:border-white/20'
+                                                            : 'bg-[#08131B]/40 border-white/5 opacity-60'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleMachineDowntime(c)}
+                                                            className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer ${
+                                                                c.isActive
+                                                                    ? 'bg-rose-500 border-rose-400 text-white'
+                                                                    : 'bg-white/5 border-white/20'
+                                                            }`}
+                                                            title={c.isActive ? 'Clique para desativar' : 'Clique para ativar'}
+                                                        >
+                                                            {c.isActive && <span className="text-[10px] leading-none">✓</span>}
+                                                        </button>
+                                                        <span className={`font-bold truncate ${c.isActive ? 'text-white' : 'text-slate-400 line-through'}`}>
+                                                            {c.reason}
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-rose-500/15 border border-rose-500/30 text-rose-300">
+                                                            {c.thresholdMinutes || 15} min
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-slate-400">
+                                                            {c.machineType || 'Geral'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <span className={`text-[10px] font-bold ${c.isActive ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                                            {c.isActive ? 'Ativo no App' : 'Inativo'}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteMachineDowntime(c.id, c.reason)}
+                                                            className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                                                            title="Excluir do banco de dados"
+                                                        >
+                                                            <TrashIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Rodapé da aba de Paradas */}
+                                    <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-white/10 shrink-0">
+                                        <div className="flex items-center gap-1.5 text-[10px] text-cyan-300 font-mono">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                            <span>Sincronização em tempo real ativada</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setMachineShiftModalTarget(null);
+                                                setMachineShiftModalDraft(null);
+                                            }}
+                                            className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs transition cursor-pointer"
+                                        >
+                                            Concluir e Fechar
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL 2: REAGENDAMENTO RÁPIDO DE OP EXISTENTE / ESTENDER PRAZO */}
+            {selectedOP && (() => {
+                const isAlreadyStarted = hasProductionStarted(selectedOP);
+                return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fade p-4">
+                    <div className="w-full max-w-[420px] pcp-glass-card rounded-2xl border border-white/10 p-6 flex flex-col gap-4 text-slate-100">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <h3 className="text-sm font-black uppercase tracking-wider text-[#00E5FF] flex items-center gap-2">
+                                <CalendarIcon className="w-5 h-5" />
+                                {isAlreadyStarted ? `Estender Prazo • OP #${selectedOP.orderNumber}` : `Reprogramar OP #${selectedOP.orderNumber}`}
+                            </h3>
+                            <button onClick={() => setSelectedOP(null)} className="text-slate-400 hover:text-white transition-colors">
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {isAlreadyStarted && (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex flex-col gap-1">
+                                <span className="font-bold flex items-center gap-1.5 text-amber-400 uppercase text-[10px] tracking-wider">
+                                    <span>⚠️</span>
+                                    <span>OP com produção em andamento</span>
+                                </span>
+                                <p className="text-[11px] leading-relaxed text-slate-300">
+                                    Esta OP iniciou em <strong className="text-white">{formatFriendlyDate(selectedOP.plannedStartDate)}</strong>. A data de início permanece travada para preservar os apontamentos já realizados. Ajuste a duração abaixo para <strong>estender o prazo</strong> de entrega.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Máquina</label>
+                                <select
+                                    value={scheduleMachine}
+                                    onChange={(e) => setScheduleMachine(e.target.value)}
+                                    disabled={isAlreadyStarted}
+                                    className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${
+                                        isAlreadyStarted ? 'opacity-60 cursor-not-allowed' : ''
+                                    }`}
+                                >
+                                    {MACHINES.map(m => (
+                                        <option key={m.name} value={m.name}>{m.name} ({m.type})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                    <span>Data de Início</span>
+                                    {isAlreadyStarted && (
+                                        <span className="text-[9px] font-bold text-amber-400 uppercase">🔒 Início Travado</span>
+                                    )}
+                                </label>
+                                <input
+                                    type="date"
+                                    value={scheduleStartDate}
+                                    onChange={(e) => setScheduleStartDate(e.target.value)}
+                                    disabled={isAlreadyStarted}
+                                    className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${
+                                        isAlreadyStarted ? 'opacity-60 cursor-not-allowed bg-black/40' : ''
+                                    }`}
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
+                                    <span>{isAlreadyStarted ? 'Duração Total (Dias Úteis)' : 'Duração Estimada'}</span>
+                                    <span className="text-[#00E5FF] font-black">{scheduleDuration} {scheduleDuration === 1 ? 'dia' : 'dias'}</span>
+                                </label>
+                                <div className="flex items-center gap-3 bg-[#0A1D2A] border border-white/10 rounded-xl p-1 justify-between">
+                                    <button
+                                        type="button"
+                                        onClick={() => setScheduleDuration(prev => Math.max(1, prev - 1))}
+                                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                                    >
+                                        -
+                                    </button>
+                                    <span className="text-xs font-bold text-white">{scheduleDuration}d</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setScheduleDuration(prev => prev + 1)}
+                                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                    Término previsto: <strong className="text-white">{formatFriendlyDate(calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration))}</strong>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 border-t border-white/10 pt-4 mt-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedOP(null)}
+                                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl py-2.5 text-xs font-bold text-slate-400 hover:text-white transition-all text-center"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveSchedule}
+                                className="flex-1 bg-[#00E5FF] hover:bg-[#00B4D8] text-slate-900 rounded-xl py-2.5 text-xs font-black transition-all shadow-md text-center active:scale-95 uppercase tracking-wider"
+                            >
+                                {isAlreadyStarted ? 'Salvar Extensão' : 'Salvar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
+
+            {/* DRAWER LATERAL: RAIO-X DA OP */}
+            {drawerOP && (
+                <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade">
+                    <div 
+                        className="fixed inset-0"
+                        onClick={() => setDrawerOP(null)}
+                    />
+                    
+                    <div className="relative w-full max-w-md bg-white border-l border-slate-200 shadow-2xl p-6 flex flex-col gap-5 overflow-y-auto h-full z-10 animate-fade text-slate-800">
+                        
+                        {/* Topo do Drawer */}
+                        <div className="flex items-start justify-between border-b border-slate-200 pb-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-black tracking-widest text-blue-900 uppercase">RAIO-X DA ORDEM</span>
+                                    {(() => {
+                                        const p = getOPProgress(drawerOP);
+                                        if (p.isCompleted) {
+                                            return (
+                                                <span className="flex items-center gap-1 text-[8px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                                                    CONCLUÍDA
+                                                </span>
+                                            );
+                                        }
+                                        if (p.isLive) {
+                                            if (p.isStopped) {
+                                                return (
+                                                    <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-rose-600 text-white px-2 py-0.5 rounded shadow-sm animate-pulse">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                                        PARADA: {p.downtimeReason} ({formatDuration(p.downtimeDurationMs)})
+                                                    </span>
+                                                );
+                                            }
+                                            if (p.isPrep) {
+                                                const isRedundant = (p.downtimeReason || '').trim().toLowerCase() === 'preparação' || (p.downtimeReason || '').trim().toLowerCase() === 'preparacao';
+                                                return (
+                                                    <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-amber-500 text-white px-2 py-0.5 rounded shadow-sm">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                                        {isRedundant ? `PREPARAÇÃO (${formatDuration(p.downtimeDurationMs)})` : `PREPARAÇÃO: ${p.downtimeReason} (${formatDuration(p.downtimeDurationMs)})`}
+                                                    </span>
+                                                );
+                                            }
+                                            if (p.isOffline) {
+                                                return (
+                                                    <span className="flex items-center gap-1 text-[8px] font-black uppercase bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-300">
+                                                        DESLIGADA: FINAL DE TURNO
+                                                    </span>
+                                                );
+                                            }
+                                            return (
+                                                <span className="flex items-center gap-1 text-[8px] font-extrabold uppercase bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm animate-pulse">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />
+                                                    AO VIVO (EM OPERAÇÃO)
+                                                </span>
+                                            );
+                                        }
+                                        return (
+                                            <span className="flex items-center gap-1 text-[8px] font-extrabold uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-300">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                                AGENDADA (AGUARDANDO INÍCIO)
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                                <h2 className="text-xl font-black text-blue-950 mt-1">OP #{drawerOP.orderNumber}</h2>
+                                <p className="text-xs text-slate-500 mt-0.5">{drawerOP.scheduledMachine || (drawerOP.machine as string)}</p>
+                            </div>
+                            <button 
+                                onClick={() => setDrawerOP(null)}
+                                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Alerta de Máquina Parada no Raio-X */}
+                        {(() => {
+                            const p = getOPProgress(drawerOP);
+                            if (p.isLive && p.isStopped) {
+                                return (
+                                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 flex flex-col gap-1.5 shadow-sm animate-pulse">
+                                        <div className="flex items-center justify-between">
+                                            <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-rose-600">
+                                                <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
+                                                Máquina Parada em Operação
+                                            </span>
+                                            <span className="text-sm font-mono font-black text-white bg-rose-600 px-2.5 py-0.5 rounded shadow-sm">
+                                                ⏱️ {formatDuration(p.downtimeDurationMs)}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-rose-900 font-bold">
+                                            Motivo registrado: <strong className="text-rose-950 font-black uppercase underline">{p.downtimeReason}</strong>
+                                        </p>
+                                    </div>
+                                );
+                            }
+                            if (p.isLive && p.isPrep) {
+                                return (
+                                    <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col gap-1.5 shadow-sm">
+                                        <div className="flex items-center justify-between">
+                                            <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-amber-700">
+                                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                Máquina em Preparação / Setup
+                                            </span>
+                                            <span className="text-sm font-mono font-black text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded border border-amber-300">
+                                                ⏱️ {formatDuration(p.downtimeDurationMs)}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-amber-800 font-bold">
+                                            Atividade: <strong className="text-amber-950 font-black uppercase underline">{p.downtimeReason}</strong>
+                                        </p>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+
+                        {/* Card de Evolução Geral */}
+                        {(() => {
+                            const prog = getOPProgress(drawerOP);
+                            return (
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-3 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Evolução Real</span>
+                                        <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${prog.statusColor}`}>
+                                            {prog.statusLabel}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-baseline justify-between">
+                                        <span className="text-2xl font-black text-slate-900">
+                                            {prog.produced.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-500">{prog.unit}</span>
+                                        </span>
+                                        <span className="text-2xl font-black text-blue-700">
+                                            {prog.pct}%
+                                        </span>
+                                    </div>
+
+                                    <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden border border-slate-300">
+                                        <div 
+                                            className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+                                            style={{ width: `${prog.pct}%` }}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[10px] text-slate-600">
+                                        <span>Meta: {prog.target.toLocaleString('pt-BR')} {prog.unit}</span>
+                                        <span>Restante: {Math.max(0, prog.target - prog.produced).toLocaleString('pt-BR')} {prog.unit}</span>
+                                    </div>
+
+                                    {!isViewer && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenAdjustQuantity(drawerOP, { mode: 'total' })}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                                                title="Ajustar quantidade produzida desta OP no PCP e sincronizar com o operador"
+                                            >
+                                                <span>✏️</span>
+                                                <span>Ajustar Quantidade Produzida (Gestor)</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingInProgressOP(drawerOP)}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                                                title="Editar OP em Produção (Nome, Meta, Turnos Finalizados)"
+                                            >
+                                                <PencilIcon className="w-4 h-4 text-orange-600" />
+                                                <span>Editar OP em Produção (Nome, Meta, Turnos)</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const today = new Date();
+                                                    const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
+                                                    const todayStats = getOpDayStats(drawerOP, today, machine);
+                                                    setSelectedDailyReport({
+                                                        op: drawerOP,
+                                                        date: today,
+                                                        dateStr: formatDateString(today),
+                                                        dayName: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][today.getDay()],
+                                                        produced: todayStats.produced,
+                                                        unit: (drawerOP.machine && drawerOP.machine.startsWith('Trefila')) ? 'kg' : 'pçs',
+                                                        dayStats: todayStats
+                                                    });
+                                                }}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                                                title="Ver paradas e motivos por dia desta OP"
+                                            >
+                                                <span>🛑</span>
+                                                <span>Ver Paradas e Motivos (Por Dia)</span>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const today = new Date();
+                                                    const dateStr = formatDateString(today);
+                                                    const machine = drawerOP.scheduledMachine || (drawerOP.machine as string) || 'Treliça 1';
+                                                    const todayStats = getOpDayStats(drawerOP, today, machine);
+                                                    const cleanTarget = String(drawerOP.targetBitola || '').replace('mm', '').trim();
+                                                    const isTrefilaMach = String(machine || '').toLowerCase().includes('trefila');
+                                                    let opCode = drawerOP.productCode;
+                                                    let opDesc = drawerOP.productDescription;
+                                                    if (isTrefilaMach && (!opCode || !opDesc) && (cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || drawerOP.orderNumber === '87493')) {
+                                                        opCode = opCode || '8624';
+                                                        opDesc = opDesc || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
+                                                    }
+                                                    setOfficialReportModalData({
+                                                        op: { ...drawerOP, productCode: opCode, productDescription: opDesc },
+                                                        dateStr,
+                                                        machine,
+                                                        initialProduced: todayStats.produced,
+                                                        initialOperator: todayStats.operatorName,
+                                                        initialDayStats: todayStats
+                                                    });
+                                                }}
+                                                className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-98"
+                                                title="Abrir Ficha Oficial de Produção Diária (Impressão e WhatsApp)"
+                                            >
+                                                <span>📄</span>
+                                                <span>Ficha Diária Oficial (A4 / WhatsApp)</span>
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Ficha Técnica da OP */}
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5 text-xs shadow-sm">
+                            <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-2">Especificações</h4>
+                            
+                            <div className="flex justify-between py-1 border-b border-slate-200">
+                                <span className="text-slate-500">Tipo de Linha:</span>
+                                <strong className="text-slate-900">{drawerOP.machine}</strong>
+                            </div>
+
+                            {drawerOP.targetBitola && (
+                                <div className="flex justify-between py-1 border-b border-slate-200">
+                                    <span className="text-slate-500">Bitola:</span>
+                                    <strong className="text-blue-700 font-black">{drawerOP.targetBitola} mm</strong>
+                                </div>
+                            )}
+
+                            {drawerOP.trelicaModel && (
+                                <div className="flex justify-between py-1 border-b border-slate-200">
+                                    <span className="text-slate-500">Modelo Treliça:</span>
+                                    <strong className="text-emerald-700 font-black">{drawerOP.trelicaModel}</strong>
+                                </div>
+                            )}
+
+                            {drawerOP.tamanho && (
+                                <div className="flex justify-between py-1 border-b border-slate-200">
+                                    <span className="text-slate-500">Comprimento:</span>
+                                    <strong className="text-slate-900">{drawerOP.tamanho}</strong>
+                                </div>
+                            )}
+
+                            {drawerOP.malhaModel && (
+                                <div className="flex justify-between py-1 border-b border-slate-200">
+                                    <span className="text-slate-500">Modelo Malha:</span>
+                                    <strong className="text-purple-700 font-black">{drawerOP.malhaModel}</strong>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between py-1 border-b border-slate-200">
+                                <span className="text-slate-500">Início Agendado:</span>
+                                <strong className="text-slate-900">{drawerOP.plannedStartDate || 'Não agendado'}</strong>
+                            </div>
+
+                            <div className="flex justify-between items-center py-1">
+                                <span className="text-slate-500">Duração Estimada:</span>
+                                <div className="flex items-center gap-1.5">
+                                    <strong className="text-slate-900">{drawerOP.estimatedDurationDays || 1} dia(s)</strong>
+                                    {!isViewer && (
+                                        <div className="flex items-center gap-1 ml-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAdjustDuration(drawerOP, -1)}
+                                                className="w-5 h-5 rounded bg-slate-200 hover:bg-rose-100 text-slate-700 hover:text-rose-700 text-xs font-black flex items-center justify-center transition-all cursor-pointer"
+                                                title="Diminuir 1 dia de duração"
+                                            >
+                                                -
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAdjustDuration(drawerOP, 1)}
+                                                className="w-5 h-5 rounded bg-slate-200 hover:bg-emerald-100 text-slate-700 hover:text-emerald-700 text-xs font-black flex items-center justify-center transition-all cursor-pointer"
+                                                title="Aumentar 1 dia de duração"
+                                            >
+                                                +
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDirectSetDuration(drawerOP)}
+                                                className="text-[10px] bg-slate-200 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold transition-all cursor-pointer"
+                                                title="Digitar quantidade de dias"
+                                            >
+                                                Alterar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Apontamentos Recentes de Turno */}
+                        {(() => {
+                            const relatedReports = shiftReports.filter(r => 
+                                r.productionOrderId === drawerOP.id || 
+                                (drawerOP.orderNumber && r.orderNumber === drawerOP.orderNumber)
+                            );
+
+                            return (
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col gap-2.5 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                                            Apontamentos de Turno ({relatedReports.length})
+                                        </h4>
+                                    </div>
+
+                                    {relatedReports.length === 0 ? (
+                                        <p className="text-xs text-slate-500 italic py-2 text-center">Nenhum apontamento registrado ainda.</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                            {relatedReports.map(rep => (
+                                                <div key={rep.id} className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex justify-between items-center shadow-sm">
+                                                    <div>
+                                                        <span className="text-slate-900 font-bold block">{rep.operator || 'Operador'}</span>
+                                                        <span className="text-[10px] text-slate-500">{rep.date || rep.shiftStartTime?.split('T')[0]}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-blue-700 font-black block">
+                                                            {rep.totalProducedWeight ? `${rep.totalProducedWeight.toLocaleString('pt-BR')} kg` : `${rep.totalProducedQuantity || 0} pçs`}
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-500">{rep.machine}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+
+                        {/* Ações Rápidas do Drawer */}
+                        <div className="mt-auto pt-4 border-t border-slate-200 flex flex-col gap-2.5">
+                            <button
+                                onClick={() => {
+                                    const op = drawerOP;
+                                    setDrawerOP(null);
+                                    setDiagnosticOP(op);
+                                }}
+                                className="w-full bg-gradient-to-r from-amber-500/20 via-cyan-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 text-amber-200 border border-amber-500/40 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-amber-500/10 active:scale-95 transition-all uppercase tracking-wider"
+                            >
+                                <ClipboardListIcon className="w-4 h-4 text-amber-400" />
+                                Diagnóstico da Produção (Planejado vs Realizado)
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    const op = drawerOP;
+                                    setDrawerOP(null);
+                                    handlePrintOP(op);
+                                }}
+                                className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-cyan-500/10 active:scale-95 transition-all uppercase tracking-wider"
+                            >
+                                <PrinterIcon className="w-4 h-4 text-cyan-400" />
+                                Imprimir Ordem de Produção (Ficha A4)
+                            </button>
+
+                            {/* Encerrar / Finalizar OP (Liberar Máquina no PCP) */}
+                            {!isViewer && (() => {
+                                const isCompleted = drawerOP.status === 'completed' || drawerOP.status === 'Finalizado' || drawerOP.status === 'Concluída';
+                                return (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCompleteOP(drawerOP)}
+                                        className={`w-full font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all uppercase tracking-wider ${
+                                            isCompleted
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                                                : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-rose-600/20'
+                                        }`}
+                                        title={isCompleted ? "OP Concluída. Clique para reabrir a ordem se necessário." : "Encerrar esta OP, finalizar apontamentos em aberto e liberar a máquina no PCP"}
+                                    >
+                                        <span>{isCompleted ? '✅' : '🏁'}</span>
+                                        <span>{isCompleted ? 'OP Concluída (Clique para Reabrir)' : 'Encerrar e Finalizar Ordem'}</span>
+                                    </button>
+                                );
+                            })()}
+
+                            {/* Ações de Pausa e Retomada para Liberação de Máquina */}
+                            {!isViewer && (() => {
+                                const isOPPaused = drawerOP.status === 'paused' || drawerOP.status === 'Pausada' || Boolean((drawerOP as any).isPaused) || Boolean(drawerOP.summary?.isPaused);
+                                const isOPInProgress = !isOPPaused && (drawerOP.status === 'in_progress' || drawerOP.status === 'Em Produção');
+
+                                if (isOPInProgress) {
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePauseOPFromPCP(drawerOP)}
+                                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all uppercase tracking-wider"
+                                            title="Pausar ordem para liberar a máquina para outra OP urgente"
+                                        >
+                                            <span>⏸️</span>
+                                            <span>Pausar Ordem (Liberar Máquina)</span>
+                                        </button>
+                                    );
+                                }
+
+                                if (isOPPaused) {
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleResumeOPFromPCP(drawerOP)}
+                                            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all uppercase tracking-wider"
+                                            title="Retomar a produção desta ordem de onde parou"
+                                        >
+                                            <PlayIcon className="w-4 h-4 text-slate-950" />
+                                            <span>Retomar Ordem Pausada</span>
+                                        </button>
+                                    );
+                                }
+
+                                return null;
+                            })()}
+
+                            {/* Alternar Ordem Fantasma (Liberar / Reservar Lotes no Estoque) */}
+                            {!isViewer && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleGhostOrder(drawerOP)}
+                                    className={`w-full font-bold rounded-xl py-2.5 text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                        drawerOP.isGhostOrder
+                                            ? 'bg-amber-950/40 text-amber-300 border border-amber-500/40 hover:bg-amber-900/50'
+                                            : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-amber-300'
+                                    }`}
+                                    title={drawerOP.isGhostOrder 
+                                        ? "Esta OP é Fantasma (lotes livres no estoque). Clique para reservar os lotes." 
+                                        : "Esta OP está reservando lotes no estoque. Clique para liberar os lotes mantendo a OP ativa."}
+                                >
+                                    <span>👻</span>
+                                    <span>
+                                        {drawerOP.isGhostOrder 
+                                            ? 'Modo Fantasma Ativo (Lotes Liberados)' 
+                                            : 'Converter em Ordem Fantasma (Liberar Lotes)'}
+                                    </span>
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => handleGoToProduction(drawerOP)}
+                                className="w-full bg-gradient-to-r from-[#00E5FF] to-[#00B4D8] text-slate-950 font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-[#00E5FF]/20 active:scale-95 transition-all uppercase tracking-wider"
+                            >
+                                <PlayIcon className="w-4 h-4 text-slate-950" />
+                                Abrir Terminal de Produção
+                            </button>
+
+                            {!isViewer && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const op = drawerOP;
+                                            setDrawerOP(null);
+                                            openScheduleModal(op);
+                                        }}
+                                        className="bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold rounded-xl py-2.5 text-xs flex items-center justify-center gap-1.5 transition-all"
+                                    >
+                                        <CalendarIcon className="w-4 h-4 text-[#00E5FF]" />
+                                        Reprogramar
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDeleteOP(drawerOP.id, drawerOP.orderNumber)}
+                                        className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold rounded-xl py-2.5 text-xs flex items-center justify-center gap-1.5 transition-all"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                        Excluir OP
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL 5: PARÂMETROS DE METAS DE PARADAS & CHECKLIST (FIXO NO PCP)         */}
+            {/* ========================================================================= */}
+            {isDowntimeLimitsModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-3 sm:p-5 overflow-y-auto">
+                    <div className="w-full max-w-2xl pcp-glass-card rounded-3xl border border-amber-500/30 p-6 flex flex-col gap-5 text-slate-100 shadow-2xl my-auto">
+                        
+                        {/* Topo do Modal */}
+                        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                                    <AdjustmentsIcon className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
+                                        Metas de Paradas & Parâmetros do Checklist
+                                    </h3>
+                                    <p className="text-xs text-slate-400">
+                                        Estipule os limites de tempo aceitáveis para cada etapa e motivo de parada
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setIsDowntimeLimitsModalOpen(false)} 
+                                className="text-slate-400 hover:text-white transition-colors p-1 rounded-xl hover:bg-white/5"
+                            >
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Corpo com os campos de parametrização */}
+                        <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                            
+                            {/* Bloco 1: Sequência Padrão do Checklist da Produção */}
+                            <div className="bg-[#07131D] p-4 rounded-2xl border border-amber-500/20 space-y-3">
+                                <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wider border-b border-white/5 pb-2">
+                                    <span>📋 1. Sequência Padrão de Paradas Programadas da OP</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* Setup Inicial */}
+                                    <div className="bg-[#0B1D2A] p-3 rounded-xl border border-white/5">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                                🔧 Setup de Máquina
+                                            </span>
+                                            <span className="text-[10px] text-amber-400 font-mono font-bold">Padrão Inicial</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number"
+                                                min="5"
+                                                max="360"
+                                                value={customDowntimeLimits['Setup'] ?? 30}
+                                                onChange={(e) => setCustomDowntimeLimits(prev => ({ ...prev, 'Setup': Number(e.target.value) }))}
+                                                className="w-24 bg-black/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5 text-sm font-bold text-center text-white focus:outline-none focus:border-amber-400 font-mono"
+                                            />
+                                            <span className="text-xs text-slate-400 font-bold">minutos por setup</span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-500 block mt-1">Tempo tolerado para preparação de ferramentas/bitola</span>
+                                    </div>
+
+                                    {/* Troca de Rolo */}
+                                    <div className="bg-[#0B1D2A] p-3 rounded-xl border border-white/5">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                                🔄 Troca de Rolo / Bobina
+                                            </span>
+                                            <span className="text-[10px] text-cyan-400 font-mono font-bold">Por Lote</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number"
+                                                min="1"
+                                                max="60"
+                                                value={customDowntimeLimits['Troca de Rolo / Preparação'] ?? 10}
+                                                onChange={(e) => setCustomDowntimeLimits(prev => ({ ...prev, 'Troca de Rolo / Preparação': Number(e.target.value) }))}
+                                                className="w-24 bg-black/40 border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-sm font-bold text-center text-white focus:outline-none focus:border-[#00E5FF] font-mono"
+                                            />
+                                            <span className="text-xs text-slate-400 font-bold">minutos por troca</span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-500 block mt-1">Tempo para alimentar e passar a nova ponta</span>
+                                    </div>
+
+                                    {/* Lubrificação */}
+                                    <div className="bg-[#0B1D2A] p-3 rounded-xl border border-white/5">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                                🧴 Lubrificação
+                                            </span>
+                                            <span className="text-[10px] text-emerald-400 font-mono font-bold">Limite por Ciclo</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number"
+                                                min="1"
+                                                max="60"
+                                                value={customDowntimeLimits['Lubrificação'] ?? 10}
+                                                onChange={(e) => setCustomDowntimeLimits(prev => ({ ...prev, 'Lubrificação': Number(e.target.value) }))}
+                                                className="w-24 bg-black/40 border border-emerald-500/30 rounded-lg px-2.5 py-1.5 text-sm font-bold text-center text-white focus:outline-none focus:border-emerald-400 font-mono"
+                                            />
+                                            <span className="text-xs text-slate-400 font-bold">minutos por parada</span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-500 block mt-1">Acima deste limite conta como perda de tempo</span>
+                                    </div>
+
+                                    {/* Frequência de Lubrificação */}
+                                    <div className="bg-[#0B1D2A] p-3 rounded-xl border border-white/5">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                                ⏱️ Cadência do Checklist
+                                            </span>
+                                            <span className="text-[10px] text-purple-400 font-mono font-bold">Frequência</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="number"
+                                                min="30"
+                                                max="480"
+                                                step="30"
+                                                value={lubricationIntervalMin}
+                                                onChange={(e) => setLubricationIntervalMin(Number(e.target.value))}
+                                                className="w-24 bg-black/40 border border-purple-500/30 rounded-lg px-2.5 py-1.5 text-sm font-bold text-center text-white focus:outline-none focus:border-purple-400 font-mono"
+                                            />
+                                            <span className="text-xs text-slate-400 font-bold">minutos ({(lubricationIntervalMin / 60).toFixed(1)}h)</span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-500 block mt-1">Intervalo recomendado entre lubrificações sucessivas</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bloco 2: Paradas Operacionais & Tolerâncias de Manutenção */}
+                            <div className="bg-[#07131D] p-4 rounded-2xl border border-white/5 space-y-3">
+                                <div className="flex items-center justify-between text-slate-300 font-black text-xs uppercase tracking-wider border-b border-white/5 pb-2">
+                                    <span>⚠️ 2. Tolerâncias para Paradas Não Programadas (Chão de Fábrica)</span>
+                                    <span className="text-[10px] text-slate-500 lowercase">minutos tolerados</span>
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                                    {[
+                                        { key: 'Enrosco de fio', label: 'Enrosco de Fio', icon: '🪢' },
+                                        { key: 'Quebra fio', label: 'Quebra de Fio', icon: '⚡' },
+                                        { key: 'Falha no sensor', label: 'Falha Sensor', icon: '🔌' },
+                                        { key: 'Vazamento de água', label: 'Vazamento Água', icon: '💧' },
+                                        { key: 'Limpeza', label: 'Limpeza Geral', icon: '🧹' },
+                                        { key: 'Outros', label: 'Outros Motivos', icon: '❓' }
+                                    ].map(item => (
+                                        <div key={item.key} className="bg-[#0B1D2A] p-2.5 rounded-xl border border-white/5 flex flex-col justify-between">
+                                            <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1 truncate mb-1">
+                                                <span>{item.icon}</span>
+                                                <span className="truncate">{item.label}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <input 
+                                                    type="number"
+                                                    min="1"
+                                                    max="120"
+                                                    value={customDowntimeLimits[item.key] ?? 10}
+                                                    onChange={(e) => {
+                                                        const val = Number(e.target.value);
+                                                        setCustomDowntimeLimits(prev => ({ ...prev, [item.key]: val }));
+                                                    }}
+                                                    className="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs font-bold text-center text-white focus:outline-none focus:border-amber-400 font-mono"
+                                                />
+                                                <span className="text-[10px] text-slate-400">min</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Botões do Rodapé */}
+                        <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const defaultLimits = {
+                                        'Setup': 30,
+                                        'Troca de Rolo / Preparação': 10,
+                                        'Lubrificação': 10,
+                                        'Enrosco de fio': 10,
+                                        'Quebra fio': 10,
+                                        'Falha no sensor': 10,
+                                        'Vazamento de água': 10,
+                                        'Limpeza': 15,
+                                        'Manutenção': 60,
+                                        'Outros': 15
+                                    };
+                                    handleSaveDowntimeLimits(defaultLimits, 180);
+                                }}
+                                className="text-xs text-slate-400 hover:text-rose-400 font-bold transition-colors"
+                            >
+                                Restaurar Padrões de Fábrica
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDowntimeLimitsModalOpen(false)}
+                                    className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-slate-300 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSaveDowntimeLimits(customDowntimeLimits, lubricationIntervalMin)}
+                                    className="px-5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all uppercase tracking-wider flex items-center gap-1.5"
+                                >
+                                    <CheckCircleIcon className="w-4 h-4 text-slate-950" />
+                                    Salvar Parâmetros
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* MODAL 6: DIAGNÓSTICO DA PRODUÇÃO (PLANEJADO VS REALIZADO & CHECKLIST)     */}
+            {/* ========================================================================= */}
+            {diagnosticOP && (
+                (() => {
+                    const op = diagnosticOP;
+                    const prog = getOPProgress(op);
+                    const machineName = op.scheduledMachine || (op.machine as string) || 'Máquina';
+                    const targetBitola = op.targetBitola;
+                    const modelSubtitle = op.trelicaModel ? `${op.trelicaModel} (${op.tamanho || '6m'})` : op.malhaModel ? op.malhaModel : `Bitola ${targetBitola}mm`;
+                    
+                    // 1. Início da OP
+                    const startRaw = op.startTime || op.creationDate;
+                    const startDateObj = startRaw ? new Date(startRaw) : null;
+                    const formattedStartTime = startDateObj && !isNaN(startDateObj.getTime())
+                        ? startDateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                        : 'Não iniciado';
+                    const formattedStartDate = startDateObj && !isNaN(startDateObj.getTime())
+                        ? startDateObj.toLocaleDateString('pt-BR')
+                        : '';
+
+                    // 2. Tempo Total Decorrido da OP
+                    const totalDurationMs = startDateObj && !isNaN(startDateObj.getTime())
+                        ? (op.endTime ? new Date(op.endTime).getTime() - startDateObj.getTime() : Math.max(0, liveNow.getTime() - startDateObj.getTime()))
+                        : 0;
+
+                    // 3. Processamento de Eventos de Parada
+                    const events = [...(op.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
+                    
+                    const normalize = (s: string) => s ? s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
+
+                    // Metas estipuladas
+                    const expectedSetupMin = op.setupTimeMinutes || customDowntimeLimits['Setup'] || 30;
+                    const expectedRollChangeMin = op.rollChangeTimeMinutes || customDowntimeLimits['Troca de Rolo / Preparação'] || 10;
+                    const expectedLubricationMin = customDowntimeLimits['Lubrificação'] || 10;
+
+                    // Classificação e Checklist dos Eventos
+                    let totalDowntimeMs = 0;
+                    let totalLostTimeMs = 0; // Tempo excedido além das metas
+                    let setupActualMs = 0;
+                    let rollChangeActualMs = 0;
+                    let rollChangeCount = 0;
+                    let lubricationActualMs = 0;
+                    let lubricationCount = 0;
+
+                    // Mapa para agrupamento de perdas por motivo (Radar de Gargalos)
+                    const reasonsLostTime: Record<string, { count: number; totalDurationMs: number; excessMs: number; expectedSingleMin: number }> = {};
+
+                    const checklistItems: Array<{
+                        id: string;
+                        type: 'start' | 'setup' | 'lubrication' | 'roll_change' | 'stop' | 'lot' | 'shift_end';
+                        title: string;
+                        timeStr: string;
+                        timestampMs: number;
+                        durationMs?: number;
+                        expectedDurationMin?: number;
+                        status: 'ok' | 'warning' | 'error' | 'info';
+                        statusText: string;
+                        diffMinutes?: number;
+                        observation?: string;
+                    }> = [];
+
+                    // Item 1: Entrada / Início
+                    checklistItems.push({
+                        id: 'start-step',
+                        type: 'start',
+                        title: '1° Horário de Entrada / Início da Produção',
+                        timeStr: formattedStartTime,
+                        timestampMs: startDateObj && !isNaN(startDateObj.getTime()) ? startDateObj.getTime() : 0,
+                        status: startDateObj ? 'ok' : 'info',
+                        statusText: startDateObj ? 'Início Registrado' : 'Aguardando Início',
+                        observation: `Data: ${formattedStartDate || '--'} | Operador: ${op.operator || 'Não identificado'}`
+                    });
+
+                    // Iterar sobre as paradas
+                    events.forEach((ev, idx) => {
+                        const stopDate = new Date(ev.stopTime);
+                        const resumeDate = ev.resumeTime ? new Date(ev.resumeTime) : liveNow;
+                        const durationMs = Math.max(0, resumeDate.getTime() - stopDate.getTime());
+                        const durationMin = Math.round(durationMs / 60000);
+                        totalDowntimeMs += durationMs;
+
+                        const reason = ev.reason || 'Outros';
+                        const normReason = normalize(reason);
+
+                        // Determinar tolerância da parada
+                        let expectedMin = customDowntimeLimits[reason] || 10;
+                        let itemType: 'setup' | 'lubrication' | 'roll_change' | 'stop' | 'shift_end' = 'stop';
+                        let itemTitle = `Parada: ${reason}`;
+
+                        if (normReason.includes('setup') || normReason.includes('ajuste')) {
+                            itemType = 'setup';
+                            expectedMin = expectedSetupMin;
+                            setupActualMs += durationMs;
+                            itemTitle = `🔧 Setup de Máquina (${durationMin} min)`;
+                        } else if (normReason.includes('lubrific')) {
+                            lubricationCount++;
+                            itemType = 'lubrication';
+                            expectedMin = expectedLubricationMin;
+                            lubricationActualMs += durationMs;
+                            itemTitle = `🧴 ${lubricationCount}° Lubrificação da Máquina`;
+                        } else if (normReason.includes('troca de rolo') || normReason.includes('preparacao')) {
+                            rollChangeCount++;
+                            itemType = 'roll_change';
+                            expectedMin = expectedRollChangeMin;
+                            rollChangeActualMs += durationMs;
+                            itemTitle = `🔄 ${rollChangeCount}° Troca de Rolo / Bobina`;
+                        } else if (normReason.includes('final de turno') || normReason.includes('turno')) {
+                            itemType = 'shift_end';
+                            expectedMin = durationMin; // Não penaliza final de turno
+                            itemTitle = `🌙 Máquina Desligada: Final de Turno`;
+                        }
+
+                        const diffMin = durationMin - expectedMin;
+                        const excessMs = diffMin > 0 ? diffMin * 60000 : 0;
+                        if (itemType !== 'shift_end') {
+                            totalLostTimeMs += excessMs;
+                        }
+
+                        // Agrupar motivos
+                        const groupKey = itemType === 'setup' ? 'Setup de Máquina' :
+                                         itemType === 'lubrication' ? 'Lubrificação' :
+                                         itemType === 'roll_change' ? 'Troca de Rolo' :
+                                         itemType === 'shift_end' ? 'Final de Turno' : reason;
+                        
+                        if (!reasonsLostTime[groupKey]) {
+                            reasonsLostTime[groupKey] = { count: 0, totalDurationMs: 0, excessMs: 0, expectedSingleMin: expectedMin };
+                        }
+                        reasonsLostTime[groupKey].count += 1;
+                        reasonsLostTime[groupKey].totalDurationMs += durationMs;
+                        reasonsLostTime[groupKey].excessMs += excessMs;
+
+                        let status: 'ok' | 'warning' | 'error' | 'info' = 'ok';
+                        let statusText = 'No Prazo';
+                        if (itemType === 'shift_end') {
+                            status = 'info';
+                            statusText = 'Turno Concluído';
+                        } else if (diffMin > 5) {
+                            status = 'error';
+                            statusText = `Estourou +${diffMin}m`;
+                        } else if (diffMin > 0) {
+                            status = 'warning';
+                            statusText = `Alerta +${diffMin}m`;
+                        } else if (diffMin < 0) {
+                            status = 'ok';
+                            statusText = `Economizou ${Math.abs(diffMin)}m`;
+                        }
+
+                        const timeFormatted = !isNaN(stopDate.getTime()) 
+                            ? stopDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) 
+                            : '--:--';
+
+                        checklistItems.push({
+                            id: `stop-${idx}`,
+                            type: itemType,
+                            title: itemTitle,
+                            timeStr: timeFormatted,
+                            timestampMs: !isNaN(stopDate.getTime()) ? stopDate.getTime() : 0,
+                            durationMs: durationMs,
+                            expectedDurationMin: expectedMin,
+                            diffMinutes: diffMin,
+                            status: status,
+                            statusText: statusText,
+                            observation: ev.resumeTime ? `Concluída (${formatDuration(durationMs)})` : 'Em andamento ao vivo'
+                        });
+                    });
+
+                    // Localizar Lote no Estoque
+                    const findStockLot = (lotObjOrId: any) => {
+                        if (!lotObjOrId) return undefined;
+                        const targetId = typeof lotObjOrId === 'string' 
+                            ? lotObjOrId 
+                            : (lotObjOrId.lotId || lotObjOrId.id || lotObjOrId.internalLot);
+                        if (!targetId) return undefined;
+                        return stock.find(s => 
+                            s.id === targetId || 
+                            s.internalLot === targetId ||
+                            (typeof lotObjOrId === 'object' && lotObjOrId.internalLot && s.internalLot === lotObjOrId.internalLot) ||
+                            (typeof lotObjOrId === 'object' && lotObjOrId.lotId && s.id === lotObjOrId.lotId)
+                        );
+                    };
+
+                    // Extrair lista de IDs de lotes selecionados no PCP
+                    let selectedLotIdsList: string[] = [];
+                    if (Array.isArray(op.selectedLotIds)) {
+                        selectedLotIdsList = op.selectedLotIds.filter(Boolean);
+                    } else if (op.selectedLotIds && typeof op.selectedLotIds === 'object') {
+                        selectedLotIdsList = Object.values(op.selectedLotIds).flat().filter(Boolean) as string[];
+                    }
+
+                    // Inserir Lotes Processados no Checklist
+                    const processedLots = op.processedLots || [];
+                    const processedLotIdsSet = new Set<string>();
+
+                    processedLots.forEach((lot, lIdx) => {
+                        const stockItem = findStockLot(lot);
+                        if (lot.lotId) processedLotIdsSet.add(lot.lotId);
+                        if ((lot as any).id) processedLotIdsSet.add((lot as any).id);
+                        if (stockItem?.id) processedLotIdsSet.add(stockItem.id);
+                        if (stockItem?.internalLot) processedLotIdsSet.add(stockItem.internalLot);
+
+                        const lotStart = lot.startTime ? new Date(lot.startTime) : null;
+                        const lotEnd = lot.endTime ? new Date(lot.endTime) : null;
+                        const lotTimeStr = lotStart && !isNaN(lotStart.getTime()) 
+                            ? lotStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) 
+                            : '--:--';
+                        const lotDurationMs = lotStart && lotEnd ? Math.max(0, lotEnd.getTime() - lotStart.getTime()) : undefined;
+
+                        // Identificação do Lote (Número de Lote Interno e Corrida)
+                        const lotNum = stockItem?.internalLot || (lot as any).internalLot || (lot.lotId && !lot.lotId.startsWith('STOCK-') ? lot.lotId : `${lIdx + 1}`);
+                        const corrida = stockItem?.runNumber || (lot as any).runNumber;
+                        const supplierLot = stockItem?.supplierLot || (lot as any).supplierLot;
+
+                        // Pesos
+                        const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
+                        const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                            ? Number(lot.finalWeight) 
+                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined 
+                                ? Number((lot as any).producedWeight) 
+                                : undefined;
+
+                        // Descrição de material & bitola
+                        const bitolaDesc = stockItem?.bitola 
+                            ? (stockItem.bitola.toString().includes('mm') ? stockItem.bitola : `${stockItem.bitola}mm`) 
+                            : (op.inputBitola ? `${op.inputBitola}mm` : '');
+                        const materialDesc = stockItem?.materialType || 'Fio Máquina';
+
+                        // Montar observação detalhada com lote, corrida, pesos e duração
+                        const obsParts: string[] = [];
+                        if (materialDesc || bitolaDesc) {
+                            obsParts.push(`${materialDesc} ${bitolaDesc}`.trim());
+                        }
+                        if (inputWeight > 0 && outputWeight !== undefined && outputWeight > 0) {
+                            obsParts.push(`Entrada: ${inputWeight.toLocaleString('pt-BR')} kg ➔ Saída: ${outputWeight.toLocaleString('pt-BR')} kg`);
+                            if (inputWeight !== outputWeight) {
+                                const diff = inputWeight - outputWeight;
+                                obsParts.push(`Apara: ${diff > 0 ? '-' : '+'}${Math.abs(diff).toLocaleString('pt-BR')} kg`);
+                            }
+                        } else if (inputWeight > 0) {
+                            obsParts.push(`Peso Bobina (Entrada): ${inputWeight.toLocaleString('pt-BR')} kg`);
+                        } else if (outputWeight !== undefined && outputWeight > 0) {
+                            obsParts.push(`Peso Produzido: ${outputWeight.toLocaleString('pt-BR')} kg`);
+                        }
+
+                        if (lotDurationMs) {
+                            obsParts.push(`Duração: ${formatDuration(lotDurationMs)}`);
+                        }
+                        if ((lot as any).speed) {
+                            obsParts.push(`Velocidade: ${(lot as any).speed.toFixed(1)} m/s`);
+                        }
+                        if (supplierLot) {
+                            obsParts.push(`Lote Fornec.: ${supplierLot}`);
+                        }
+
+                        const displayWeight = outputWeight !== undefined && outputWeight > 0 
+                            ? `${outputWeight.toLocaleString('pt-BR')} kg` 
+                            : inputWeight > 0 
+                                ? `${inputWeight.toLocaleString('pt-BR')} kg` 
+                                : 'Processado';
+
+                        const titleText = corrida 
+                            ? `📦 Lote Processado: Lote #${lotNum} • Corrida: ${corrida}`
+                            : `📦 Lote Processado: Lote #${lotNum}`;
+
+                        checklistItems.push({
+                            id: `lot-${lIdx}`,
+                            type: 'lot',
+                            title: titleText,
+                            timeStr: lotTimeStr,
+                            timestampMs: lotStart && !isNaN(lotStart.getTime()) ? lotStart.getTime() : 0,
+                            durationMs: lotDurationMs,
+                            status: 'ok',
+                            statusText: displayWeight,
+                            observation: obsParts.join(' • ')
+                        });
+                    });
+
+                    // Inserir Lotes Programados Ainda Não Processados (se houver)
+                    selectedLotIdsList.forEach((selectedId, pIdx) => {
+                        if (processedLotIdsSet.has(selectedId)) return;
+                        const stockItem = findStockLot(selectedId);
+                        if (stockItem && (processedLotIdsSet.has(stockItem.id) || (stockItem.internalLot && processedLotIdsSet.has(stockItem.internalLot)))) return;
+
+                        const lotNum = stockItem?.internalLot || selectedId;
+                        const corrida = stockItem?.runNumber;
+                        const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || 0);
+                        const bitolaDesc = stockItem?.bitola ? (stockItem.bitola.toString().includes('mm') ? stockItem.bitola : `${stockItem.bitola}mm`) : '';
+                        const materialDesc = stockItem?.materialType || 'Fio Máquina';
+
+                        checklistItems.push({
+                            id: `pending-lot-${pIdx}`,
+                            type: 'lot',
+                            title: corrida ? `⏳ Lote Programado: Lote #${lotNum} • Corrida: ${corrida}` : `⏳ Lote Programado: Lote #${lotNum}`,
+                            timeStr: '--:--',
+                            timestampMs: Number.MAX_SAFE_INTEGER,
+                            status: 'info',
+                            statusText: inputWeight > 0 ? `${inputWeight.toLocaleString('pt-BR')} kg` : 'Aguardando',
+                            observation: `${materialDesc} ${bitolaDesc} • Aguardando processamento • Bobina: ${inputWeight > 0 ? `${inputWeight.toLocaleString('pt-BR')} kg` : 'N/D'}`
+                        });
+                    });
+
+                    // Ordenar itens cronologicamente (Início sempre em 1°, paradas e lotes por horário)
+                    checklistItems.sort((a, b) => {
+                        if (a.id === 'start-step') return -1;
+                        if (b.id === 'start-step') return 1;
+                        return a.timestampMs - b.timestampMs;
+                    });
+
+                    // Totais de Lotes e Pesos
+                    const totalSelectedLotsCount = selectedLotIdsList.length > 0 ? selectedLotIdsList.length : processedLots.length;
+                    const processedLotsCount = processedLots.length;
+
+                    const totalInputWeight = (processedLots.length > 0 ? processedLots : selectedLotIdsList).reduce((acc, lotOrId) => {
+                        const sItem = findStockLot(lotOrId);
+                        const w = Number(sItem?.initialQuantity || sItem?.weight || sItem?.labelWeight || (typeof lotOrId === 'object' ? (lotOrId as any).inputWeight : 0) || 0);
+                        return acc + w;
+                    }, 0);
+
+                    const totalProducedWeight = processedLots.reduce((acc, lot) => {
+                        const w = lot.finalWeight !== null && lot.finalWeight !== undefined 
+                            ? Number(lot.finalWeight) 
+                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined 
+                                ? Number((lot as any).producedWeight) 
+                                : 0;
+                        return acc + w;
+                    }, 0) || Number(op.totalProducedWeight || op.actualProducedWeight || 0);
+
+                    // Tempo Produzindo Líquido (Tempo Total - Paradas)
+                    const netProducingMs = Math.max(0, totalDurationMs - totalDowntimeMs);
+
+                    // Ranking de Vilões de Tempo (Onde a Produção Perdeu Tempo)
+                    const sortedBottlenecks = Object.entries(reasonsLostTime)
+                        .filter(([k, v]) => k !== 'Final de Turno')
+                        .sort((a, b) => b[1].excessMs - a[1].excessMs);
+
+                    const hasBottleneck = sortedBottlenecks.some(b => b[1].excessMs > 0);
+
+                    return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-2 sm:p-4 overflow-y-auto">
+                            <div className="w-full max-w-4xl pcp-glass-card rounded-3xl border border-white/15 p-5 sm:p-7 flex flex-col gap-5 text-slate-100 shadow-2xl my-auto">
+                                
+                                {/* Cabeçalho do Diagnóstico */}
+                                <div className="flex items-start justify-between border-b border-white/10 pb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00E5FF]/20 to-amber-500/20 text-[#00E5FF] border border-[#00E5FF]/30 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                                            <ClipboardListIcon className="w-7 h-7" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h2 className="text-lg font-black uppercase text-white tracking-wider">
+                                                    Diagnóstico da Produção • OP #{op.orderNumber}
+                                                </h2>
+                                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${prog.statusColor}`}>
+                                                    {prog.statusLabel}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                                                <span>Linha: <strong className="text-white">{machineName}</strong></span>
+                                                <span>•</span>
+                                                <span>{modelSubtitle}</span>
+                                                {(() => {
+                                                    const diagEmp = findEmployeeByIdentifier(op.operator);
+                                                    return (
+                                                        <span className="flex items-center gap-1.5">
+                                                            {diagEmp?.photoUrl && (
+                                                                <img src={diagEmp.photoUrl} alt={diagEmp.name} className="w-4 h-4 rounded-full object-cover border border-cyan-400 inline-block" />
+                                                            )}
+                                                            <span>Operador: <strong className="text-white">{diagEmp ? formatShortName(diagEmp.name) : (op.operator || 'Não informado')}</strong></span>
+                                                        </span>
+                                                    );
+                                                })()}
+                                                {totalSelectedLotsCount > 0 && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span className="text-cyan-300 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 font-mono text-[11px] flex items-center gap-1">
+                                                            📦 {processedLotsCount}/{totalSelectedLotsCount} Lotes
+                                                            {totalProducedWeight > 0 ? ` • ⚖️ ${totalProducedWeight.toLocaleString('pt-BR')} kg` : totalInputWeight > 0 ? ` • ⚖️ ${totalInputWeight.toLocaleString('pt-BR')} kg` : ''}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setDiagnosticOP(null)} 
+                                        className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-xl hover:bg-white/5"
+                                    >
+                                        <XIcon className="w-6 h-6" />
+                                    </button>
+                                </div>
+
+                                {/* KPIs Principais de Produtividade & Tempo */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {/* KPI 1: Horário de Entrada */}
+                                    <div className="bg-[#08131B] p-3.5 rounded-2xl border border-white/5 flex flex-col justify-between">
+                                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+                                            <ClockIcon className="w-3.5 h-3.5 text-[#00E5FF]" />
+                                            <span>Entrada / Início</span>
+                                        </div>
+                                        <div className="mt-2">
+                                            <span className="text-xl font-black text-white font-mono">{formattedStartTime}</span>
+                                            <span className="text-[10px] text-slate-500 block">{formattedStartDate || 'Data N/D'}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* KPI 2: Tempo Produzindo Líquido */}
+                                    <div className="bg-[#08131B] p-3.5 rounded-2xl border border-cyan-500/20 flex flex-col justify-between">
+                                        <div className="flex items-center gap-1.5 text-cyan-400 text-[10px] font-bold uppercase tracking-wider">
+                                            <span>⚡ Tempo Produzindo</span>
+                                        </div>
+                                        <div className="mt-2">
+                                            <span className="text-xl font-black text-[#00E5FF] font-mono">{formatDuration(netProducingMs)}</span>
+                                            <span className="text-[10px] text-cyan-300/70 block">
+                                                {totalDurationMs > 0 ? `${Math.round((netProducingMs / totalDurationMs) * 100)}% de eficiência` : '--'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* KPI 3: Tempo Total em Paradas */}
+                                    <div className="bg-[#08131B] p-3.5 rounded-2xl border border-amber-500/20 flex flex-col justify-between">
+                                        <div className="flex items-center gap-1.5 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+                                            <span>⏱️ Total Paradas</span>
+                                        </div>
+                                        <div className="mt-2">
+                                            <span className="text-xl font-black text-amber-300 font-mono">{formatDuration(totalDowntimeMs)}</span>
+                                            <span className="text-[10px] text-amber-300/70 block">
+                                                {events.length} {events.length === 1 ? 'parada registrada' : 'paradas registradas'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* KPI 4: Saldo de Tempo Perdido (Gargalo) */}
+                                    <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                                        totalLostTimeMs > 0 
+                                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
+                                             : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                                    }`}>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
+                                            <span>{totalLostTimeMs > 0 ? '🔴 Tempo Perdido (Gargalo)' : '🟢 No Padrão Estipulado'}</span>
+                                        </div>
+                                        <div className="mt-2">
+                                            <span className="text-xl font-black font-mono">
+                                                {totalLostTimeMs > 0 ? `+${Math.round(totalLostTimeMs / 60000)} min` : '0 min'}
+                                            </span>
+                                            <span className="text-[10px] opacity-80 block">
+                                                {totalLostTimeMs > 0 ? 'acima das metas estipuladas' : 'dentro dos limites do PCP'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Bloco "Radar: Onde a Produção Perdeu Tempo" */}
+                                {hasBottleneck && (
+                                    <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-4 flex flex-col gap-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black uppercase tracking-wider text-rose-300 flex items-center gap-2">
+                                                <span>🔍 Onde Você Perdeu Tempo (Vilões de Produtividade)</span>
+                                            </span>
+                                            <span className="text-[10px] text-rose-400 font-mono font-bold">
+                                                Total Excedente: {Math.round(totalLostTimeMs / 60000)} min
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-1">
+                                            {sortedBottlenecks.filter(b => b[1].excessMs > 0).slice(0, 3).map(([reason, stats], rIdx) => {
+                                                const excessMin = Math.round(stats.excessMs / 60000);
+                                                const totalMin = Math.round(stats.totalDurationMs / 60000);
+                                                return (
+                                                    <div key={rIdx} className="bg-black/40 border border-rose-500/30 p-3 rounded-xl flex flex-col justify-between">
+                                                        <div>
+                                                            <div className="flex justify-between items-center text-xs font-bold text-white mb-1">
+                                                                <span className="truncate">{reason}</span>
+                                                                <span className="text-rose-400 font-black font-mono">+{excessMin}m</span>
+                                                            </div>
+                                                            <span className="text-[10px] text-slate-400 block">
+                                                                {stats.count} ocorrência(s) • Total: {totalMin}m (meta: {stats.expectedSingleMin}m/cada)
+                                                            </span>
+                                                        </div>
+                                                        <div className="w-full bg-white/10 rounded-full h-1.5 mt-2 overflow-hidden">
+                                                            <div 
+                                                                className="h-full bg-rose-500 rounded-full" 
+                                                                style={{ width: `${Math.min(100, (excessMin / Math.max(1, Math.round(totalLostTimeMs / 60000))) * 100)}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Checklist Cronológico Passo a Passo */}
+                                <div className="bg-[#08131B] p-4 sm:p-5 rounded-2xl border border-white/5 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-black uppercase tracking-wider text-white">
+                                                📋 Checklist de Paradas & Lotes em Tempo Real
+                                            </span>
+                                            <span className="text-[10px] bg-white/5 text-slate-400 px-2 py-0.5 rounded-full font-mono">
+                                                {checklistItems.length} registros
+                                            </span>
+                                            {totalSelectedLotsCount > 0 && (
+                                                <span className="text-[10px] bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold px-2 py-0.5 rounded-md font-mono hidden sm:inline">
+                                                    {processedLotsCount} de {totalSelectedLotsCount} lotes processados
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-[11px] text-slate-400 hidden sm:inline">
+                                            Compara tempos reais com as metas de setup, lubrificação e paradas
+                                        </span>
+                                    </div>
+
+                                    {/* Lista de Itens do Checklist */}
+                                    <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1">
+                                        {checklistItems.map((item, index) => {
+                                            const isSetup = item.type === 'setup';
+                                            const isLubrication = item.type === 'lubrication';
+                                            const isRollChange = item.type === 'roll_change';
+                                            const isLot = item.type === 'lot';
+                                            const isStart = item.type === 'start';
+
+                                            let badgeClass = 'bg-white/5 border-white/10 text-slate-300';
+                                            if (item.status === 'ok') badgeClass = 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400';
+                                            if (item.status === 'warning') badgeClass = 'bg-amber-500/15 border-amber-500/30 text-amber-300';
+                                            if (item.status === 'error') badgeClass = 'bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse';
+                                            if (item.status === 'info') badgeClass = 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300';
+
+                                            return (
+                                                <div 
+                                                    key={item.id}
+                                                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-xs ${
+                                                        isLot 
+                                                            ? 'bg-[#0A2234]/85 border-cyan-500/25 hover:border-cyan-500/45 shadow-sm' 
+                                                            : 'bg-[#0B1D2A]/80 border-white/5 hover:border-white/15'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="w-16 font-mono text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                                                            <ClockIcon className="w-3.5 h-3.5 text-slate-500" />
+                                                            {item.timeStr}
+                                                        </span>
+
+                                                        <div className="flex flex-col">
+                                                            <span className={`font-bold flex items-center gap-1.5 ${isLot ? 'text-cyan-100' : 'text-white'}`}>
+                                                                {item.title}
+                                                            </span>
+                                                            {item.observation && (
+                                                                <span className={`text-[10px] mt-0.5 ${isLot ? 'text-slate-300' : 'text-slate-400'}`}>
+                                                                    {item.observation}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        {item.expectedDurationMin !== undefined && (
+                                                            <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                                                                Meta: {item.expectedDurationMin}m
+                                                            </span>
+                                                        )}
+                                                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border font-mono ${badgeClass}`}>
+                                                            {isLot ? `⚖️ ${item.statusText}` : item.statusText}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Rodapé com Ações */}
+                                <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDowntimeLimitsModalOpen(true);
+                                        }}
+                                        className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1.5 transition-colors"
+                                    >
+                                        <AdjustmentsIcon className="w-4 h-4" />
+                                        <span>Alterar Metas de Paradas no PCP</span>
+                                    </button>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePrintOP(op)}
+                                            className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-cyan-300 border border-cyan-500/30 transition-all flex items-center gap-1.5"
+                                        >
+                                            <PrinterIcon className="w-4 h-4" />
+                                            Imprimir OP
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDiagnosticOP(null)}
+                                            className="px-5 py-2 bg-gradient-to-r from-[#00E5FF] to-[#00B4D8] text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-[#00E5FF]/20 active:scale-95 transition-all uppercase tracking-wider"
+                                        >
+                                            Fechar Diagnóstico
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()
+            )}
+
+            {/* MODAL / SUB-JANELA: GÊMEO DIGITAL DOS 5 PORTA-ROLOS DA TRELIÇA */}
+            {viewSpoolStandsMachine && (
+                <div 
+                    className={`fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center ${
+                        isSpoolStandsFullscreen ? 'p-0' : 'p-2 sm:p-4'
+                    } animate-fade-in`}
+                    onClick={() => setViewSpoolStandsMachine(null)}
+                >
+                    <div 
+                        className={`bg-[#0A1620] border border-white/20 shadow-2xl flex flex-col transition-all duration-200 ${
+                            isSpoolStandsFullscreen 
+                                ? 'w-full h-full rounded-none p-3 sm:p-5 overflow-y-auto custom-scrollbar' 
+                                : 'w-full max-w-[98vw] 2xl:max-w-[1720px] max-h-[97vh] rounded-3xl p-3 sm:p-5 overflow-y-auto custom-scrollbar'
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-1">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-black text-base">
+                                    ⚙️
+                                </div>
+                                <div>
+                                    <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                                        PORTA-ROLOS & DESBOBINADORES: <span className="text-blue-400 font-mono">{viewSpoolStandsMachine}</span>
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400">
+                                        Monitoramento e troca de bobinas em tempo real (1 Superior • 2 Senozoides • 2 Inferiores)
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSpoolStandsFullscreen(!isSpoolStandsFullscreen)}
+                                    className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white flex items-center gap-1.5 font-bold text-xs transition border border-white/10"
+                                    title={isSpoolStandsFullscreen ? "Restaurar para Janela Enquadrada" : "Expandir para Tela Cheia Total"}
+                                >
+                                    <span>{isSpoolStandsFullscreen ? '🗗 Janela' : '⛶ Tela Cheia'}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewSpoolStandsMachine(null)}
+                                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center font-bold text-xs transition"
+                                    title="Fechar"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+
+                        <TrelicaSpoolStands
+                            machineName={viewSpoolStandsMachine}
+                            stock={stock}
+                            currentUser={currentUser}
+                            productionOrders={productionOrders}
+                            activeOrder={productionOrders.find(o => 
+                                (o.machine === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) && 
+                                (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'pending' || o.status === 'Aberta')
+                            ) || null}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Modal da Cabeça de Solda, Relatórios e Calibração de Eletrodos no Quadro PCP */}
+            {viewWeldingHeadMachine && (
+                <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[115] p-3 sm:p-6 animate-fade-in">
+                    <div className="w-full max-w-7xl max-h-[94vh] overflow-y-auto custom-scrollbar">
+                        <TrelicaWeldingHead
+                            machineName={viewWeldingHeadMachine}
+                            readOnly={false}
+                            onClose={() => setViewWeldingHeadMachine(null)}
+                            stock={stock}
+                            gauges={gauges}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Ajuste de Quantidade Produzida pelo Gestor */}
+            {adjustQuantityConfig && (
+                <AdjustQuantityModal
+                    order={adjustQuantityConfig.order}
+                    initialMode={adjustQuantityConfig.initialMode || 'shift'}
+                    context={{
+                        dayStats: adjustQuantityConfig.dayStats,
+                        targetDay: adjustQuantityConfig.targetDay,
+                        dayColName: adjustQuantityConfig.dayColName,
+                        operatorName: adjustQuantityConfig.operatorName,
+                        shiftProduced: adjustQuantityConfig.shiftProduced
+                    }}
+                    onClose={() => setAdjustQuantityConfig(null)}
+                    onSave={handleSaveAdjustQuantity}
+                />
+            )}
+
+            {/* Modal de Edição da OP em Produção (Nome, Meta, Turnos Finalizados) */}
+            {editingInProgressOP && (
+                <EditActiveOPModal
+                    order={editingInProgressOP}
+                    shiftReports={shiftReports}
+                    gauges={gauges}
+                    onClose={() => setEditingInProgressOP(null)}
+                    onSave={handleSaveActiveOPEdit}
+                />
+            )}
+
+            {/* Modal de Autorização do Gestor para Ajuste de Quantidade */}
+            {showManagerAuthForAdjust && (
+                <ManagerAuthModalForAdjust
+                    onSuccess={handleManagerAuthSuccessForAdjust}
+                    onCancel={() => {
+                        setShowManagerAuthForAdjust(false);
+                        setPendingAdjustConfig(null);
+                    }}
+                    users={users}
+                />
+            )}
+
+            {/* Modal de Relatório Diário (Paradas e Motivos por Dia) */}
+            {selectedDailyReport && (
+                <DailyDowntimeReportModal
+                    data={selectedDailyReport}
+                    onClose={() => setSelectedDailyReport(null)}
+                    weekDays={weekDays}
+                    productionOrders={productionOrders}
+                    shiftReports={shiftReports}
+                    shiftConfig={shiftConfig}
+                    stock={stock}
+                    gauges={gauges}
+                    employees={employees}
+                    users={users}
+                    getOpDayStats={getOpDayStats}
+                />
+            )}
+
+            {/* Modal da Ficha Oficial de Produção Diária (Aberto via Gaveta ou Atalho) */}
+            {officialReportModalData && (
+                <DailyProductionReportSheetModal
+                    isOpen={Boolean(officialReportModalData)}
+                    onClose={() => setOfficialReportModalData(null)}
+                    machine={officialReportModalData.machine}
+                    dateStr={officialReportModalData.dateStr}
+                    op={officialReportModalData.op}
+                    shiftReports={shiftReports}
+                    productionOrders={productionOrders}
+                    initialProduced={officialReportModalData.initialProduced}
+                    initialOperator={officialReportModalData.initialOperator}
+                    initialDayStats={officialReportModalData.initialDayStats}
+                    shiftConfig={shiftConfig}
+                    stock={stock}
+                    gauges={gauges}
+                    employees={employees}
+                    users={users}
+                />
+            )}
+
+            {/* Modal de Lançamento de Peso de Lote Aguardando Pesagem (Trefila 1 e 2) */}
+            {weighingLotModal && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[150] p-4 animate-fade" onClick={() => setWeighingLotModal(null)}>
+                    <div className="bg-[#0A1B27] rounded-2xl border border-amber-400/40 shadow-2xl w-full max-w-md text-slate-100 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        {/* Topo */}
+                        <div className="p-4 border-b border-white/10 bg-[#08131B] flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-400 text-xl font-bold">
+                                    ⚖️
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                        Lançar Peso do Lote
+                                    </h3>
+                                    <p className="text-xs text-amber-300 font-mono">
+                                        OP #{weighingLotModal.op.orderNumber} • {weighingLotModal.op.scheduledMachine || weighingLotModal.op.machine}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setWeighingLotModal(null)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Conteúdo */}
+                        <form onSubmit={handleSaveLotWeight} className="p-5 flex flex-col gap-4">
+                            <div className="p-3 bg-amber-950/20 border border-amber-400/20 rounded-xl flex items-center justify-between font-mono text-xs">
+                                <div>
+                                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Lote Finalizado</span>
+                                    <strong className="text-amber-300 text-sm">{weighingLotModal.lotName}</strong>
+                                </div>
+                                {weighingLotModal.entryWeight > 0 && (
+                                    <div className="text-right">
+                                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Peso Inicial (MP)</span>
+                                        <span className="text-slate-200 font-black">{weighingLotModal.entryWeight.toLocaleString('pt-BR')} kg</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-amber-300 mb-1">
+                                    Peso da Balança (KG Saída) *
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={lotWeightInput}
+                                        onChange={(e) => setLotWeightInput(e.target.value)}
+                                        placeholder="Ex: 2050"
+                                        autoFocus
+                                        required
+                                        className="w-full p-3 pr-12 bg-black/50 border border-white/20 focus:border-amber-400 rounded-xl text-white font-mono text-xl font-black outline-none transition text-center"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black font-mono pointer-events-none">
+                                        KG
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-1 block">
+                                    Ao salvar, o lote sai de "Aguardando Peso" e soma automaticamente na produção do dia e total da OP.
+                                </span>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    Bitola Aferida (mm) - Opcional
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={measuredGaugeInput}
+                                        onChange={(e) => setMeasuredGaugeInput(e.target.value)}
+                                        placeholder={weighingLotModal.op.targetBitola || '4.20'}
+                                        className="w-full p-2.5 pr-12 bg-black/40 border border-white/10 focus:border-amber-400 rounded-xl text-slate-200 font-mono text-sm font-bold outline-none transition text-center"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono pointer-events-none">
+                                        mm
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-white/10 mt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setWeighingLotModal(null)}
+                                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingLotWeight}
+                                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                    {isSavingLotWeight ? (
+                                        <span>Salvando...</span>
+                                    ) : (
+                                        <>
+                                            <span>Salvar Peso</span>
+                                            <span>⚖️</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Relatório Diário e Paradas por Dia da OP
+// ============================================================================
+interface DailyDowntimeReportModalProps {
+    data: {
+        op: ProductionOrderData;
+        date: Date;
+        dateStr: string;
+        dayName: string;
+        produced: number;
+        unit: string;
+        dayStats?: any;
+    };
+    onClose: () => void;
+    weekDays: Date[];
+    productionOrders: ProductionOrderData[];
+    shiftReports?: ShiftReport[];
+    shiftConfig?: PcpShiftConfig;
+    stock?: StockItem[];
+    gauges?: StockGauge[];
+    employees?: Employee[];
+    users?: User[];
+    getOpDayStats?: (op: ProductionOrderData, date: Date, machName: string) => any;
+}
+
+const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
+    data,
+    onClose,
+    weekDays,
+    productionOrders,
+    shiftReports = [],
+    shiftConfig,
+    stock = [],
+    gauges = [],
+    employees = [],
+    users = [],
+    getOpDayStats
+}) => {
+    const activeOp = productionOrders.find(o => o.id === data.op.id) || data.op;
+    const [selectedDateStr, setSelectedDateStr] = useState<string>(data.dateStr);
+    const [showOfficialReport, setShowOfficialReport] = useState<boolean>(false);
+
+    const parseDateOnly = (val: any): string => {
+        if (!val) return '';
+        try {
+            const dt = new Date(val);
+            if (isNaN(dt.getTime())) return String(val).split('T')[0] || '';
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        } catch {
+            return String(val).split('T')[0] || '';
+        }
+    };
+
+    // Coleta todas as paradas da OP
+    const allStops = useMemo(() => {
+        const stopsList: {
+            id: string;
+            reason: string;
+            stopTime: string;
+            resumeTime: string | null;
+            durationMin: number;
+            dateStr: string;
+            timeFormatted: string;
+            operator?: string;
+            isOngoing: boolean;
+        }[] = [];
+
+        // 1. Paradas de activeOp.downtimeEvents (ou downtime_events)
+        const rawOpEvents = activeOp.downtimeEvents || (activeOp as any).downtime_events || [];
+        rawOpEvents.forEach((e: any, idx: number) => {
+            if (!e) return;
+            const stopTime = e.stopTime || e.stop_time || '';
+            const resumeTime = e.resumeTime || e.resume_time || null;
+            const sDate = new Date(stopTime);
+            const rDate = resumeTime ? new Date(resumeTime) : null;
+            const isValidStop = !isNaN(sDate.getTime());
+            
+            let dur = 0;
+            const rawDur = e.durationMin ?? e.duration_min;
+            if (rawDur !== undefined && !isNaN(Number(rawDur)) && Number(rawDur) > 0) {
+                dur = Number(rawDur);
+            } else if (isValidStop) {
+                const endMs = rDate && !isNaN(rDate.getTime()) ? rDate.getTime() : Date.now();
+                dur = Math.max(0, Math.round((endMs - sDate.getTime()) / 60000));
+            }
+
+            const rawReason = e.reason || e.motivo || 'Sem motivo registrado';
+            const justStr = e.justification ? ` - ${e.justification.trim()}` : '';
+            const fullReason = `${rawReason}${justStr}`;
+            const reasonNorm = rawReason.toLowerCase().trim();
+            const sHour = isValidStop ? sDate.getHours() : 12;
+            const isTurnoEndReason = reasonNorm.includes('final de turno') || 
+                                     reasonNorm.includes('fim de turno') || 
+                                     reasonNorm.includes('aguardando início') ||
+                                     reasonNorm.includes('encerramento');
+            // Desconsiderar paradas fantasmas de 'Final de Turno' com 0 minutos ou interjornadas noturnas
+            if (isTurnoEndReason && (dur > 180 || dur === 0)) {
+                return;
+            }
+            if (dur > 480 && (sHour >= 17 || sHour < 6)) {
+                return;
+            }
+
+            const dStr = parseDateOnly(stopTime) || data.dateStr;
+
+            // Desduplicar 'Final de Turno' ou paradas com horários e motivos idênticos/sobrepostos
+            const existingIdx = stopsList.findIndex(s => {
+                if (s.dateStr !== dStr) return false;
+                const prevTime = new Date(s.stopTime).getTime();
+                const curTime = sDate.getTime();
+                const sameTime = Math.abs(prevTime - curTime) < 90000;
+                const sReason = s.reason.toLowerCase();
+                return sameTime && (sReason.includes(reasonNorm.substring(0, 8)) || reasonNorm.includes(sReason.substring(0, 8)));
+            });
+            if (existingIdx !== -1) {
+                if (fullReason.length > stopsList[existingIdx].reason.length) {
+                    stopsList[existingIdx].reason = fullReason;
+                }
+                if (dur > stopsList[existingIdx].durationMin) {
+                    stopsList[existingIdx].durationMin = dur;
+                }
+                return;
+            }
+
+            const timeFormatted = isValidStop
+                ? `${sDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${rDate && !isNaN(rDate.getTime()) ? ` às ${rDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ' (Em andamento)'}`
+                : 'Horário não informado';
+
+            stopsList.push({
+                id: `op-event-${idx}`,
+                reason: fullReason,
+                stopTime: String(stopTime),
+                resumeTime: resumeTime ? String(resumeTime) : null,
+                durationMin: dur,
+                dateStr: dStr,
+                timeFormatted,
+                operator: e.operator,
+                isOngoing: !resumeTime
+            });
+        });
+
+        // 2. Paradas de shiftReports correspondentes
+        const matchingReports = shiftReports.filter(r => r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber);
+        matchingReports.forEach((r, rIdx) => {
+            const reportDate = r.date || parseDateOnly(r.shiftStartTime || r.shiftEndTime) || data.dateStr;
+            
+            (r.downtimeEvents || []).forEach((e: any, eIdx: number) => {
+                const stopTime = e.stopTime || r.shiftStartTime || '';
+                const resumeTime = e.resumeTime || null;
+                const sDate = new Date(stopTime);
+                const rDate = resumeTime ? new Date(resumeTime) : null;
+                const isValidStop = !isNaN(sDate.getTime());
+
+                let dur = 0;
+                if (e.durationMin !== undefined && !isNaN(Number(e.durationMin)) && Number(e.durationMin) > 0) {
+                    dur = Number(e.durationMin);
+                } else if (isValidStop) {
+                    const endMs = rDate && !isNaN(rDate.getTime()) ? rDate.getTime() : Date.now();
+                    dur = Math.max(0, Math.round((endMs - sDate.getTime()) / 60000));
+                }
+
+                const rNorm = (e.reason || '').toLowerCase().trim();
+                const sHour = isValidStop ? sDate.getHours() : 12;
+                const isTurnoEndReason = rNorm.includes('final de turno') || 
+                                         rNorm.includes('fim de turno') || 
+                                         rNorm.includes('aguardando início') ||
+                                         rNorm.includes('encerramento');
+                if (isTurnoEndReason && (dur > 180 || dur === 0)) {
+                    return;
+                }
+                if (dur > 480 && (sHour >= 17 || sHour < 6)) {
+                    return;
+                }
+
+                const dStr = parseDateOnly(stopTime) || reportDate;
+                const timeFormatted = isValidStop 
+                    ? `${sDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${rDate && !isNaN(rDate.getTime()) ? ` às ${rDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`
+                    : 'Horário do turno';
+
+                const isDupe = stopsList.some(s => {
+                    if (s.dateStr !== dStr) return false;
+                    const prevTime = new Date(s.stopTime).getTime();
+                    const curTime = sDate.getTime();
+                    const sameTime = Math.abs(prevTime - curTime) < 90000;
+                    const sReason = s.reason.toLowerCase();
+                    const matchReason = sReason.includes(rNorm.substring(0, 8)) || rNorm.includes(sReason.substring(0, 8));
+                    return sameTime && (matchReason || s.durationMin === dur);
+                });
+                if (!isDupe) {
+                    stopsList.push({
+                        id: `rep-event-${rIdx}-${eIdx}`,
+                        reason: e.reason || 'Parada de Turno',
+                        stopTime: String(stopTime),
+                        resumeTime: resumeTime ? String(resumeTime) : null,
+                        durationMin: dur,
+                        dateStr: dStr,
+                        timeFormatted,
+                        operator: r.operator || e.operator,
+                        isOngoing: false
+                    });
+                }
+            });
+
+            (r.stops || []).forEach((s: any, sIdx: number) => {
+                const isDupe = stopsList.some(item => item.dateStr === reportDate && item.reason === s.reason);
+                if (!isDupe) {
+                    stopsList.push({
+                        id: `rep-stop-${rIdx}-${sIdx}`,
+                        reason: s.reason || 'Parada de Turno',
+                        stopTime: r.shiftStartTime || '',
+                        resumeTime: null,
+                        durationMin: Number(s.duration) || 0,
+                        dateStr: reportDate,
+                        timeFormatted: 'Registrado no Fechamento de Turno',
+                        operator: r.operator,
+                        isOngoing: false
+                    });
+                }
+            });
+        });
+
+        return stopsList.sort((a, b) => {
+            const timeA = new Date(a.stopTime).getTime() || 0;
+            const timeB = new Date(b.stopTime).getTime() || 0;
+            return timeB - timeA;
+        });
+    }, [activeOp, shiftReports, data.dateStr]);
+
+    // Abas de dias
+    const dayTabs = useMemo(() => {
+        const tabs: { label: string; dateStr: string; dayName: string; count: number }[] = [];
+        
+        weekDays.forEach((day, idx) => {
+            const dStr = formatDateString(day);
+            const dName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][idx] || '';
+            const count = allStops.filter(s => s.dateStr === dStr).length;
+            tabs.push({
+                label: `${dName} ${formatFriendlyDate(day)}`,
+                dateStr: dStr,
+                dayName: dName,
+                count
+            });
+        });
+
+        // Datas fora de Seg-Sex (ex: Domingo ou semanas anteriores)
+        const otherDates = Array.from(new Set(allStops.map(s => s.dateStr))).filter((dStr): dStr is string => Boolean(dStr && !tabs.some(t => t.dateStr === dStr)));
+        otherDates.forEach((dStr: string) => {
+            const dt = new Date(dStr + 'T12:00:00');
+            const dName = isNaN(dt.getTime()) ? 'Dia' : (['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][dt.getDay()] || '');
+            const count = allStops.filter(s => s.dateStr === dStr).length;
+            tabs.push({
+                label: isNaN(dt.getTime()) ? dStr : `${dName} ${formatFriendlyDate(dt)}`,
+                dateStr: dStr,
+                dayName: dName,
+                count
+            });
+        });
+
+        return tabs;
+    }, [weekDays, allStops]);
+
+    // Paradas filtradas pela data selecionada ou todas
+    const filteredStops = useMemo(() => {
+        if (selectedDateStr === 'ALL') {
+            return allStops;
+        }
+        return allStops.filter(s => s.dateStr === selectedDateStr);
+    }, [allStops, selectedDateStr]);
+
+    const totalMinutes = useMemo(() => {
+        // Calcular minutos de parada evitando contagem duplicada de intervalos sobrepostos
+        const intervals: [number, number][] = [];
+        filteredStops.forEach(s => {
+            const sDate = new Date(s.stopTime);
+            if (isNaN(sDate.getTime()) || s.durationMin <= 0) return;
+            const startMin = sDate.getHours() * 60 + sDate.getMinutes();
+            const endMin = startMin + s.durationMin;
+            intervals.push([startMin, endMin]);
+        });
+        if (intervals.length === 0) return filteredStops.reduce((acc, s) => acc + (s.durationMin || 0), 0);
+        intervals.sort((a, b) => a[0] - b[0]);
+        let mergedTotal = 0;
+        let [curStart, curEnd] = intervals[0];
+        for (let i = 1; i < intervals.length; i++) {
+            const [nextStart, nextEnd] = intervals[i];
+            if (nextStart <= curEnd) {
+                curEnd = Math.max(curEnd, nextEnd);
+            } else {
+                mergedTotal += (curEnd - curStart);
+                curStart = nextStart;
+                curEnd = nextEnd;
+            }
+        }
+        mergedTotal += (curEnd - curStart);
+        return mergedTotal;
+    }, [filteredStops]);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const formattedDuration = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+
+    const selectedTab = dayTabs.find(t => t.dateStr === selectedDateStr);
+    const activeLabel = selectedDateStr === 'ALL' ? 'Todas as Paradas da OP' : (selectedTab?.label || selectedDateStr);
+
+    const targetReportDateStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
+    const machName = activeOp.scheduledMachine || (activeOp.machine as string) || 'Malha 1';
+    const [showMalhaPackagesReport, setShowMalhaPackagesReport] = useState(false);
+
+    // Obter estatísticas dinâmicas fiéis do PCP para o dia ativo (Ritmo, Ciclo, Efetivo, Paradas, Produção)
+    const activeDayStats = useMemo(() => {
+        if (getOpDayStats && targetReportDateStr) {
+            const targetDate = new Date(targetReportDateStr + 'T12:00:00');
+            return getOpDayStats(activeOp, targetDate, machName);
+        }
+        return targetReportDateStr === data.dateStr ? data.dayStats : undefined;
+    }, [getOpDayStats, activeOp, targetReportDateStr, machName, data.dateStr, data.dayStats]);
+
+    // Calcular produção e operador para a data ativa na Ficha Oficial
+    const { dayProduced, dayOperator } = useMemo(() => {
+        let produced = 0;
+        let operatorName = '';
+
+        // 1. ShiftReports correspondentes a esta OP e data (Deduplicados)
+        const opReportsRaw = (shiftReports || []).filter(r => 
+            (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
+            (r.date === targetReportDateStr || parseDateOnly(r.shiftStartTime || r.shiftEndTime) === targetReportDateStr)
+        );
+        const opReportsMap = new Map<string, ShiftReport>();
+        opReportsRaw.forEach(r => {
+            const shiftKey = `${(r.shift || '').toLowerCase().trim()}_${(r.operator || '').toLowerCase().trim()}`;
+            if (!opReportsMap.has(shiftKey)) {
+                opReportsMap.set(shiftKey, r);
+            } else {
+                const ex = opReportsMap.get(shiftKey)!;
+                if (Number(r.totalProducedQuantity || r.totalProducedWeight || 0) > Number(ex.totalProducedQuantity || ex.totalProducedWeight || 0)) {
+                    opReportsMap.set(shiftKey, r);
+                }
+            }
+        });
+        const opReports = Array.from(opReportsMap.values());
+
+        opReports.forEach(r => {
+            if (!operatorName && r.operator) operatorName = r.operator;
+            produced += Number(r.totalProducedWeight || r.totalProducedQuantity || 0);
+        });
+
+        // 2. Lotes processados se for Trefila (somente lotes pesados/finalizados)
+        const isTrefilaMach = machName.toLowerCase().includes('trefila');
+        if (isTrefilaMach) {
+            const pLots = activeOp.processedLots || (activeOp as any).processed_lots || [];
+            let lotWeight = 0;
+            pLots.forEach((l: any) => {
+                const fw = l.finalWeight !== null && l.finalWeight !== undefined 
+                    ? Number(l.finalWeight) 
+                    : (l.final_weight !== null && l.final_weight !== undefined ? Number(l.final_weight) : 0);
+                if (fw <= 0) return;
+                const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
+                if (lIso && parseDateOnly(lIso) === targetReportDateStr) {
+                    lotWeight += fw;
+                }
+            });
+            if (lotWeight > 0) {
+                produced = lotWeight;
+            }
+        }
+
+        // 3. OperatorLogs desta data
+        const opLogs = (activeOp.operatorLogs || []).filter(l => {
+            const s = parseDateOnly(l.startTime);
+            const e = parseDateOnly(l.endTime);
+            return s === targetReportDateStr || e === targetReportDateStr;
+        });
+        opLogs.forEach(l => {
+            if (!operatorName && l.operator) operatorName = l.operator;
+            if (produced === 0) {
+                if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
+                    produced += Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
+                } else if (!l.endTime && l.startQuantity !== undefined) {
+                    const currentTotal = isTrefilaMach 
+                        ? Number(activeOp.actualProducedWeight || 0) 
+                        : Number(activeOp.actualProducedQuantity || 0);
+                    produced += Math.max(0, currentTotal - Number(l.startQuantity));
+                }
+            }
+        });
+
+        // 4. Se houver activeDayStats fiel calculado pelo PCP para esta data, priorizar
+        if (activeDayStats?.produced !== undefined && activeDayStats.produced > 0) {
+            produced = activeDayStats.produced;
+        } else if (targetReportDateStr === data.dateStr && data.produced > 0) {
+            produced = data.produced;
+        } else if (targetReportDateStr === data.dateStr && (produced === 0 || !produced)) {
+            produced = data.produced || 0;
+        }
+
+        // 5. Operador fallback das paradas, de activeDayStats ou da OP
+        if (!operatorName && activeDayStats?.operatorName) {
+            operatorName = activeDayStats.operatorName;
+        }
+        if (!operatorName) {
+            const stopWithOp = allStops.find(s => s.dateStr === targetReportDateStr && s.operator);
+            if (stopWithOp) operatorName = stopWithOp.operator!;
+        }
+        if (!operatorName) {
+            operatorName = activeOp.operatorName || (activeOp as any).operator || '';
+        }
+
+        return { dayProduced: produced, dayOperator: operatorName };
+    }, [activeOp, targetReportDateStr, shiftReports, allStops, data.dateStr, data.produced, machName, activeDayStats]);
+
+    return (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[140] p-3 sm:p-4 animate-fade" onClick={onClose}>
+            <div className="bg-[#0A1B27] rounded-2xl border border-white/15 shadow-2xl w-full max-w-2xl text-slate-100 flex flex-col max-h-[90vh] my-auto overflow-hidden" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 bg-[#08131B]/80">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/30 flex items-center justify-center text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+                            <CalendarIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                    Paradas e Motivos • OP #{activeOp.orderNumber}
+                                </h3>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
+                                    {activeOp.scheduledMachine || activeOp.machine}
+                                </span>
+                                {machName.toLowerCase().includes('malha') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMalhaPackagesReport(true)}
+                                        className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.35)] transition-all cursor-pointer active:scale-95 border border-amber-300/60"
+                                        title="Abrir Planilha de Consumo por Lote e Pacotes de 50 Malhas (Conversão Longitudinal / Transversal)"
+                                    >
+                                        <span>📊</span>
+                                        <span>Planilha Lotes & Pacotes (50 pçs)</span>
+                                    </button>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                {activeOp.trelicaModel ? `${activeOp.trelicaModel} • ` : activeOp.targetBitola ? `Bitola ${activeOp.targetBitola}mm • ` : ''}
+                                {activeLabel}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowOfficialReport(true)}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(59,130,246,0.35)] transition-all cursor-pointer active:scale-95 border border-blue-400/40"
+                            title="Gerar Ficha Oficial de Controle de Produção Diária (Impressão e WhatsApp)"
+                        >
+                            <span>📄</span>
+                            <span className="hidden sm:inline">Ficha Diária Oficial (Impressão / WhatsApp)</span>
+                            <span className="sm:hidden">Ficha Oficial</span>
+                        </button>
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Fechar modal">
+                            <XIcon className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Seletor de Dia (Abas Rápidas) */}
+                <div className="flex items-center gap-1.5 p-3 bg-black/40 border-b border-white/10 overflow-x-auto custom-scrollbar">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                        Dia:
+                    </span>
+                    {dayTabs.map(tab => {
+                        const isSelected = selectedDateStr === tab.dateStr;
+                        return (
+                            <button
+                                key={tab.dateStr}
+                                type="button"
+                                onClick={() => setSelectedDateStr(tab.dateStr)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                    isSelected
+                                        ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                                }`}
+                            >
+                                <span>{tab.label}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                    isSelected
+                                        ? 'bg-slate-950 text-[#00E5FF]'
+                                        : tab.count > 0 
+                                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50' 
+                                            : 'bg-white/10 text-slate-400'
+                                }`}>
+                                    {tab.count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                    <button
+                        type="button"
+                        onClick={() => setSelectedDateStr('ALL')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                            selectedDateStr === 'ALL'
+                                ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                                : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
+                        }`}
+                    >
+                        <span>Todas as Paradas</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            selectedDateStr === 'ALL'
+                                ? 'bg-slate-950 text-[#00E5FF]'
+                                : allStops.length > 0
+                                    ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
+                                    : 'bg-white/10 text-slate-400'
+                        }`}>
+                            {allStops.length}
+                        </span>
+                    </button>
+                </div>
+
+                {/* Resumo do Dia Selecionado */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-4 border-b border-white/5 bg-[#08131B]/50">
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Total de Paradas</span>
+                        <span className="text-lg font-black text-rose-400 font-mono mt-0.5">
+                            {filteredStops.length} <span className="text-xs font-bold text-slate-400">{filteredStops.length === 1 ? 'parada' : 'paradas'}</span>
+                        </span>
+                    </div>
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">Tempo Total Parado</span>
+                        <span className="text-lg font-black text-amber-300 font-mono mt-0.5">
+                            {formattedDuration}
+                        </span>
+                    </div>
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1 justify-between">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">Produzido no Dia</span>
+                            <button
+                                type="button"
+                                onClick={() => setShowOfficialReport(true)}
+                                className="text-[10px] font-black text-[#00E5FF] hover:underline flex items-center gap-1 cursor-pointer"
+                                title="Abrir Ficha Diária Oficial deste dia"
+                            >
+                                <span>📄 Ficha Oficial</span>
+                            </button>
+                        </div>
+                        <span className="text-lg font-black text-[#00E5FF] font-mono mt-0.5">
+                            {(activeDayStats?.produced !== undefined ? activeDayStats.produced : (dayProduced > 0 ? dayProduced : (data.dateStr === selectedDateStr ? data.produced : 0))).toLocaleString('pt-BR')} <span className="text-xs font-bold text-[#00E5FF]/70">{data.unit}</span>
+                        </span>
+                    </div>
+                </div>
+
+                {/* Lista e Linha do Tempo de Paradas e Jornada */}
+                <div className="p-4 overflow-y-auto flex-1 space-y-2.5 custom-scrollbar">
+                    {(() => {
+                        const targetDStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
+                        const machName = activeOp.scheduledMachine || activeOp.machine || 'Trefila 1';
+                        const machCfg = resolveMachineShiftConfig(machName, shiftConfig);
+                        
+                        const dayLogs = (activeOp.operatorLogs || []).filter(l => {
+                            if (!l.startTime) return false;
+                            const s = parseDateOnly(l.startTime);
+                            const e = parseDateOnly(l.endTime);
+                            return s === targetDStr || e === targetDStr;
+                        }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+                        const matchingShiftReport = shiftReports.find(r => 
+                            (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
+                            (r.date === targetDStr || parseDateOnly(r.shiftStartTime) === targetDStr)
+                        );
+
+                        const firstLog = dayLogs[0];
+                        const lastLog = dayLogs[dayLogs.length - 1];
+
+                        const fmtHM = (iso?: string) => {
+                            if (!iso) return '';
+                            try {
+                                const dt = new Date(iso);
+                                if (isNaN(dt.getTime())) {
+                                    if (/^\d{2}:\d{2}/.test(iso)) return iso.slice(0, 5);
+                                    return '';
+                                }
+                                return dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                            } catch {
+                                return '';
+                            }
+                        };
+
+                        const scheduledStart = machCfg.workStart || '07:45';
+                        const actualStart = fmtHM(firstLog?.startTime) || fmtHM(matchingShiftReport?.shiftStartTime) || (dayLogs.length > 0 ? scheduledStart : (filteredStops.length > 0 ? 'Iniciado' : '--:--'));
+                        const scheduledEnd = machCfg.workEnd || '17:33';
+                        const isOpen = lastLog && !lastLog.endTime;
+                        const actualEnd = isOpen 
+                            ? 'Em andamento' 
+                            : (fmtHM(lastLog?.endTime) || fmtHM(matchingShiftReport?.shiftEndTime) || (dayLogs.length > 0 ? scheduledEnd : (filteredStops.length > 0 ? 'Em andamento' : '--:--')));
+                        const operatorName = firstLog?.operator || lastLog?.operator || matchingShiftReport?.operator || activeOp.operatorName;
+
+                        return (
+                            <>
+                                {/* 1 & 2. TOPO DA LINHA DO TEMPO: TÉRMINO DO TURNO (SISTEMA E APP) */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 py-0.5 px-1">
+                                        <div className="h-px bg-indigo-500/30 flex-1" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                                            <span>🏁</span>
+                                            <span>Término / Encerramento do Turno</span>
+                                        </span>
+                                        <div className="h-px bg-indigo-500/30 flex-1" />
+                                    </div>
+
+                                    {/* Término do Turno (Horário programado no sistema) */}
+                                    <div className="p-3 bg-indigo-950/30 rounded-xl border border-indigo-500/25 flex items-center justify-between gap-3 transition-all hover:border-indigo-500/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                                🏁
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-indigo-200">
+                                                        Término do Turno (Horário Programado no Sistema)
+                                                    </h5>
+                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                                        Sistema
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    Horário previsto de término do expediente • {machName}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border bg-indigo-500/20 text-indigo-200 border-indigo-500/40">
+                                            {scheduledEnd}
+                                        </div>
+                                    </div>
+
+                                    {/* Término no App (Apontado pelo Operador) */}
+                                    <div className="p-3 bg-blue-950/30 rounded-xl border border-blue-500/25 flex items-center justify-between gap-3 transition-all hover:border-blue-500/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                                                📱
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-blue-200">
+                                                        Término no App (Apontado pelo Operador)
+                                                    </h5>
+                                                    {actualEnd === 'Em andamento' ? (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
+                                                            Em andamento
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                                            Apontado no App
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    {actualEnd === 'Em andamento' ? 'Máquina operando no chão de fábrica' : 'Horário registrado no encerramento do turno'}
+                                                    {operatorName ? ` • Operador: ${operatorName}` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
+                                            actualEnd === 'Em andamento' 
+                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
+                                                : 'bg-blue-500/20 text-blue-200 border-blue-500/40'
+                                        }`}>
+                                            {actualEnd}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* DIVISOR DE PARADAS REGISTRADAS */}
+                                <div className="flex items-center gap-2 py-1 px-1">
+                                    <div className="h-px bg-white/10 flex-1" />
+                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                                        <span>🛑</span>
+                                        <span>Paradas e Interrupções ({filteredStops.length})</span>
+                                    </span>
+                                    <div className="h-px bg-white/10 flex-1" />
+                                </div>
+
+                                {/* LISTA DE PARADAS */}
+                                {filteredStops.length === 0 ? (
+                                    <div className="p-6 text-center flex flex-col items-center justify-center gap-2 bg-white/5 rounded-2xl border border-white/5">
+                                        <span className="text-2xl">✅</span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <p className="text-xs font-bold text-slate-300">
+                                                Nenhuma parada registrada em {activeLabel}.
+                                            </p>
+                                            <p className="text-[11px] text-slate-500">
+                                                A máquina operou sem interrupções registradas nesta data.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    filteredStops.map((stop) => {
+                                        const isLong = stop.durationMin >= 30;
+                                        const isMedium = stop.durationMin >= 10;
+                                        
+                                        return (
+                                            <div 
+                                                key={stop.id} 
+                                                className="p-3 bg-black/40 rounded-xl border border-white/5 hover:border-white/15 flex items-center justify-between gap-3 transition-all"
+                                            >
+                                                <div className="flex items-start gap-3 min-w-0">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${
+                                                        stop.isOngoing 
+                                                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
+                                                            : isLong 
+                                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                                                                : isMedium 
+                                                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                                                                    : 'bg-white/5 text-slate-400 border border-white/10'
+                                                    }`}>
+                                                        🛑
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h5 className="text-sm font-bold text-rose-300 truncate">
+                                                                {stop.reason.includes(' [') ? stop.reason.split(' [')[0] : stop.reason}
+                                                            </h5>
+                                                            {stop.isOngoing && (
+                                                                <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse">
+                                                                    Em andamento
+                                                                </span>
+                                                            )}
+                                                            {selectedDateStr === 'ALL' && stop.dateStr && (
+                                                                <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-white/5 text-slate-400 border border-white/10">
+                                                                    {stop.dateStr}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Badge de Controladoria de Eletrodos */}
+                                                        {(() => {
+                                                            const hasBracket = stop.reason.includes('[') && stop.reason.includes(']');
+                                                            const isElectrodeStop = stop.reason.toLowerCase().includes('eletrodo') || stop.reason.toLowerCase().includes('solda');
+                                                            
+                                                            let lotDetail = '';
+                                                            if (hasBracket && isElectrodeStop) {
+                                                                lotDetail = stop.reason.substring(stop.reason.indexOf('[') + 1, stop.reason.lastIndexOf(']'));
+                                                            } else if (isElectrodeStop) {
+                                                                // Histórico / Retroativo da Treliça: busca nos eletrodos configurados da máquina
+                                                                const machName = activeOp.scheduledMachine || activeOp.machine || 'Treliça 1';
+                                                                const machEls = getLocalMachineElectrodes(machName);
+                                                                const activeLots = machEls.map(e => `${e.shortLabel || e.position_label}: ${e.lot_number}`).slice(0, 3).join(' • ');
+                                                                lotDetail = activeLots ? `Lotes da Máquina: ${activeLots}...` : 'Lotes da Máquina Vinculados';
+                                                            }
+
+                                                            if (!lotDetail) return null;
+
+                                                            return (
+                                                                <div className="mt-1 px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-200 text-xs font-mono flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-amber-400 font-bold">⚡ Controladoria:</span>
+                                                                    <span className="text-slate-200 font-medium">{lotDetail}</span>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        <div className="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                                                            <span>🕒 {stop.timeFormatted}</span>
+                                                            {stop.operator && (
+                                                                <span className="text-slate-500">
+                                                                    • Op: <strong className="text-slate-300">{stop.operator}</strong>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
+                                                    isLong 
+                                                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                                                        : isMedium 
+                                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                                                            : 'bg-white/5 text-slate-300 border-white/10'
+                                                }`}>
+                                                    {stop.durationMin} min
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+
+                                {/* 3 & 4. BASE DA LINHA DO TEMPO: INÍCIO DO TURNO (APP E SISTEMA) */}
+                                <div className="space-y-2 pt-1">
+                                    <div className="flex items-center gap-2 py-0.5 px-1">
+                                        <div className="h-px bg-emerald-500/30 flex-1" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                            <span>⏰</span>
+                                            <span>Início / Abertura do Turno</span>
+                                        </span>
+                                        <div className="h-px bg-emerald-500/30 flex-1" />
+                                    </div>
+
+                                    {/* Início da Máquina no App */}
+                                    <div className="p-3 bg-emerald-950/30 rounded-xl border border-emerald-500/25 flex items-center justify-between gap-3 transition-all hover:border-emerald-500/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                                📱
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-emerald-200">
+                                                        Início da Máquina no App
+                                                    </h5>
+                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                        Início no App
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    Horário que o operador iniciou o turno no app
+                                                    {operatorName ? ` • Operador: ${operatorName}` : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border bg-emerald-500/20 text-emerald-200 border-emerald-500/40">
+                                            {actualStart}
+                                        </div>
+                                    </div>
+
+                                    {/* Início do Turno (Horário programado no sistema) */}
+                                    <div className="p-3 bg-[#00E5FF]/10 rounded-xl border border-[#00E5FF]/25 flex items-center justify-between gap-3 transition-all hover:border-[#00E5FF]/40">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40">
+                                                ⏰
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className="text-sm font-bold text-cyan-200">
+                                                        Início do Turno (Horário Programado no Sistema)
+                                                    </h5>
+                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/30">
+                                                        Sistema
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                                    Horário programado de início de turno • {machName}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/40">
+                                            {scheduledStart}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        );
+                    })()}
+                </div>
+
+                {/* Rodapé */}
+                <div className="p-3 border-t border-white/10 bg-[#08131B] flex items-center justify-between">
+                    <span className="text-xs text-slate-500 font-mono">
+                        {allStops.length} parada(s) no histórico desta OP
+                    </span>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs transition cursor-pointer"
+                    >
+                        Fechar
+                    </button>
+                </div>
+            </div>
+
+            {/* Modal da Ficha Oficial de Produção Diária (Impressão e WhatsApp) */}
+            {showOfficialReport && (
+                <DailyProductionReportSheetModal
+                    isOpen={showOfficialReport}
+                    onClose={() => setShowOfficialReport(false)}
+                    machine={activeOp.scheduledMachine || (activeOp.machine as string) || 'Treliça 1'}
+                    dateStr={targetReportDateStr}
+                    op={{
+                        ...activeOp,
+                        productCode: activeOp.productCode || ((activeOp.targetBitola?.includes('3.4') || activeOp.orderNumber === '87493') ? '8624' : activeOp.productCode),
+                        productDescription: activeOp.productDescription || ((activeOp.targetBitola?.includes('3.4') || activeOp.orderNumber === '87493') ? 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*' : activeOp.productDescription)
+                    }}
+                    shiftReports={shiftReports}
+                    productionOrders={productionOrders}
+                    initialProduced={activeDayStats?.produced !== undefined && activeDayStats.produced > 0 ? activeDayStats.produced : (dayProduced > 0 ? dayProduced : (targetReportDateStr === data.dateStr ? data.produced : undefined))}
+                    initialOperator={activeDayStats?.operatorName || dayOperator}
+                    initialDayStats={activeDayStats || (targetReportDateStr === data.dateStr ? data.dayStats : undefined)}
+                    shiftConfig={shiftConfig}
+                    stock={stock}
+                    gauges={gauges}
+                    employees={employees}
+                    users={users}
+                />
+            )}
+
+            {showMalhaPackagesReport && (
+                <MalhaConsumptionReportModal
+                    isOpen={showMalhaPackagesReport}
+                    onClose={() => setShowMalhaPackagesReport(false)}
+                    op={activeOp}
+                    stock={stock}
+                    shiftReports={shiftReports}
+                />
+            )}
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Ajuste de Quantidade Produzida pelo Gestor
+// ============================================================================
+const AdjustQuantityModal: React.FC<{
+    order: ProductionOrderData;
+    initialMode?: 'shift' | 'total';
+    context?: {
+        dayStats?: any;
+        targetDay?: Date;
+        dayColName?: string;
+        operatorName?: string;
+        shiftProduced?: number;
+    };
+    onClose: () => void;
+    onSave: (
+        orderId: string, 
+        newTotalQty: number, 
+        reason: string,
+        details?: {
+            mode: 'shift' | 'total';
+            shiftQty?: number;
+            operatorName?: string;
+            dayStats?: any;
+            updatedLogs?: any[];
+        }
+    ) => Promise<void>;
+}> = ({ order, initialMode = 'shift', context, onClose, onSave }) => {
+    const isTrefila = typeof order.machine === 'string' && order.machine.startsWith('Trefila') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
+    const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
+    const unit = isTrefila ? 'kg' : 'pçs';
+
+    const currentTotal = isTrefila 
+        ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0) 
+        : (Number(order.actualProducedQuantity) || 0);
+    
+    const target = isTrefila 
+        ? (order.totalWeight || order.quantityToProduce || 18000) 
+        : (order.quantityToProduce || (isTrelica ? 3500 : 5000));
+
+    // Turno ativo do operador (se houver)
+    const rawModalLogs: any[] = order.operatorLogs || (order as any).operator_logs || [];
+    const activeLogIndex = rawModalLogs.findIndex((l: any) => !l.endTime && !l.end_time);
+    const activeLog = activeLogIndex !== -1 ? rawModalLogs[activeLogIndex] : null;
+
+    // Se existir log fechado após o log aberto no array, descontar do cálculo do turno aberto
+    let trailingClosedAfterActive = 0;
+    if (activeLogIndex !== -1) {
+        for (let k = activeLogIndex + 1; k < rawModalLogs.length; k++) {
+            const tl = rawModalLogs[k];
+            if (tl.endTime || tl.end_time) {
+                const tsQ = Number(tl.startQuantity ?? tl.start_quantity ?? 0) || 0;
+                const teQ = Number(tl.endQuantity ?? tl.end_quantity ?? 0) || 0;
+                trailingClosedAfterActive += Math.max(0, teQ - tsQ);
+            }
+        }
+    }
+
+    // Nome do operador
+    const formatName = (name?: string) => {
+        if (!name) return '';
+        const parts = name.trim().split(/\s+/).filter(Boolean);
+        if (parts.length <= 1) return parts[0] || '';
+        const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+        return `${cap(parts[0])} ${cap(parts[parts.length - 1])}`;
+    };
+
+    const operatorName = formatName(context?.operatorName) 
+        || (activeLog?.operator ? formatName(activeLog.operator) : '') 
+        || (context?.dayStats?.operatorName ? formatName(context.dayStats.operatorName) : '')
+        || 'Operador';
+
+    // Determinar a quantidade de produção base deste turno
+    const logStartQty = Number(activeLog?.startQuantity ?? (activeLog as any)?.start_quantity ?? 0) || 0;
+    const computedActiveShiftQty = Math.max(0, currentTotal - trailingClosedAfterActive - logStartQty);
+    const shiftBaseQty = context?.shiftProduced !== undefined 
+        ? context.shiftProduced 
+        : computedActiveShiftQty;
+
+    const [mode, setMode] = useState<'shift' | 'total'>(initialMode);
+    const [qty, setQty] = useState<number | ''>(initialMode === 'shift' ? shiftBaseQty : currentTotal);
+    const [reason, setReason] = useState<string>(
+        initialMode === 'shift' 
+            ? 'Ajuste manual de contagem do turno (Gestor)' 
+            : 'Ajuste manual de contagem geral da OP (Gestor)'
+    );
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Trocar modo (Turno vs Total da OP)
+    const handleSwitchMode = (newMode: 'shift' | 'total') => {
+        if (newMode === mode) return;
+        setMode(newMode);
+        if (newMode === 'shift') {
+            setQty(shiftBaseQty);
+            setReason('Ajuste manual de contagem do turno (Gestor)');
+        } else {
+            setQty(currentTotal);
+            setReason('Ajuste manual de contagem geral da OP (Gestor)');
+        }
+    };
+
+    const isShiftMode = mode === 'shift';
+
+    // Soma de todas as peças registradas nos turnos da OP para garantir consistência (sem duplicar logs fora de ordem)
+    const sumLogsTotal = useMemo(() => {
+        let sum = 0;
+        rawModalLogs.forEach((l: any) => {
+            const hasEnd = Boolean(l.endTime || l.end_time);
+            const sQ = Number(l.startQuantity ?? l.start_quantity ?? 0) || 0;
+            const eQ = Number(l.endQuantity ?? l.end_quantity ?? 0) || 0;
+            if (hasEnd) {
+                sum += Math.max(0, eQ - sQ);
+            } else {
+                sum += Math.max(0, currentTotal - trailingClosedAfterActive - sQ);
+            }
+        });
+        return sum > 0 ? sum : currentTotal;
+    }, [rawModalLogs, currentTotal, trailingClosedAfterActive]);
+
+    // Cálculos dinâmicos
+    // O Gestor pode reduzir a quantidade, portanto o mínimo permitido é 0
+    const minAllowedQty = 0;
+    const numericQty = qty === '' ? 0 : Number(qty);
+    const originalQty = isShiftMode ? shiftBaseQty : currentTotal;
+    const isBelowMinimum = numericQty < minAllowedQty;
+
+    const shiftDelta = isShiftMode ? (numericQty - shiftBaseQty) : (numericQty - currentTotal);
+    const calculatedNewTotal = isShiftMode 
+        ? Math.max(0, sumLogsTotal + (numericQty - shiftBaseQty))
+        : numericQty;
+    const calculatedNewShift = isShiftMode
+        ? numericQty
+        : Math.max(0, shiftBaseQty + (numericQty - currentTotal));
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (numericQty < minAllowedQty) return;
+        setIsSaving(true);
+        try {
+            await onSave(order.id, calculatedNewTotal, reason, {
+                mode,
+                shiftQty: isShiftMode ? numericQty : calculatedNewShift,
+                operatorName,
+                dayStats: context?.dayStats
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-3 sm:p-4 overflow-y-auto">
+            <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto">
+                {/* Topo do Modal */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/30 flex items-center justify-center text-[#00E5FF] shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+                            <AdjustmentsIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                    {isShiftMode ? 'Ajustar Quantidade do Turno' : 'Ajustar Quantidade Total da OP'}
+                                </h3>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
+                                    GESTOR
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono">
+                                OP #{order.orderNumber} • {order.scheduledMachine || (order.machine as string)} {order.trelicaModel ? `• ${order.trelicaModel}` : order.targetBitola ? `• Bitola ${order.targetBitola}mm` : ''} {context?.dayColName ? `• ${context.dayColName}` : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
+                    >
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Seletor de Modo: Turno vs Total da OP */}
+                <div className="flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/10">
+                    <button
+                        type="button"
+                        onClick={() => handleSwitchMode('shift')}
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            isShiftMode
+                                ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        <span>👤</span>
+                        <span className="truncate">Turno de {operatorName} ({shiftBaseQty.toLocaleString('pt-BR')} {unit})</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleSwitchMode('total')}
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            !isShiftMode
+                                ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        <span>📊</span>
+                        <span className="truncate">Total da OP ({currentTotal.toLocaleString('pt-BR')} {unit})</span>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {/* Resumo Atual */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {isShiftMode ? (
+                            <>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-[#00E5FF]/40 shadow-[0_0_12px_rgba(0,229,255,0.15)] flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-[#00E5FF] tracking-wider truncate">Turno de {operatorName}</span>
+                                    <span className="text-xl font-black text-[#00E5FF] font-mono mt-0.5">
+                                        {shiftBaseQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-[#00E5FF]/70">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Acumulado OP</span>
+                                    <span className="text-xl font-black text-white font-mono mt-0.5">
+                                        {currentTotal.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Meta Total</span>
+                                    <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                        {target.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-[#00E5FF]/40 shadow-[0_0_12px_rgba(0,229,255,0.15)] flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-[#00E5FF] tracking-wider">Produção Total Atual</span>
+                                    <span className="text-xl font-black text-white font-mono mt-0.5">
+                                        {currentTotal.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Meta Total</span>
+                                    <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                        {target.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-400">{unit}</span>
+                                    </span>
+                                </div>
+                                <div className="bg-[#08131B] p-3 rounded-xl border border-white/5 flex flex-col col-span-2 sm:col-span-1">
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider truncate">Turno de {operatorName}</span>
+                                    <span className="text-xl font-black text-slate-300 font-mono mt-0.5">
+                                        {shiftBaseQty.toLocaleString('pt-BR')} <span className="text-xs font-bold text-slate-500">{unit}</span>
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Controlador Principal da Nova Quantidade */}
+                    <div className="bg-[#0B1D2A]/90 p-4 rounded-2xl border border-white/10 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                {isShiftMode 
+                                    ? `Definir Quantidade Produzida no Turno (${operatorName}):` 
+                                    : 'Definir Nova Quantidade Total da OP:'}
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setQty(originalQty)}
+                                className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
+                            >
+                                Restaurar Inicial ({originalQty.toLocaleString('pt-BR')} {unit})
+                            </button>
+                        </div>
+
+                        {/* Alerta se tentar colocar menos que o já registrado */}
+                        {isBelowMinimum && (
+                            <div className="bg-rose-950/70 border border-rose-500/60 p-3 rounded-xl flex items-center gap-2.5 text-xs text-rose-200 animate-pulse">
+                                <span className="text-base shrink-0">⛔</span>
+                                <div>
+                                    <span className="font-black text-white">Quantidade Bloqueada!</span>
+                                    <p className="text-[11px] text-rose-300 mt-0.5">
+                                        Não é permitido marcar uma quantidade menor que <strong className="text-white font-mono">{minAllowedQty.toLocaleString('pt-BR')} {unit}</strong> (valor já registrado anteriormente).
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Campo de Entrada com Steppers Grandes */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                disabled={numericQty <= minAllowedQty}
+                                onClick={() => setQty(prev => Math.max(minAllowedQty, (Number(prev) || 0) - (isTrefila ? 50 : 1)))}
+                                className={`w-12 h-12 rounded-xl border text-2xl font-black flex items-center justify-center transition-all select-none ${
+                                    numericQty <= minAllowedQty
+                                        ? 'bg-white/5 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
+                                        : 'bg-white/5 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border-white/10 hover:border-rose-500/40 active:scale-95 cursor-pointer'
+                                }`}
+                                title={numericQty <= minAllowedQty ? `Mínimo permitido: ${minAllowedQty} ${unit}` : `Diminuir 1 ${unit}`}
+                            >
+                                -
+                            </button>
+                            
+                            <div className="relative flex-1">
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={qty}
+                                    onChange={(e) => {
+                                        const str = e.target.value;
+                                        if (str === '') {
+                                            setQty('');
+                                        } else {
+                                            const val = parseInt(str, 10);
+                                            setQty(isNaN(val) ? '' : Math.max(0, val));
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        if (qty === '') setQty(0);
+                                    }}
+                                    className={`w-full h-12 bg-black/50 border rounded-xl text-center text-2xl font-black font-mono tracking-wider outline-none transition-all ${
+                                        isBelowMinimum
+                                            ? 'border-rose-500 text-rose-300 focus:border-rose-400 ring-2 ring-rose-500/20'
+                                            : 'border-white/15 text-white focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF]'
+                                    }`}
+                                    autoFocus
+                                    onFocus={(e) => e.target.select()}
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400">
+                                    {unit}
+                                </span>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setQty(prev => (Number(prev) || 0) + (isTrefila ? 50 : 1))}
+                                className="w-12 h-12 rounded-xl bg-white/5 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/40 text-2xl font-black flex items-center justify-center transition-all active:scale-95 cursor-pointer select-none"
+                                title={`Aumentar 1 ${unit}`}
+                            >
+                                +
+                            </button>
+                        </div>
+
+                        {/* Indicador em Tempo Real da Diferença e Efeito no Painel */}
+                        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                            shiftDelta > 0 
+                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' 
+                                : shiftDelta < 0 
+                                    ? 'bg-amber-950/40 border-amber-500/40 text-amber-200' 
+                                    : 'bg-black/30 border-white/5 text-slate-400'
+                        }`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-base shrink-0">{shiftDelta > 0 ? '📈' : shiftDelta < 0 ? '📉' : '⚖️'}</span>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-bold">
+                                        {shiftDelta > 0 
+                                            ? `Acréscimo de +${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}` 
+                                            : shiftDelta < 0 
+                                                ? `Redução de ${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}` 
+                                                : `Nenhuma alteração na quantidade ${isShiftMode ? 'do turno' : 'da OP'}`}
+                                    </span>
+                                    <span className="text-[11px] opacity-90 truncate mt-0.5">
+                                        No Painel do Operador passará a exibir: <strong className="font-black text-[#00E5FF] underline">{calculatedNewShift.toLocaleString('pt-BR')} {unit}</strong> no turno
+                                    </span>
+                                    <span className="text-[10px] text-slate-300/80 mt-0.5">
+                                        Total acumulado da OP passará de {currentTotal.toLocaleString('pt-BR')} para <strong className="text-white font-bold">{calculatedNewTotal.toLocaleString('pt-BR')} {unit}</strong>
+                                    </span>
+                                </div>
+                            </div>
+                            <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-black/40 border border-white/10 shrink-0 ml-2">
+                                {Math.min(100, Math.round((calculatedNewTotal / (target || 1)) * 100))}% da Meta
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Motivo do Ajuste */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            Motivo do Ajuste (Auditoria):
+                        </label>
+                        <select
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            className="bg-[#08131B] border border-white/15 focus:border-[#00E5FF] rounded-xl px-3 py-2 text-xs text-slate-200 outline-none cursor-pointer"
+                        >
+                            <option value="Ajuste manual de contagem do turno (Gestor)">Ajuste manual de contagem do turno (Gestor)</option>
+                            <option value="Ajuste manual de contagem geral da OP (Gestor)">Ajuste manual de contagem geral da OP (Gestor)</option>
+                            <option value="Correção de refugo ou pontas de solda">Correção de refugo ou pontas de solda</option>
+                            <option value="Contagem física do lote / amarrado">Contagem física do lote / amarrado</option>
+                            <option value="Ajuste por parada de setup">Ajuste por parada de setup</option>
+                            <option value="Outro motivo operacional">Outro motivo operacional</option>
+                        </select>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/10">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isSaving}
+                            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSaving || isBelowMinimum}
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#00E5FF] to-emerald-400 hover:from-[#00c8df] hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-98"
+                        >
+                            {isSaving ? (
+                                <span>Salvando...</span>
+                            ) : (
+                                <>
+                                    <span>✓</span>
+                                    <span>{isShiftMode ? `Salvar e Atualizar Dashboard (${operatorName})` : 'Salvar e Atualizar Total da OP'}</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Autorização do Gestor para Ajuste de Quantidade
+// ============================================================================
+const ManagerAuthModalForAdjust: React.FC<{
+    onSuccess: () => void;
+    onCancel: () => void;
+    users: User[];
+}> = ({ onSuccess, onCancel, users }) => {
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const manager = users.find(u => (u.role === 'gestor' || u.role === 'admin') && u.password === password);
+        if (manager) {
+            onSuccess();
+        } else {
+            setError('Senha de gestor incorreta ou usuário sem permissão.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[130] p-4 animate-fade">
+            <form onSubmit={handleSubmit} className="bg-[#0A1B27] p-6 rounded-2xl border border-white/15 shadow-2xl w-full max-w-md text-slate-100 flex flex-col gap-4">
+                <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-xl font-bold">
+                        🔒
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black uppercase tracking-wider text-white">
+                            Autorização de Gestor
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                            Apenas o gestor pode alterar a quantidade produzida
+                        </p>
+                    </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                    Esta alteração atualiza a contagem no Quadro PCP e no painel do operador da máquina em tempo real. Digite a senha do gestor ou administrador para prosseguir:
+                </p>
+
+                <div>
+                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+                        Senha do Gestor
+                    </label>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-2.5 bg-black/50 border border-white/15 focus:border-[#00E5FF] rounded-xl text-white outline-none font-mono"
+                        required
+                        autoFocus
+                        placeholder="Digite a senha..."
+                    />
+                    {error && <p className="text-rose-400 text-xs mt-1.5 font-bold flex items-center gap-1">⚠️ {error}</p>}
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2 border-t border-white/10">
+                    <button 
+                        type="button" 
+                        onClick={onCancel} 
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 cursor-pointer active:scale-98"
+                    >
+                        Autorizar e Ajustar
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
+// ============================================================================
+// COMPONENTE: Modal de Edição da OP em Produção (Nome, Meta, Turnos Finalizados)
+// Modelo técnico bloqueado para preservar a rastreabilidade dos lotes.
+// ============================================================================
+interface EditActiveOPModalProps {
+    order: ProductionOrderData;
+    shiftReports?: ShiftReport[];
+    gauges?: any[];
+    onClose: () => void;
+    onSave: (
+        orderId: string,
+        data: {
+            newOrderNumber: string;
+            newQuantityToProduce: number;
+            updatedFinalizedShifts: {
+                logIndex: number;
+                reportId?: string;
+                operator: string;
+                pieces: number;
+                startTime?: string;
+                endTime?: string;
+            }[];
+            activeShiftPieces?: number;
+        }
+    ) => Promise<void>;
+}
+
+interface FinalizedShiftItem {
+    id: string;
+    logIndex: number;
+    reportId?: string;
+    operator: string;
+    startTime?: string;
+    endTime?: string;
+    dateFormatted: string;
+    timeRange: string;
+    pieces: number;
+}
+
+const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
+    order,
+    shiftReports = [],
+    gauges = [],
+    onClose,
+    onSave
+}) => {
+    const isTrefila = typeof order.machine === 'string' && order.machine.startsWith('Trefila') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
+    const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
+    const unit = isTrefila ? 'kg' : 'pçs';
+
+    // 1. Nome / Número da Ordem
+    const [orderNumber, setOrderNumber] = useState<string>(order.orderNumber || '');
+
+    // 2. Meta (Quantidade a Produzir)
+    const initialMeta = useMemo(() => {
+        if (isTrefila) {
+            return Number(order.quantityToProduce) || Number(order.totalWeight) || 18000;
+        }
+        return Number(order.quantityToProduce) || (isTrelica ? 3500 : 5000);
+    }, [order, isTrefila, isTrelica]);
+
+    const [quantityToProduce, setQuantityToProduce] = useState<number>(initialMeta);
+
+    // 3. Modelo Técnico (BLOQUEADO)
+    const modelDisplay = useMemo(() => {
+        if (isTrelica) {
+            return `${order.trelicaModel || 'Treliça'}${order.tamanho ? ` • ${order.tamanho}` : ''}`;
+        }
+        if (isTrefila) {
+            let pCode = order.productCode || '';
+            let pDesc = order.productDescription || '';
+            if (!pDesc || !pCode) {
+                // Fallback for old orders: lookup in gauges
+                const cleanTarget = String(order.targetBitola || '').replace('mm', '').trim();
+                const matchedGauge = gauges.find((g: any) => {
+                    const mat = (g.materialType || '').toLowerCase();
+                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
+                    if (!isCa60) return false;
+                    const gClean = String(g.gauge || '').replace('mm', '').trim();
+                    return g.gauge === order.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                });
+                if (matchedGauge) {
+                    if (!pCode) pCode = matchedGauge.productCode || (matchedGauge as any).code || '';
+                    if (!pDesc) pDesc = matchedGauge.description || (matchedGauge as any).gaugeDescription || '';
+                }
+            }
+            if (pDesc) {
+                return pCode && !pDesc.startsWith(pCode) ? `[${pCode}] ${pDesc}` : pDesc;
+            }
+            return `Bitola ${order.targetBitola || 'N/A'}mm${order.inputBitola ? ` (Entrada: ${order.inputBitola}mm)` : ''}`;
+        }
+        return order.malhaModel || 'Malha Padrão';
+    }, [order, isTrelica, isTrefila, gauges]);
+
+    // 4. Turnos Finalizados (Peças Produzidas)
+    const initialShifts = useMemo(() => {
+        const list: FinalizedShiftItem[] = [];
+        const logs = (order.operatorLogs || []) as any[];
+        const matchingReports = (shiftReports || []).filter(r => 
+            (r.productionOrderId && r.productionOrderId === order.id) || 
+            (r.orderNumber && r.orderNumber === order.orderNumber)
+        );
+
+        logs.forEach((log, index) => {
+            if (!log.startTime) return;
+            if (log.endTime) {
+                const shiftPieces = Math.max(0, (Number(log.endQuantity) || 0) - (Number(log.startQuantity) || 0));
+                const sDate = log.startTime ? getIsoDateStrGlobal(log.startTime) : '';
+                const matchingReport = matchingReports.find(r => {
+                    const rDate = r.date || (r.shiftStartTime ? getIsoDateStrGlobal(r.shiftStartTime) : '');
+                    return rDate === sDate || (r.operator && log.operator && r.operator.toLowerCase() === log.operator.toLowerCase());
+                });
+
+                const startDt = new Date(log.startTime);
+                const endDt = new Date(log.endTime);
+                const dateFormatted = !isNaN(startDt.getTime()) ? startDt.toLocaleDateString('pt-BR') : 'Data não informada';
+                const timeRange = !isNaN(startDt.getTime()) && !isNaN(endDt.getTime())
+                    ? `${startDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} às ${endDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Turno Encerrado';
+
+                list.push({
+                    id: `log-${index}`,
+                    logIndex: index,
+                    reportId: matchingReport?.id,
+                    operator: log.operator || 'Operador',
+                    startTime: log.startTime,
+                    endTime: log.endTime,
+                    dateFormatted,
+                    timeRange,
+                    pieces: shiftPieces
+                });
+            }
+        });
+
+        // Se não havia logs fechados em operatorLogs, verificar shiftReports
+        if (list.length === 0 && matchingReports.length > 0) {
+            matchingReports.forEach((rep, rIdx) => {
+                const qty = isTrefila 
+                    ? (Number(rep.totalProducedWeight) || 0)
+                    : (Number(rep.totalProducedQuantity) || 0);
+                const dt = rep.date ? new Date(rep.date) : (rep.shiftStartTime ? new Date(rep.shiftStartTime) : new Date());
+                const dateFormatted = !isNaN(dt.getTime()) ? dt.toLocaleDateString('pt-BR') : 'Data não informada';
+                list.push({
+                    id: `rep-${rep.id || rIdx}`,
+                    logIndex: -1,
+                    reportId: rep.id,
+                    operator: rep.operator || 'Operador',
+                    startTime: rep.shiftStartTime,
+                    endTime: rep.shiftEndTime,
+                    dateFormatted,
+                    timeRange: 'Turno Registrado',
+                    pieces: qty
+                });
+            });
+        }
+
+        return list;
+    }, [order, shiftReports, isTrefila]);
+
+    const [finalizedShifts, setFinalizedShifts] = useState<FinalizedShiftItem[]>(initialShifts);
+
+    // 5. Turno Ativo (Ao Vivo) se existir
+    const activeLogIndex = (order.operatorLogs || []).findIndex((l: any) => !l.endTime);
+    const activeLog = activeLogIndex !== -1 ? order.operatorLogs![activeLogIndex] : null;
+    const hasActiveShift = activeLog !== null;
+
+    const initialActivePieces = useMemo(() => {
+        if (!hasActiveShift) return 0;
+        const currentTotal = isTrefila 
+            ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0)
+            : (Number(order.actualProducedQuantity) || 0);
+        const startQty = Number(activeLog?.startQuantity) || 0;
+        return Math.max(0, currentTotal - startQty);
+    }, [hasActiveShift, activeLog, order, isTrefila]);
+
+    const [activeShiftPieces, setActiveShiftPieces] = useState<number>(initialActivePieces);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Handlers para atualizar peças do turno finalizado
+    const handleShiftPiecesChange = (index: number, delta: number) => {
+        setFinalizedShifts(prev => prev.map((s, idx) => {
+            if (idx === index) {
+                return { ...s, pieces: Math.max(0, (Number(s.pieces) || 0) + delta) };
+            }
+            return s;
+        }));
+    };
+
+    const handleSetShiftPieces = (index: number, value: number) => {
+        setFinalizedShifts(prev => prev.map((s, idx) => {
+            if (idx === index) {
+                return { ...s, pieces: Math.max(0, value) };
+            }
+            return s;
+        }));
+    };
+
+    // Cálculos em tempo real
+    const sumFinalized = finalizedShifts.reduce((acc, s) => acc + (Number(s.pieces) || 0), 0);
+    const recalculatedTotal = sumFinalized + (hasActiveShift ? (Number(activeShiftPieces) || 0) : 0);
+    const target = Number(quantityToProduce) || 1;
+    const progressPercent = Math.min(100, Math.round((recalculatedTotal / target) * 100));
+
+    const quickMetaDeltas = isTrefila 
+        ? [-1000, -500, -100, 100, 500, 1000]
+        : [-500, -100, -50, 50, 100, 500];
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            await onSave(order.id, {
+                newOrderNumber: orderNumber,
+                newQuantityToProduce: quantityToProduce,
+                updatedFinalizedShifts: finalizedShifts.map(s => ({
+                    logIndex: s.logIndex,
+                    reportId: s.reportId,
+                    operator: s.operator,
+                    pieces: s.pieces,
+                    startTime: s.startTime,
+                    endTime: s.endTime
+                })),
+                activeShiftPieces: hasActiveShift ? activeShiftPieces : undefined
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-3 sm:p-4 overflow-y-auto">
+            <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto">
+                {/* Cabeçalho do Modal */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+                            <PencilIcon className="w-5 h-5 text-purple-300" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base font-black uppercase tracking-wider text-white">
+                                    Editar OP em Produção
+                                </h3>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono">
+                                    PCP / GESTOR
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono">
+                                {order.scheduledMachine || order.machine} • ID: {order.id.slice(0, 8)}...
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
+                    >
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {/* 1. Nome / Número da Ordem */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                            <span>Nome / Número da Ordem</span>
+                            <span className="text-[10px] text-slate-400 font-normal">Identificador da OP nos terminais e painel</span>
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 font-mono text-sm font-bold">#</span>
+                            <input
+                                type="text"
+                                value={orderNumber}
+                                onChange={(e) => setOrderNumber(e.target.value)}
+                                className="w-full bg-slate-900/90 border border-white/15 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 rounded-xl pl-8 pr-3 py-2.5 text-white font-mono font-bold text-sm tracking-wide transition-all outline-none"
+                                placeholder="Ex: teste 3888888 ou TR-9222"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    {/* 2. Modelo Técnico Bloqueado */}
+                    <div className="bg-slate-900/70 border border-amber-500/30 rounded-xl p-3.5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                <LockClosedIcon className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Modelo Técnico do Produto</span>
+                            </span>
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 font-mono">
+                                <span>🔒</span> BLOQUEADO
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-lg px-3 py-2">
+                            <span className="font-mono text-sm font-bold text-slate-200">
+                                {modelDisplay}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400">
+                                {order.scheduledMachine || order.machine}
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-amber-300/80 leading-snug">
+                            ⚠️ O modelo técnico não pode ser trocado com a OP em andamento para não corromper a rastreabilidade dos lotes de matéria-prima e bobinas já consumidas.
+                        </p>
+                    </div>
+
+                    {/* 3. Quantidade a Produzir (Meta) */}
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-black uppercase tracking-wider text-slate-300">
+                                Quantidade a Produzir (Meta da OP)
+                            </label>
+                            <span className="text-xs font-mono text-[#00E5FF] font-bold">
+                                Unidade: {unit}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min={1}
+                                value={quantityToProduce}
+                                onChange={(e) => setQuantityToProduce(Math.max(1, Number(e.target.value) || 0))}
+                                className="flex-1 bg-slate-900/90 border border-white/15 focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] rounded-xl px-3 py-2 text-white font-mono font-bold text-base transition-all outline-none"
+                                required
+                            />
+                            <span className="text-sm font-bold text-slate-400 font-mono px-2">
+                                {unit}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {quickMetaDeltas.map(d => (
+                                <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setQuantityToProduce(prev => Math.max(1, prev + d))}
+                                    className="px-2.5 py-1 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-mono text-slate-300 hover:text-white transition-all cursor-pointer"
+                                >
+                                    {d > 0 ? `+${d.toLocaleString('pt-BR')}` : d.toLocaleString('pt-BR')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 4. Turnos Finalizados */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                                <span>Peças Produzidas nos Turnos Finalizados</span>
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                    {finalizedShifts.length} {finalizedShifts.length === 1 ? 'Turno' : 'Turnos'}
+                                </span>
+                            </label>
+                        </div>
+
+                        {finalizedShifts.length === 0 ? (
+                            <div className="bg-slate-900/50 border border-white/10 rounded-xl p-3 text-center text-xs text-slate-400">
+                                Nenhum turno finalizado registrado para esta OP até o momento.
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                                {finalizedShifts.map((shift, idx) => (
+                                    <div key={shift.id || idx} className="bg-slate-900/80 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-mono font-bold text-[10px]">
+                                                    {idx + 1}
+                                                </span>
+                                                <span className="font-bold text-slate-200">
+                                                    {shift.operator || 'Operador'}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 font-mono">
+                                                    {shift.dateFormatted}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+                                                {shift.timeRange}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? -100 : -10)}
+                                                    className="w-8 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '-100' : '-10'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? -10 : -1)}
+                                                    className="w-7 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '-10' : '-1'}
+                                                </button>
+                                            </div>
+
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={shift.pieces}
+                                                onChange={(e) => handleSetShiftPieces(idx, Number(e.target.value) || 0)}
+                                                className="flex-1 bg-black/50 border border-white/15 focus:border-emerald-400 rounded-lg px-3 py-1.5 text-center font-mono font-bold text-emerald-300 text-sm outline-none"
+                                            />
+                                            <span className="text-xs font-mono font-bold text-slate-400 w-8">
+                                                {unit}
+                                            </span>
+
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? 10 : 1)}
+                                                    className="w-7 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '+10' : '+1'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleShiftPiecesChange(idx, isTrefila ? 100 : 10)}
+                                                    className="w-8 h-8 bg-white/5 hover:bg-white/15 border border-white/10 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {isTrefila ? '+100' : '+10'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 5. Turno Atual em Andamento (se houver) */}
+                    {hasActiveShift && (
+                        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] animate-pulse" />
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-[#00E5FF] flex items-center gap-1.5">
+                                        <span>Turno Atual em Execução (Ao Vivo)</span>
+                                    </span>
+                                    <span className="text-[11px] text-slate-300 font-mono">
+                                        {activeLog?.operator || 'Operador'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-sm font-mono font-black text-white">
+                                    {activeShiftPieces.toLocaleString('pt-BR')} {unit}
+                                </span>
+                                <span className="block text-[10px] text-slate-400">em andamento</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 6. Barra de Progresso e Resumo Recalculado */}
+                    <div className="bg-black/50 border border-white/10 rounded-xl p-3.5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-400">Progresso Recalculado da OP</span>
+                            <span className="font-mono font-bold text-[#00E5FF]">{progressPercent}%</span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                            <div 
+                                className="h-full bg-gradient-to-r from-purple-500 via-[#00E5FF] to-emerald-400 transition-all duration-300"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-mono pt-1">
+                            <div>
+                                <span className="text-slate-400 block text-[10px]">TOTAL REALIZADO:</span>
+                                <span className="font-black text-emerald-400 text-sm">
+                                    {recalculatedTotal.toLocaleString('pt-BR')} {unit}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-slate-400 block text-[10px]">META DA OP:</span>
+                                <span className="font-black text-white text-sm">
+                                    {quantityToProduce.toLocaleString('pt-BR')} {unit}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Botões de Ação */}
+                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+                        <button 
+                            type="button" 
+                            onClick={onClose} 
+                            disabled={isSaving}
+                            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button 
+                            type="submit" 
+                            disabled={isSaving}
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/25 flex items-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                        >
+                            {isSaving ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Salvando...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <PencilIcon className="w-3.5 h-3.5" />
+                                    <span>Salvar Alterações da OP</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
