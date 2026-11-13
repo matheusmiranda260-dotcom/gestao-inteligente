@@ -827,6 +827,7 @@ interface TrelicaPackagesOperatorPanelProps {
     stock?: StockItem[];
     shiftReports?: ShiftReport[];
     machineName?: string;
+    showManagerControls?: boolean;
     onOpenFullSheet?: () => void;
 }
 
@@ -835,6 +836,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
     stock = [],
     shiftReports = [],
     machineName,
+    showManagerControls = false,
     onOpenFullSheet
 }) => {
     const [reportData, setReportData] = useState<TrelicaPackagesReportData>(() =>
@@ -904,23 +906,6 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
         return Array.from(map.values());
     }, [shiftReports, fetchedShifts]);
 
-    const dailyMarkings = useMemo(
-        () =>
-            extractDailyMarkingsForTrelicaOp(
-                op,
-                allShiftReports,
-                computed.totals.avgPieceWeightKg || reportData.techConfig.pesoFinalUnit
-            ),
-        [op, allShiftReports, computed.totals.avgPieceWeightKg, reportData.techConfig.pesoFinalUnit]
-    );
-
-    const totalMarkedPieces = useMemo(() => {
-        const fromDaily = dailyMarkings.reduce((acc, d) => acc + d.quantity, 0);
-        return Math.max(fromDaily, Number(op.actualProducedQuantity || 0));
-    }, [dailyMarkings, op.actualProducedQuantity]);
-
-    const pendingPiecesInMachine = Math.max(0, totalMarkedPieces - computed.totals.totalPieces);
-
     // Lotes já em uso ou já esgotados em qualquer uma das 5 posições
     const usedOrActiveLotsSet = useMemo(() => {
         const map = new Map<string, { posLabel: string; status: string }>();
@@ -949,6 +934,24 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
         setLotWeightText(current?.kgEntra ? String(current.kgEntra) : '');
         setShowAllGaugesInPicker(false);
         setSlotError(null);
+    };
+
+    const handleDirectWeightChange = async (
+        positionKey: TrelicaWirePositionKey,
+        lotCode: string,
+        newWeight: number
+    ) => {
+        const cleanTarget = cleanLotCode(lotCode);
+        const currentQueue = (reportData.queues[positionKey] || []).map(item =>
+            cleanLotCode(item.lot) === cleanTarget ? { ...item, weight: Math.max(0, newWeight) } : item
+        );
+        await persistData({
+            ...reportData,
+            queues: {
+                ...reportData.queues,
+                [positionKey]: currentQueue
+            }
+        });
     };
 
     const handleSaveLotSlot = async () => {
@@ -1049,7 +1052,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
 
         if (weightKg <= 0) {
             setPackageValidationError({
-                message: 'Digite o Peso Real do Pacote na balança (kg) para fechar o pacote de treliças.',
+                message: 'Digite o Peso do Pacote na balança (kg) antes de confirmar!',
                 missingPositions: []
             });
             return;
@@ -1070,7 +1073,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
             const reserve = st?.reserveLot;
             const needed = calc.kgConsByPosition[key];
 
-            if (!active || !active.lot) {
+            if (!active || !active.lot || active.kgEntra <= 0) {
                 missingActive.push(key);
                 return;
             }
@@ -1091,7 +1094,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                 .map(k => TRELICA_WIRE_POSITIONS.find(p => p.key === k)?.shortLabel || k)
                 .join(', ');
             setPackageValidationError({
-                message: `Selecione primeiro o 1º Lote Ativo (Em Máquina) para: ${names}.`,
+                message: `Selecione primeiro o Lote Ativo (e seu Peso) para: ${names}.`,
                 missingPositions: missingActive
             });
             return;
@@ -1101,11 +1104,11 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
             const details = deficitPositions
                 .map(
                     d =>
-                        `${d.label} (precisa ${formatBR(d.needed, 1)} kg, saldo atual ${formatBR(d.available, 1)} kg)`
+                        `${d.label} (precisa ${formatBR(d.needed, 0)} kg, saldo ${formatBR(d.available, 0)} kg)`
                 )
                 .join(' • ');
             setPackageValidationError({
-                message: `Saldo insuficiente no rolo ativo! Cadastre o 2º Lote Reserva para completar o pacote: ${details}`,
+                message: `Saldo insuficiente no rolo ativo! Cadastre o 2º Lote Reserva para: ${details}`,
                 missingPositions: deficitPositions.map(d => d.posKey)
             });
             return;
@@ -1143,6 +1146,13 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
         setPackageValidationError(null);
     };
 
+    const handleUpdateSavedPkgWeight = async (pkgId: string, newWeight: number | null) => {
+        const nextPackages = reportData.packages.map(p =>
+            p.id === pkgId ? { ...p, measuredPackageWeight: newWeight } : p
+        );
+        await persistData({ ...reportData, packages: nextPackages });
+    };
+
     const handleDeletePackage = async (pkgId: string) => {
         const nextPackages = reportData.packages
             .filter(p => p.id !== pkgId)
@@ -1153,7 +1163,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
         });
     };
 
-    // Lista de lotes CA-60 disponíveis no estoque para o seletor rápido
+    // Lista de lotes CA-60 disponíveis no estoque para o seletor rápido por toque
     const availableStockForEditingSlot = useMemo(() => {
         if (!editingSlot) return [];
         const targetBitola = shares[editingSlot.positionKey].bitola;
@@ -1176,310 +1186,74 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
             .sort((a, b) => String(a.internalLot).localeCompare(String(b.internalLot), undefined, { numeric: true }));
     }, [editingSlot, stock, shares, showAllGaugesInPicker]);
 
+    const nextPkgNumber = reportData.packages.length + 1;
+    const configuredActiveCount = TRELICA_WIRE_POSITIONS.filter(
+        p => Boolean(computed.activeStateByPos[p.key]?.activeLot?.lot)
+    ).length;
+
     return (
-        <div className="space-y-4 text-slate-100">
-            {/* CABEÇALHO RESUMO DO PAINEL DE LOTES & PACOTES (200 PEÇAS) */}
-            <div className="bg-slate-900/95 border border-cyan-500/30 rounded-2xl p-4 shadow-xl">
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div className="space-y-4 w-full max-w-full overflow-hidden text-left">
+            {/* BLOCO 1: OS 5 LOTES NA MÁQUINA (VISUAL LIMPO E DIRETO PARA CELULAR) */}
+            <div className="bg-slate-100/90 p-3.5 sm:p-5 rounded-2xl border border-slate-200 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                                {machineName || op.machine || 'Treliça'} • OP #{op.orderNumber}
-                            </span>
-                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                Padrão: 200 Peças / Pacote
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-800">
+                                🔄 1. Os 5 Lotes na Máquina (Ativo & Reserva)
+                            </h3>
+                            <span
+                                className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                                    configuredActiveCount === 5
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}
+                            >
+                                {configuredActiveCount}/5 Lotes Ativos
                             </span>
                         </div>
-                        <h3 className="text-base md:text-lg font-black text-white mt-1">
-                            {reportData.techConfig.modelName} ({reportData.techConfig.tamanhoMeters}m) — Controle dos 5 Lotes & Fechamento de Pacotes
-                        </h3>
-                        <p className="text-xs text-slate-400">
-                            1x Superior (ø{formatBR(reportData.techConfig.bitolaSuperior, 1)}mm) • 2x Senoides (ø{formatBR(reportData.techConfig.bitolaSenoide, 1)}mm) • 2x Inferiores (ø{formatBR(reportData.techConfig.bitolaInferior, 1)}mm) • Peso Teórico: <strong className="text-cyan-300">{formatBR(reportData.techConfig.pesoFinalUnit, 3)} kg/pç</strong> (~{formatBR(reportData.techConfig.pesoFinalUnit * 200, 0)} kg / pct 200 pçs)
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Toque para informar os 5 rolos em máquina. Quando um rolo estiver acabando, cadastre o <strong>2º Lote Reserva</strong>.
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {showManagerControls && (
                         <button
                             type="button"
                             onClick={() => {
                                 if (onOpenFullSheet) onOpenFullSheet();
                                 else setShowFullSheetModal(true);
                             }}
-                            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 transition-all"
+                            className="px-3.5 py-2 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-xs uppercase tracking-wider shadow-sm flex items-center gap-1.5 cursor-pointer self-start"
                         >
-                            <span>📋 Planilha de Fechamento & Impressão A4</span>
+                            <span>📊 Fechamento & Impressão A4</span>
                         </button>
-                    </div>
+                    )}
                 </div>
 
-                {/* CARDS DE RESUMO RÁPIDO DA OP */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 mt-3">
-                    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5">
-                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Pacotes Fechados</span>
-                        <span className="text-lg font-black text-white">{computed.totals.totalPackages} pcts</span>
-                        <span className="text-[11px] text-cyan-300 block">{formatInt(computed.totals.totalPieces)} pçs embaladas</span>
-                    </div>
-                    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5">
-                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Peso Total Pesado</span>
-                        <span className="text-lg font-black text-emerald-400">{formatBR(computed.totals.totalWeightKg, 1)} kg</span>
-                        <span className="text-[11px] text-slate-300 block">Média: {formatBR(computed.totals.avgPieceWeightKg, 3)} kg/pç</span>
-                    </div>
-                    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5">
-                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Marcações Diárias</span>
-                        <span className="text-lg font-black text-amber-300">{formatInt(totalMarkedPieces)} pçs</span>
-                        <span className="text-[11px] text-slate-300 block">Meta OP: {formatInt(op.quantityToProduce)} pçs</span>
-                    </div>
-                    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5">
-                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Saldo p/ Próximo Pacote</span>
-                        <span className="text-lg font-black text-purple-300">{formatInt(pendingPiecesInMachine)} pçs</span>
-                        <span className="text-[11px] text-slate-400 block">
-                            {pendingPiecesInMachine >= 200
-                                ? `⚠️ ${Math.floor(pendingPiecesInMachine / 200)} pacote(s) de 200 pronto(s) p/ pesar!`
-                                : `Faltam ${Math.max(0, 200 - pendingPiecesInMachine)} pçs p/ fechar 200`}
-                        </span>
-                    </div>
-                    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5">
-                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Saldo Nos 5 Rolos</span>
-                        <span className="text-lg font-black text-cyan-300">{formatBR(computed.totals.totalSobra, 0)} kg</span>
-                        <span className="text-[11px] text-slate-400 block">Entrada: {formatBR(computed.totals.totalEntra, 0)} kg</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* ETAPA 1: OS 5 LOTES ATIVOS + 5 LOTES RESERVA (SIMPLIFICADO IGUAL À MALHA) */}
-            <div className="bg-slate-900/95 border border-slate-700/80 rounded-2xl p-4 shadow-xl">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <div>
-                        <h4 className="text-sm font-black uppercase tracking-wider text-cyan-300 flex items-center gap-2">
-                            <span>1. Lotes Abastecidos nas 5 Posições da Treliça (Ativo + Reserva)</span>
-                        </h4>
-                        <p className="text-xs text-slate-400">
-                            Mantenha os 5 lotes ativos preenchidos. Quando um rolo estiver acabando, deixe o <strong>2º Lote Reserva</strong> selecionado para virada automática no pacote.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    {TRELICA_WIRE_POSITIONS.map(pos => {
-                        const posState = computed.activeStateByPos[pos.key];
-                        const activeLot = posState?.activeLot;
-                        const reserveLot = posState?.reserveLot;
-                        const wireShare = shares[pos.key];
-                        const consPer200Pkg = wireShare.unitWeight * 200;
-                        const isLowBalance = activeLot && activeLot.sobra < consPer200Pkg;
-
-                        return (
-                            <div
-                                key={pos.key}
-                                className={`rounded-xl border p-3 flex flex-col justify-between transition-all ${
-                                    !activeLot
-                                        ? 'bg-red-950/20 border-red-500/40'
-                                        : isLowBalance && !reserveLot
-                                        ? 'bg-amber-950/20 border-amber-500/50'
-                                        : 'bg-slate-800/90 border-slate-700'
-                                }`}
-                            >
-                                <div>
-                                    {/* Cabeçalho da Posição */}
-                                    <div className="flex items-center justify-between gap-1 pb-2 mb-2 border-b border-slate-700/80">
-                                        <div>
-                                            <span className="text-[11px] font-black uppercase text-white block">
-                                                {pos.label}
-                                            </span>
-                                            <span className="text-[10px] font-bold text-cyan-300">
-                                                Bitola ø {formatBR(wireShare.bitola, 2)} mm • {(wireShare.ratio * 100).toFixed(1)}%
-                                            </span>
-                                        </div>
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-700">
-                                            ~{formatBR(consPer200Pkg, 1)} kg/pct
-                                        </span>
-                                    </div>
-
-                                    {/* 1º Lote Ativo (Em Máquina) */}
-                                    <div className="bg-slate-900/90 border border-slate-700 rounded-lg p-2.5 mb-2">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[10px] font-black uppercase text-emerald-400">
-                                                1º Lote Ativo (Máquina)
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => openLotPicker(pos.key, 'ACTIVE')}
-                                                className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-600/30 hover:bg-cyan-600 text-cyan-200 hover:text-white border border-cyan-500/40 transition-colors"
-                                            >
-                                                {activeLot ? 'Trocar / Editar' : '+ Selecionar'}
-                                            </button>
-                                        </div>
-
-                                        {activeLot ? (
-                                            <div>
-                                                <div className="flex items-baseline justify-between">
-                                                    <span className="text-base font-black text-amber-300">
-                                                        Lote #{activeLot.lot}
-                                                    </span>
-                                                    <span className="text-xs font-bold text-slate-300">
-                                                        Entrou: {formatBR(activeLot.kgEntra, 0)} kg
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1.5 pt-1.5 border-t border-slate-800 flex items-center justify-between text-xs">
-                                                    <span className="text-slate-400">
-                                                        Cons.: <strong className="text-rose-300">{formatBR(activeLot.cons, 1)} kg</strong>
-                                                    </span>
-                                                    <span
-                                                        className={`font-black ${
-                                                            activeLot.sobra < consPer200Pkg
-                                                                ? 'text-amber-300'
-                                                                : 'text-emerald-400'
-                                                        }`}
-                                                    >
-                                                        Sobra: {formatBR(activeLot.sobra, 1)} kg
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => openLotPicker(pos.key, 'ACTIVE')}
-                                                className="w-full py-2 mt-1 rounded-lg border border-dashed border-red-400/50 bg-red-500/10 hover:bg-red-500/20 text-red-200 font-bold text-xs transition-all"
-                                            >
-                                                + Selecionar 1º Lote ({pos.shortLabel})
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* 2º Lote Reserva (Próximo da Fila) */}
-                                    <div className="bg-slate-900/60 border border-slate-700/70 rounded-lg p-2">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[10px] font-black uppercase text-amber-300">
-                                                2º Lote Reserva (Fila)
-                                            </span>
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openLotPicker(pos.key, 'RESERVE')}
-                                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-500/40 transition-colors"
-                                                >
-                                                    {reserveLot ? 'Editar' : '+ Reserva'}
-                                                </button>
-                                                {reserveLot && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveReserveSlot(pos.key)}
-                                                        className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white"
-                                                        title="Remover lote reserva"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {reserveLot ? (
-                                            <div className="flex items-center justify-between text-xs">
-                                                <span className="font-black text-amber-200">Lote #{reserveLot.lot}</span>
-                                                <span className="font-bold text-emerald-300">
-                                                    {formatBR(reserveLot.kgEntra, 0)} kg
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="text-[11px] text-slate-400 italic">
-                                                {isLowBalance ? (
-                                                    <span className="text-amber-300 font-bold not-italic">
-                                                        ⚠️ Saldo baixo p/ 200 pçs! Cadastre o Reserva.
-                                                    </span>
-                                                ) : (
-                                                    'Nenhum reserva na fila'
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {posState?.consumedHistory && posState.consumedHistory.length > 0 && (
-                                    <div className="mt-2 pt-1.5 border-t border-slate-700/60 text-[10px] text-slate-400">
-                                        Finalizados ({posState.consumedHistory.length}):{' '}
-                                        {posState.consumedHistory.map(h => `#${h.lot}`).join(', ')}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* MODAL INLINE DE SELEÇÃO DE LOTE (ESTOQUE OU MANUAL) */}
+                {/* MODAL / SELETOR POR TOQUE (APARECE NO TOPO QUANDO O OPERADOR TOCA EM TROCAR LOTE OU + RESERVA) */}
                 {editingSlot && (
-                    <div className="mt-4 bg-slate-950 border-2 border-cyan-500/60 rounded-2xl p-4 shadow-2xl">
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-800">
-                            <div>
-                                <span className="text-xs font-black uppercase text-cyan-400">
-                                    Configurando{' '}
-                                    {editingSlot.slotType === 'ACTIVE'
-                                        ? '1º Lote Ativo (Em Máquina)'
-                                        : '2º Lote Reserva (Próximo da Fila)'}{' '}
-                                    —{' '}
-                                    {
-                                        TRELICA_WIRE_POSITIONS.find(p => p.key === editingSlot.positionKey)?.label
-                                    }{' '}
-                                    (Bitola recomendada: ø{' '}
-                                    {formatBR(shares[editingSlot.positionKey].bitola, 2)} mm)
-                                </span>
-                            </div>
+                    <div className="p-4 rounded-2xl bg-slate-900 text-white border-2 border-amber-400 space-y-3 shadow-2xl animate-fade-in">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                            <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-300">
+                                {editingSlot.slotType === 'ACTIVE'
+                                    ? `🟢 1º Lote ATIVO • ${TRELICA_WIRE_POSITIONS.find(p => p.key === editingSlot.positionKey)?.label}`
+                                    : `🟡 2º Lote RESERVA • ${TRELICA_WIRE_POSITIONS.find(p => p.key === editingSlot.positionKey)?.label}`}
+                                {' '}
+                                (Ø {formatBR(shares[editingSlot.positionKey].bitola, 2)} mm)
+                            </span>
                             <button
                                 type="button"
                                 onClick={() => setEditingSlot(null)}
-                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-bold"
                             >
-                                ✕ Cancelar
+                                ✕ Fechar
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-bold text-slate-300 mb-1">
-                                    Escolher Rolo CA-60 do Estoque (Auto-preenche Peso)
-                                </label>
-                                <select
-                                    value=""
-                                    onChange={e => {
-                                        const selectedId = e.target.value;
-                                        const found = (stock || []).find(s => s.id === selectedId);
-                                        if (found) {
-                                            setLotInputText(cleanLotCode(found.internalLot));
-                                            const w = Number(
-                                                found.initialQuantity || found.remainingQuantity || found.labelWeight || 0
-                                            );
-                                            setLotWeightText(w > 0 ? String(w) : '');
-                                            setSlotError(null);
-                                        }
-                                    }}
-                                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold"
-                                >
-                                    <option value="">-- Selecionar rolo do estoque ({availableStockForEditingSlot.length} disponíveis) --</option>
-                                    {availableStockForEditingSlot.map(item => {
-                                        const c = cleanLotCode(item.internalLot);
-                                        const usage = usedOrActiveLotsSet.get(c.toLowerCase());
-                                        const w = Number(item.initialQuantity || item.remainingQuantity || 0);
-                                        return (
-                                            <option key={item.id} value={item.id} disabled={Boolean(usage)}>
-                                                Lote #{c} • ø{item.bitola}mm • {formatBR(w, 0)} kg
-                                                {usage ? ` (${usage.status} em ${usage.posLabel})` : ''}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <label className="inline-flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-400 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={showAllGaugesInPicker}
-                                        onChange={e => setShowAllGaugesInPicker(e.target.checked)}
-                                        className="rounded border-slate-600"
-                                    />
-                                    <span>Mostrar todas as bitolas de CA-60 do estoque</span>
-                                </label>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-300 mb-1">
-                                    Número do Lote Interno
+                                <label className="text-[10px] font-black uppercase text-amber-300 block mb-1">
+                                    Número do Lote *
                                 </label>
                                 <input
                                     type="text"
@@ -1488,7 +1262,6 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                         const val = e.target.value;
                                         setLotInputText(val);
                                         setSlotError(null);
-                                        // Se coincidir com algum lote do estoque, puxa o peso automaticamente
                                         const clean = cleanLotCode(val).toLowerCase();
                                         const match = (stock || []).find(
                                             s => cleanLotCode(s.internalLot).toLowerCase() === clean
@@ -1501,314 +1274,498 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                         }
                                     }}
                                     placeholder="Ex: 7660"
-                                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-black text-sm"
+                                    className="w-full px-3 py-2.5 rounded-xl bg-black/60 border-2 border-amber-400/70 text-base font-mono font-black text-white text-center outline-none"
                                 />
                             </div>
-
-                            <div className="flex items-end gap-2">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-slate-300 mb-1">
-                                        Peso Inicial do Rolo (kg)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={lotWeightText}
-                                        onChange={e => {
-                                            setLotWeightText(e.target.value);
-                                            setSlotError(null);
-                                        }}
-                                        placeholder="Ex: 2075"
-                                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-emerald-300 font-black text-sm"
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveLotSlot}
-                                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-lg"
-                                >
-                                    ✓ Salvar Lote
-                                </button>
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-emerald-300 block mb-1">
+                                    Peso do Rolo (kg) *
+                                </label>
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={lotWeightText}
+                                    onChange={e => {
+                                        setLotWeightText(e.target.value);
+                                        setSlotError(null);
+                                    }}
+                                    placeholder="Ex: 2075"
+                                    className="w-full px-3 py-2.5 rounded-xl bg-black/60 border-2 border-emerald-400/70 text-base font-mono font-black text-emerald-300 text-center outline-none"
+                                />
                             </div>
                         </div>
 
                         {slotError && (
-                            <div className="mt-2.5 p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs font-bold">
+                            <div className="p-2.5 rounded-xl bg-rose-950 border border-rose-500 text-rose-200 text-xs font-black">
                                 ⚠️ {slotError}
                             </div>
                         )}
+
+                        <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] font-bold uppercase text-slate-300">
+                                    👇 Ou toque num lote do estoque abaixo (já preenche o peso):
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllGaugesInPicker(!showAllGaugesInPicker)}
+                                    className="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg bg-white/10 text-cyan-300"
+                                >
+                                    {showAllGaugesInPicker ? 'Mostrando Todas Bitolas' : 'Ver Todas Bitolas'}
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-44 overflow-y-auto p-1.5 bg-black/40 rounded-xl">
+                                {availableStockForEditingSlot.length === 0 ? (
+                                    <div className="col-span-full text-center py-3 text-xs text-slate-400">
+                                        Nenhum lote desta bitola no estoque. Digite o número acima ou toque em "Ver Todas Bitolas".
+                                    </div>
+                                ) : (
+                                    availableStockForEditingSlot.map(item => {
+                                        const cLot = cleanLotCode(item.internalLot);
+                                        const wKg = Number(item.initialQuantity || item.remainingQuantity || 0);
+                                        const usage = usedOrActiveLotsSet.get(cLot.toLowerCase());
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                disabled={Boolean(usage)}
+                                                onClick={() => {
+                                                    setLotInputText(cLot);
+                                                    if (wKg > 0) setLotWeightText(String(wKg));
+                                                    setSlotError(null);
+                                                }}
+                                                className={`p-2.5 rounded-xl border text-left transition active:scale-95 flex flex-col ${
+                                                    usage
+                                                        ? 'opacity-40 bg-slate-900 border-slate-800 cursor-not-allowed'
+                                                        : cleanLotCode(lotInputText) === cLot
+                                                        ? 'bg-amber-500/25 border-2 border-amber-400'
+                                                        : 'bg-slate-950 border-white/15 hover:border-amber-400 cursor-pointer'
+                                                }`}
+                                            >
+                                                <span className="text-xs font-black font-mono text-white">
+                                                    Lote {cLot}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-emerald-300">
+                                                    Ø{item.bitola}mm • {wKg > 0 ? `${wKg.toFixed(0)} kg` : ''}
+                                                </span>
+                                                {usage && (
+                                                    <span className="text-[9px] text-amber-300 font-bold">
+                                                        {usage.status} ({usage.posLabel})
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => setEditingSlot(null)}
+                                className="py-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold uppercase"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveLotSlot}
+                                className="py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm font-black uppercase tracking-wider shadow-lg cursor-pointer"
+                            >
+                                ✓ Salvar Lote & Peso
+                            </button>
+                        </div>
                     </div>
                 )}
+
+                {/* LISTA DE CARTÕES CLAROS PARA AS 5 POSIÇÕES (1 COLUNA NO CELULAR, 2 OU 3 NO DESKTOP) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {TRELICA_WIRE_POSITIONS.map(pos => {
+                        const posState = computed.activeStateByPos[pos.key];
+                        const activeLot = posState?.activeLot;
+                        const reserveLot = posState?.reserveLot;
+                        const wireShare = shares[pos.key];
+                        const consPer200Pkg = wireShare.unitWeight * 200;
+                        const willNeedReserveNextPkg =
+                            activeLot && activeLot.kgEntra > 0 && activeLot.sobra < consPer200Pkg;
+                        const pctRemaining =
+                            activeLot && activeLot.kgEntra > 0
+                                ? Math.max(0, Math.min(100, (activeLot.sobra / activeLot.kgEntra) * 100))
+                                : 0;
+
+                        return (
+                            <div
+                                key={pos.key}
+                                className="p-3.5 rounded-2xl border-2 border-slate-200 bg-white shadow-sm space-y-2.5"
+                            >
+                                {/* Título da Posição e Bitola */}
+                                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-900 text-white">
+                                            {pos.label}
+                                        </span>
+                                        <span className="text-xs font-mono font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                            Ø {formatBR(wireShare.bitola, 2)} mm
+                                        </span>
+                                    </div>
+                                    <span className="text-[11px] font-mono font-bold text-slate-500">
+                                        ~{formatBR(consPer200Pkg, 0)} kg/pct
+                                    </span>
+                                </div>
+
+                                {/* 1º LOTE ATIVO (EM MÁQUINA) */}
+                                <div className="p-3 rounded-xl bg-emerald-50/70 border-2 border-emerald-300 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] font-black uppercase text-emerald-900 flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                            <span>🟢 1º Lote Ativo</span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => openLotPicker(pos.key, 'ACTIVE')}
+                                            className="px-3 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-400 text-[11px] font-black uppercase shadow-xs active:scale-95 cursor-pointer"
+                                        >
+                                            {activeLot ? '🔄 Trocar' : '+ Selecionar'}
+                                        </button>
+                                    </div>
+
+                                    {activeLot ? (
+                                        <div className="space-y-2">
+                                            <div className="grid grid-cols-2 gap-2 items-end">
+                                                <div>
+                                                    <span className="text-[9px] font-bold uppercase text-slate-500 block">
+                                                        Lote em Máquina
+                                                    </span>
+                                                    <span className="text-lg font-black font-mono text-slate-900">
+                                                        LOTE {activeLot.lot}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-emerald-900 block mb-0.5">
+                                                        ⚖️ Peso Rolo (kg)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        value={activeLot.kgEntra || ''}
+                                                        onChange={e =>
+                                                            handleDirectWeightChange(
+                                                                pos.key,
+                                                                activeLot.lot,
+                                                                parseFloat(e.target.value) || 0
+                                                            )
+                                                        }
+                                                        placeholder="Ex: 2075"
+                                                        className="w-full px-2.5 py-1.5 rounded-lg border-2 border-emerald-400 bg-white font-mono font-black text-sm text-slate-900 text-center outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-1 text-center bg-white p-2 rounded-xl border border-emerald-200">
+                                                <div>
+                                                    <span className="text-[8px] font-black uppercase text-slate-400 block">
+                                                        Entrou
+                                                    </span>
+                                                    <span className="text-xs font-mono font-bold text-slate-700">
+                                                        {formatBR(activeLot.kgEntra, 0)} kg
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[8px] font-black uppercase text-rose-500 block">
+                                                        Usado
+                                                    </span>
+                                                    <span className="text-xs font-mono font-bold text-rose-600">
+                                                        -{formatBR(activeLot.cons, 0)} kg
+                                                    </span>
+                                                </div>
+                                                <div className="bg-emerald-100/90 rounded-lg py-0.5 px-1">
+                                                    <span className="text-[8px] font-black uppercase text-emerald-900 block">
+                                                        Sobrou
+                                                    </span>
+                                                    <span
+                                                        className={`text-xs sm:text-sm font-mono font-black ${
+                                                            willNeedReserveNextPkg
+                                                                ? 'text-amber-700'
+                                                                : 'text-emerald-900'
+                                                        }`}
+                                                    >
+                                                        {formatBR(activeLot.sobra, 0)} kg
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="w-full h-2 bg-emerald-200/70 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full transition-all ${
+                                                        willNeedReserveNextPkg ? 'bg-amber-500' : 'bg-emerald-600'
+                                                    }`}
+                                                    style={{ width: `${pctRemaining}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => openLotPicker(pos.key, 'ACTIVE')}
+                                            className="w-full py-3 rounded-xl border-2 border-dashed border-emerald-400 text-emerald-800 font-black text-xs uppercase hover:bg-emerald-100/50 transition cursor-pointer"
+                                        >
+                                            + Informar 1º Lote ({pos.shortLabel})
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* 2º LOTE RESERVA (PRÓXIMO DA FILA) */}
+                                <div
+                                    className={`p-2.5 rounded-xl border-2 space-y-1.5 ${
+                                        willNeedReserveNextPkg && !reserveLot
+                                            ? 'bg-amber-50 border-amber-400'
+                                            : 'bg-slate-50 border-slate-200 border-dashed'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] font-black uppercase text-amber-900">
+                                            🟡 2º Lote Reserva (Próximo)
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => openLotPicker(pos.key, 'RESERVE')}
+                                                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase cursor-pointer active:scale-95"
+                                            >
+                                                {reserveLot ? '✏️ Trocar' : '+ Reserva'}
+                                            </button>
+                                            {reserveLot && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveReserveSlot(pos.key)}
+                                                    className="px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-[10px] font-black"
+                                                    title="Remover reserva"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {reserveLot ? (
+                                        <div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-amber-200">
+                                            <span className="text-sm font-black font-mono text-slate-900">
+                                                LOTE {reserveLot.lot}
+                                            </span>
+                                            <span className="text-xs font-mono font-black text-emerald-700">
+                                                {formatBR(reserveLot.kgEntra, 0)} kg
+                                            </span>
+                                        </div>
+                                    ) : willNeedReserveNextPkg ? (
+                                        <p className="text-[11px] font-bold text-amber-900">
+                                            ⚠️ Saldo baixo p/ fechar 200 pçs! Toque em <strong>+ Reserva</strong>.
+                                        </p>
+                                    ) : (
+                                        <p className="text-[10px] text-slate-400">
+                                            Opcional até o 1º lote estar acabando.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* ETAPA 2: FECHAMENTO DE PACOTES (PADRÃO 200 PEÇAS + PESO NA BALANÇA) */}
-            <div className="bg-slate-900/95 border border-emerald-500/30 rounded-2xl p-4 shadow-xl">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            {/* BLOCO 2: FECHAR PACOTE DE 200 PEÇAS (VISUAL SIMPLES E DIRETO PARA O OPERADOR NO CELULAR) */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                     <div>
-                        <h4 className="text-sm font-black uppercase tracking-wider text-emerald-400">
-                            2. Fechamento de Pacote de Treliça (Padrão 200 Peças)
-                        </h4>
-                        <p className="text-xs text-slate-400">
-                            Informe o peso real do pacote na balança. O sistema divide automaticamente o consumo entre os 5 fios da treliça e abate o saldo de cada rolo.
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm sm:text-base font-black uppercase text-slate-800">
+                                📦 2. Fechar Pacote de 200 Peças
+                            </h3>
+                            <span className="text-xs font-mono font-black bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                                {computed.totals.totalPackages} pacotes • {formatInt(computed.totals.totalPieces)} pçs •{' '}
+                                {formatBR(computed.totals.totalWeightKg, 0)} kg
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Basta digitar o <strong>Peso do Pacote (kg)</strong> na balança e confirmar. O sistema desconta sozinho dos 5 lotes!
                         </p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                    <div>
-                        <label className="block text-xs font-bold text-emerald-300 mb-1">
-                            Peso do Pacote na Balança (kg) *
-                        </label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            value={newPkgWeight}
-                            onChange={e => {
-                                setNewPkgWeight(e.target.value);
-                                setPackageValidationError(null);
-                            }}
-                            placeholder={`Ex: ${Math.round(reportData.techConfig.pesoFinalUnit * 200)}`}
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border-2 border-emerald-500/50 focus:border-emerald-400 text-emerald-300 font-black text-base"
-                        />
+                {/* Card de Lançamento Rápido do Pacote */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-[#0F2437] to-slate-900 text-white space-y-3.5 shadow-md">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black font-mono text-sm uppercase">
+                            PACOTE P{nextPkgNumber} (PADRÃO 200 PEÇAS)
+                        </span>
+                        <span className="text-xs font-bold text-cyan-300">
+                            Peso estimado: ~{Math.round(reportData.techConfig.pesoFinalUnit * 200)} kg
+                        </span>
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1">
-                            Quantidade no Pacote (Peças)
-                        </label>
-                        <input
-                            type="number"
-                            value={newPkgQty}
-                            onChange={e => setNewPkgQty(e.target.value)}
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-black text-base"
-                        />
-                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="text-[10px] font-black uppercase text-emerald-300 block mb-1">
+                                ⚖️ Peso do Pacote (kg) *
+                            </label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                step="0.1"
+                                value={newPkgWeight}
+                                onChange={e => {
+                                    setNewPkgWeight(e.target.value);
+                                    setPackageValidationError(null);
+                                }}
+                                placeholder={`Ex: ${Math.round(reportData.techConfig.pesoFinalUnit * 200)}`}
+                                className="w-full px-3 py-3 rounded-xl bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 font-mono font-black text-lg text-center outline-none focus:border-emerald-300"
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1">
-                            Nº Lote Etiqueta Acabado (Opcional)
-                        </label>
-                        <input
-                            type="text"
-                            value={newPkgLabelLot}
-                            onChange={e => setNewPkgLabelLot(e.target.value)}
-                            placeholder="Ex: 88910"
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 font-bold text-sm"
-                        />
-                    </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-slate-300 block mb-1">
+                                Qtd. Peças
+                            </label>
+                            <input
+                                type="number"
+                                inputMode="numeric"
+                                value={newPkgQty}
+                                onChange={e => setNewPkgQty(e.target.value)}
+                                className="w-full px-3 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-black text-base text-center outline-none"
+                            />
+                        </div>
 
-                    <div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-slate-300 block mb-1">
+                                Etiqueta (Opcional)
+                            </label>
+                            <input
+                                type="text"
+                                value={newPkgLabelLot}
+                                onChange={e => setNewPkgLabelLot(e.target.value)}
+                                placeholder="Ex: 88910"
+                                className="w-full px-3 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-bold text-sm text-center outline-none"
+                            />
+                        </div>
+
                         <button
                             type="button"
                             onClick={handleConfirmNewPackage}
-                            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider shadow-lg transition-all"
+                            className="col-span-2 sm:col-span-1 py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                            + Confirmar Pacote (p{reportData.packages.length + 1})
+                            <span>✅</span>
+                            <span>Confirmar P{nextPkgNumber}</span>
                         </button>
                     </div>
+
+                    {packageValidationError && (
+                        <div className="p-3.5 rounded-xl bg-rose-950 border-2 border-rose-500 text-rose-100 space-y-2.5">
+                            <p className="text-xs font-black leading-relaxed text-rose-200">
+                                ⚠️ {packageValidationError.message}
+                            </p>
+                            {packageValidationError.missingPositions.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {packageValidationError.missingPositions.map(posKey => {
+                                        const posInfo = TRELICA_WIRE_POSITIONS.find(p => p.key === posKey);
+                                        const hasActive = Boolean(
+                                            computed.activeStateByPos[posKey]?.activeLot?.lot &&
+                                                (computed.activeStateByPos[posKey]?.activeLot?.kgEntra || 0) > 0
+                                        );
+                                        return (
+                                            <button
+                                                key={posKey}
+                                                type="button"
+                                                onClick={() =>
+                                                    openLotPicker(posKey, hasActive ? 'RESERVE' : 'ACTIVE')
+                                                }
+                                                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase cursor-pointer"
+                                            >
+                                                + Informar {hasActive ? 'Lote Reserva' : 'Lote Ativo'}:{' '}
+                                                {posInfo?.shortLabel}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
-                {/* PREVIEW AUTOMÁTICO DA DIVISÃO DO PACOTE NOS 5 FIOS */}
-                {parseNum(newPkgWeight, 0) > 0 && (
-                    <div className="mt-3 p-3 rounded-xl bg-slate-950/90 border border-slate-800">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-2">
-                            <span className="font-bold text-slate-300">
-                                Rateio Automático deste Pacote ({formatBR(livePreview.packageWeightKg, 1)} kg ÷{' '}
-                                {Math.max(1, Math.round(parseNum(newPkgQty, 200)))} pçs ={' '}
-                                <strong className="text-cyan-300">
-                                    {formatBR(livePreview.unitPieceWeight, 3)} kg/peça
-                                </strong>
-                                ):
-                            </span>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-                            {TRELICA_WIRE_POSITIONS.map(pos => {
-                                const needed = livePreview.kgConsByPosition[pos.key];
-                                const act = computed.activeStateByPos[pos.key]?.activeLot;
-                                const res = computed.activeStateByPos[pos.key]?.reserveLot;
-                                const willSplit = act && act.sobra < needed;
-                                return (
-                                    <div
-                                        key={pos.key}
-                                        className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex flex-col"
-                                    >
-                                        <span className="text-[10px] font-bold text-slate-400">{pos.shortLabel}</span>
-                                        <span className="font-black text-white">
-                                            -{formatBR(needed, 2)} kg
+                {/* CARTÕES SIMPLES DOS PACOTES JÁ FECHADOS (SEM PLANILHA COMPLEXA NO CELULAR) */}
+                {computed.computedRows.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {computed.computedRows.map(row => (
+                            <div
+                                key={row.id}
+                                className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50 space-y-2"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
+                                            {row.packageCode.toUpperCase()}
                                         </span>
-                                        {willSplit && res && (
-                                            <span className="text-[10px] text-amber-300 font-bold">
-                                                Virada: #{act.lot} → #{res.lot}
+                                        <span className="text-xs font-black text-slate-800">
+                                            {row.quantity} peças
+                                        </span>
+                                        {row.finishedLotNumber && (
+                                            <span className="text-[11px] font-mono font-bold text-slate-500">
+                                                • Etiq: {row.finishedLotNumber}
                                             </span>
                                         )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeletePackage(row.id)}
+                                        className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-bold"
+                                        title="Excluir pacote"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
 
-                {packageValidationError && (
-                    <div className="mt-3 p-3 rounded-xl bg-rose-950/90 border-2 border-rose-500/70 text-rose-100 text-xs">
-                        <div className="font-black mb-2">⚠️ {packageValidationError.message}</div>
-                        {packageValidationError.missingPositions.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                                {packageValidationError.missingPositions.map(posKey => {
-                                    const posInfo = TRELICA_WIRE_POSITIONS.find(p => p.key === posKey);
-                                    const hasActive = Boolean(computed.activeStateByPos[posKey]?.activeLot?.lot);
-                                    return (
-                                        <button
-                                            key={posKey}
-                                            type="button"
-                                            onClick={() =>
-                                                openLotPicker(posKey, hasActive ? 'RESERVE' : 'ACTIVE')
+                                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl">
+                                    <span className="text-xs font-black uppercase text-emerald-900">
+                                        ⚖️ Peso na Balança:
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="0.1"
+                                            value={row.measuredPackageWeight ?? ''}
+                                            onChange={e =>
+                                                handleUpdateSavedPkgWeight(
+                                                    row.id,
+                                                    parseFloat(e.target.value) || null
+                                                )
                                             }
-                                            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase"
-                                        >
-                                            + Informar {hasActive ? '2º Lote Reserva' : '1º Lote Ativo'}:{' '}
-                                            {posInfo?.shortLabel}
-                                        </button>
-                                    );
-                                })}
+                                            className="w-24 px-2 py-1 rounded-lg border border-emerald-400 bg-white font-mono font-black text-sm text-center text-slate-900"
+                                        />
+                                        <span className="text-xs font-bold text-emerald-900">kg</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-mono">
+                                    {TRELICA_WIRE_POSITIONS.map(pos => {
+                                        const c = row.positions[pos.key];
+                                        return (
+                                            <span
+                                                key={pos.key}
+                                                className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-bold"
+                                            >
+                                                {pos.shortLabel}: <strong>#{c.lot || '-'}</strong> (-{formatBR(c.kgCons, 0)}kg)
+                                            </span>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        )}
+                        ))}
+                    </div>
+                ) : (
+                    <div className="p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400 text-xs">
+                        Nenhum pacote de 200 peças fechado ainda. Digite o <strong>Peso do Pacote (kg)</strong> acima e toque em <strong>Confirmar P1</strong>!
                     </div>
                 )}
-            </div>
-
-            {/* ETAPA 3: LISTA DE PACOTES FECHADOS (200 PEÇAS) & MARCAÇÕES DIÁRIAS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 bg-slate-900/95 border border-slate-800 rounded-2xl p-4 shadow-xl">
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                            Pacotes Fechados na OP ({computed.computedRows.length})
-                        </h4>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (onOpenFullSheet) onOpenFullSheet();
-                                else setShowFullSheetModal(true);
-                            }}
-                            className="text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
-                        >
-                            Abrir Tabela Completa (5 Fios Mesclados) →
-                        </button>
-                    </div>
-
-                    {computed.computedRows.length === 0 ? (
-                        <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl">
-                            Nenhum pacote de 200 peças pesado ainda nesta OP.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-800 text-slate-200 uppercase text-[10px]">
-                                        <th className="p-2 text-left">PCT</th>
-                                        <th className="p-2 text-left">Etiqueta</th>
-                                        <th className="p-2 text-center">Qtd.</th>
-                                        <th className="p-2 text-right">Peso Pct</th>
-                                        <th className="p-2 text-right">kg/Peça</th>
-                                        <th className="p-2 text-center">Sup.</th>
-                                        <th className="p-2 text-center">Sen. E/D</th>
-                                        <th className="p-2 text-center">Inf. E/D</th>
-                                        <th className="p-2 text-center">Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800">
-                                    {computed.computedRows.map(row => (
-                                        <tr key={row.id} className="hover:bg-slate-800/50">
-                                            <td className="p-2 font-black text-cyan-300">{row.packageCode}</td>
-                                            <td className="p-2 text-slate-300">{row.finishedLotNumber || '-'}</td>
-                                            <td className="p-2 text-center font-bold text-white">{row.quantity}</td>
-                                            <td className="p-2 text-right font-black text-emerald-400">
-                                                {formatBR(row.packageWeightKg, 1)} kg
-                                            </td>
-                                            <td className="p-2 text-right text-slate-300">
-                                                {formatBR(row.unitPieceWeight, 3)} kg
-                                            </td>
-                                            <td className="p-2 text-center text-amber-300 font-bold">
-                                                #{row.positions.superior.lot || '-'} ({formatBR(row.positions.superior.kgCons, 0)}kg)
-                                            </td>
-                                            <td className="p-2 text-center text-purple-300 font-bold">
-                                                #{row.positions.senoide_esq.lot || '-'} / #{row.positions.senoide_dir.lot || '-'}
-                                            </td>
-                                            <td className="p-2 text-center text-emerald-300 font-bold">
-                                                #{row.positions.inferior_esq.lot || '-'} / #{row.positions.inferior_dir.lot || '-'}
-                                            </td>
-                                            <td className="p-2 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeletePackage(row.id)}
-                                                    className="text-rose-400 hover:text-rose-300 font-bold px-1.5"
-                                                    title="Excluir pacote"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-
-                {/* MARCAÇÕES DIÁRIAS SINCRONIZADAS */}
-                <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 shadow-xl">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-300 mb-3">
-                        Atualização da Produção (Marcações Diárias)
-                    </h4>
-                    {dailyMarkings.length === 0 ? (
-                        <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-slate-800 rounded-xl">
-                            Nenhuma marcação diária registrada ainda.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-800 text-slate-200 uppercase text-[10px]">
-                                        <th className="p-2 text-center">Qnt.</th>
-                                        <th className="p-2 text-right">Peso (kg)</th>
-                                        <th className="p-2 text-right">Média</th>
-                                        <th className="p-2 text-center">Data</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800">
-                                    {dailyMarkings.map(d => (
-                                        <tr key={d.dateKey}>
-                                            <td className="p-2 text-center font-black text-white">{d.quantity}</td>
-                                            <td className="p-2 text-right font-bold text-slate-200">
-                                                {formatBR(d.weightKg, 2)}
-                                            </td>
-                                            <td className="p-2 text-right text-slate-400">
-                                                {formatBR(d.avgWeightPerPiece, 3)}
-                                            </td>
-                                            <td className="p-2 text-center font-bold text-cyan-300">{d.displayDate}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                                <tfoot>
-                                    <tr className="bg-slate-800 font-black text-white">
-                                        <td className="p-2 text-center">
-                                            {dailyMarkings.reduce((a, b) => a + b.quantity, 0)}
-                                        </td>
-                                        <td className="p-2 text-right">
-                                            {formatBR(dailyMarkings.reduce((a, b) => a + b.weightKg, 0), 2)}
-                                        </td>
-                                        <td className="p-2 text-right">
-                                            {formatBR(
-                                                computed.totals.avgPieceWeightKg || reportData.techConfig.pesoFinalUnit,
-                                                3
-                                            )}
-                                        </td>
-                                        <td className="p-2 text-center text-[10px] uppercase">Total / Média</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    )}
-                </div>
             </div>
 
             {showFullSheetModal && (
@@ -2543,3 +2500,4 @@ export const TrelicaConsumptionReportModal: React.FC<TrelicaConsumptionReportMod
     );
 };
 export default TrelicaConsumptionReportModal;
+

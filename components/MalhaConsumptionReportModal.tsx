@@ -2001,7 +2001,8 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     stock: StockItem[];
     shiftReports?: ShiftReport[];
     machineName?: string;
-}> = ({ op, stock, shiftReports = [], machineName = 'Malha 1' }) => {
+    showManagerControls?: boolean;
+}> = ({ op, stock, shiftReports = [], machineName = 'Malha 1', showManagerControls = false }) => {
     const [reportData, setReportData] = useState<MalhaPackagesReportData>(() => getSavedMalhaPackagesData(op, stock));
     const [showFullModal, setShowFullModal] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
@@ -2592,14 +2593,16 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
                             {saveStatus === 'saved' ? '✓ Sincronizado' : 'Salvando...'}
                         </span>
-                        <button
-                            type="button"
-                            onClick={() => setShowFullModal(true)}
-                            className="px-3 py-1.5 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
-                        >
-                            <span>📊</span>
-                            <span>Relatório Completo</span>
-                        </button>
+                        {showManagerControls && (
+                            <button
+                                type="button"
+                                onClick={() => setShowFullModal(true)}
+                                className="px-3 py-1.5 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
+                            >
+                                <span>📊</span>
+                                <span>Relatório Completo</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -3007,7 +3010,8 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                 )}
             </div>
 
-            {/* BLOCO 3: MARCAÇÕES DIÁRIAS DE PRODUÇÃO (SINCRONIZADO COM RELATÓRIO DIÁRIO) */}
+            {/* BLOCO 3: MARCAÇÕES DIÁRIAS DE PRODUÇÃO (VISÍVEL SOMENTE PARA GESTOR) */}
+            {showManagerControls && (
             <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-slate-200 shadow-sm space-y-3.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
                     <div>
@@ -3092,6 +3096,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     </table>
                 </div>
             </div>
+            )}
 
             {showFullModal && (
                 <MalhaConsumptionReportModal

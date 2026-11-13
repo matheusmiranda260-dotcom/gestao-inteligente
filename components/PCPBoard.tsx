@@ -3,11 +3,11 @@ import type { Page, ProductionOrderData, StockItem, User, StockGauge, ShiftRepor
 import { FioMaquinaBitolaOptions, TrefilaBitolaOptions, DefaultMalhaGauges } from '../types';
 import { DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
-import { 
-    fetchPcpShiftConfig, 
-    savePcpShiftConfig, 
-    fetchPcpHolidays, 
-    addPcpHoliday, 
+import {
+    fetchPcpShiftConfig,
+    savePcpShiftConfig,
+    fetchPcpHolidays,
+    addPcpHoliday,
     deletePcpHoliday,
     fetchTrelicaSpoolStands,
     updateItem,
@@ -15,30 +15,30 @@ import {
     deleteItem,
     deductTrelicaSpoolStandConsumption
 } from '../services/supabaseService';
-import { 
-    resolveMachineShiftConfig, 
-    checkMachineShiftStatus, 
-    DEFAULT_MACHINE_SHIFTS, 
-    DEFAULT_GLOBAL_SHIFT_CONFIG 
+import {
+    resolveMachineShiftConfig,
+    checkMachineShiftStatus,
+    DEFAULT_MACHINE_SHIFTS,
+    DEFAULT_GLOBAL_SHIFT_CONFIG
 } from '../services/shiftConfigService';
 import TrelicaSpoolStands from './TrelicaSpoolStands';
 import TrelicaWeldingHead, { getLocalMachineElectrodes, getLocalElectrodeHistory } from './TrelicaWeldingHead';
 import DailyProductionReportSheetModal from './DailyProductionReportSheetModal';
 import MalhaConsumptionReportModal from './MalhaConsumptionReportModal';
 import TrelicaConsumptionReportModal, { TrelicaPackagesOperatorPanel } from './TrelicaConsumptionReportModal';
-import { 
-    CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
-    TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
+import {
+    CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon,
+    TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon,
     CogIcon, WrenchScrewdriverIcon, PrinterIcon, ClipboardListIcon,
     AdjustmentsIcon, ChevronDownIcon, ChevronUpIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon,
     PencilIcon, LockClosedIcon
 } from './icons';
-import { 
-    ENTRY_RINGS_LIST, 
-    OUTPUT_RINGS_LIST, 
-    K7PassSetup, 
-    calculateK7Setup, 
-    suggestDefaultK7Count 
+import {
+    ENTRY_RINGS_LIST,
+    OUTPUT_RINGS_LIST,
+    K7PassSetup,
+    calculateK7Setup,
+    suggestDefaultK7Count
 } from '../utils/trefilaK7Setup';
 
 interface PCPBoardProps {
@@ -68,93 +68,93 @@ interface PCPBoardProps {
 
 // Letreiro Digital Inteligente: Rola o texto SOMENTE se não couber no espaço disponível (overflow).
 // Caso o texto caiba perfeitamente (ex: Treliças e Malhas de 4 a 5 dias), fica 100% FIXO e estático.
-const PCPTickerText: React.FC<{ 
-    text: string; 
-    className?: string; 
+const PCPTickerText: React.FC<{
+    text: string;
+    className?: string;
     separator?: string;
-}> = ({ 
-    text, 
-    className = "", 
+}> = ({
+    text,
+    className = "",
     separator = " • "
 }) => {
-    const raw = (text || '').trim();
-    const containerRef = useRef<HTMLDivElement>(null);
-    const measureRef = useRef<HTMLSpanElement>(null);
-    const [shouldScroll, setShouldScroll] = useState(false);
+        const raw = (text || '').trim();
+        const containerRef = useRef<HTMLDivElement>(null);
+        const measureRef = useRef<HTMLSpanElement>(null);
+        const [shouldScroll, setShouldScroll] = useState(false);
 
-    useEffect(() => {
-        if (!containerRef.current || !measureRef.current) return;
-
-        const check = () => {
+        useEffect(() => {
             if (!containerRef.current || !measureRef.current) return;
-            const containerWidth = containerRef.current.clientWidth;
-            const contentWidth = measureRef.current.offsetWidth;
-            
-            if (containerWidth <= 0 || contentWidth <= 0) return;
 
-            // Histerese estável: precisa ultrapassar por 6px para iniciar rolagem e não tremer na transição
-            setShouldScroll(prev => {
-                if (prev) {
-                    return contentWidth > containerWidth;
-                } else {
-                    return contentWidth > (containerWidth + 6);
-                }
-            });
-        };
+            const check = () => {
+                if (!containerRef.current || !measureRef.current) return;
+                const containerWidth = containerRef.current.clientWidth;
+                const contentWidth = measureRef.current.offsetWidth;
 
-        check();
+                if (containerWidth <= 0 || contentWidth <= 0) return;
 
-        if (typeof window !== 'undefined' && 'ResizeObserver' in window && containerRef.current) {
-            const ro = new ResizeObserver(() => check());
-            ro.observe(containerRef.current);
-            return () => ro.disconnect();
-        }
-    }, [raw]);
+                // Histerese estável: precisa ultrapassar por 6px para iniciar rolagem e não tremer na transição
+                setShouldScroll(prev => {
+                    if (prev) {
+                        return contentWidth > containerWidth;
+                    } else {
+                        return contentWidth > (containerWidth + 6);
+                    }
+                });
+            };
 
-    if (!raw) return null;
+            check();
 
-    const duration = Math.max(9, Math.round(raw.length * 0.42));
+            if (typeof window !== 'undefined' && 'ResizeObserver' in window && containerRef.current) {
+                const ro = new ResizeObserver(() => check());
+                ro.observe(containerRef.current);
+                return () => ro.disconnect();
+            }
+        }, [raw]);
 
-    return (
-        <div 
-            ref={containerRef} 
-            className={`min-w-0 max-w-full overflow-hidden relative ${className}`} 
-            title={raw}
-        >
-            {/* Medidor invisível estático e imutável para medição precisa sem causar layout shift */}
-            <span 
-                ref={measureRef} 
-                aria-hidden="true" 
-                style={{ 
-                    position: 'absolute', 
-                    visibility: 'hidden', 
-                    whiteSpace: 'nowrap', 
-                    pointerEvents: 'none',
-                    top: 0,
-                    left: 0
-                }}
+        if (!raw) return null;
+
+        const duration = Math.max(9, Math.round(raw.length * 0.42));
+
+        return (
+            <div
+                ref={containerRef}
+                className={`min-w-0 max-w-full overflow-hidden relative ${className}`}
+                title={raw}
             >
-                {raw}
-            </span>
-
-            {shouldScroll ? (
-                <div 
-                    className="pcp-ticker-track" 
-                    style={{ animationDuration: `${duration}s` }}
+                {/* Medidor invisível estático e imutável para medição precisa sem causar layout shift */}
+                <span
+                    ref={measureRef}
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute',
+                        visibility: 'hidden',
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        top: 0,
+                        left: 0
+                    }}
                 >
-                    <span className="shrink-0 pr-4 whitespace-nowrap">{raw}</span>
-                    <span className="shrink-0 pr-4 text-orange-500 font-black opacity-75">{separator}</span>
-                    <span className="shrink-0 pr-4 whitespace-nowrap">{raw}</span>
-                    <span className="shrink-0 pr-4 text-orange-500 font-black opacity-75">{separator}</span>
-                </div>
-            ) : (
-                <span className="whitespace-nowrap block truncate select-text">
                     {raw}
                 </span>
-            )}
-        </div>
-    );
-};
+
+                {shouldScroll ? (
+                    <div
+                        className="pcp-ticker-track"
+                        style={{ animationDuration: `${duration}s` }}
+                    >
+                        <span className="shrink-0 pr-4 whitespace-nowrap">{raw}</span>
+                        <span className="shrink-0 pr-4 text-orange-500 font-black opacity-75">{separator}</span>
+                        <span className="shrink-0 pr-4 whitespace-nowrap">{raw}</span>
+                        <span className="shrink-0 pr-4 text-orange-500 font-black opacity-75">{separator}</span>
+                    </div>
+                ) : (
+                    <span className="whitespace-nowrap block truncate select-text">
+                        {raw}
+                    </span>
+                )}
+            </div>
+        );
+    };
 
 // Configurações de capacidade produtiva padrão por máquina para sugerir duração
 const CAPACITY_DEFAULTS = {
@@ -267,9 +267,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Identifica se o usuário possui parametrização específica de máquinas no cadastro (ex: Compras com TR 1, TL 1, TL 2, ML 1)
     const hasCustomMachines = Boolean(
-        currentUser?.allowedMachines && 
-        Array.isArray(currentUser.allowedMachines) && 
-        currentUser.allowedMachines.length > 0 && 
+        currentUser?.allowedMachines &&
+        Array.isArray(currentUser.allowedMachines) &&
+        currentUser.allowedMachines.length > 0 &&
         currentUser.allowedMachines.length < MACHINES.length
     );
 
@@ -293,7 +293,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 }
             }
             keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch {}
+        } catch { }
     }, []);
 
     // Zoom inteligente: Ativo em Tela Cheia ou no Modo Visualizador (sem barras laterais) para máxima visibilidade
@@ -386,7 +386,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     return buildMergedTrelicaModels([], gauges, parsed);
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
         return buildMergedTrelicaModels([], gauges, DEFAULT_TRELICA_MODELS);
     });
 
@@ -399,7 +399,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     try {
                         const parsed = JSON.parse(saved);
                         if (Array.isArray(parsed) && parsed.length > 0) cached = parsed;
-                    } catch (e) {}
+                    } catch (e) { }
                 }
                 const { data, error } = await supabase.from('trelica_models').select('*');
                 const merged = buildMergedTrelicaModels(data || [], gauges, cached);
@@ -423,11 +423,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         localStorage.setItem('pcp_fullscreen_mode', String(next));
         try {
             if (next && !document.fullscreenElement) {
-                document.documentElement.requestFullscreen?.().catch(() => {});
+                document.documentElement.requestFullscreen?.().catch(() => { });
             } else if (!next && document.fullscreenElement) {
-                document.exitFullscreen?.().catch(() => {});
+                document.exitFullscreen?.().catch(() => { });
             }
-        } catch {}
+        } catch { }
     };
 
     // Sincronizar estado de Tela Cheia com evento nativo do navegador (ex: tecla ESC ou F11)
@@ -457,11 +457,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
         const filtered = MACHINES.filter(m => {
             return userAllowed.includes(m.name) ||
-                   (m.name === 'Trefila 1' && (userAllowed.includes('TR 1') || userAllowed.includes('trefila1'))) ||
-                   (m.name === 'Trefila 2' && (userAllowed.includes('TR 2') || userAllowed.includes('trefila2'))) ||
-                   (m.name === 'Treliça 1' && (userAllowed.includes('TL 1') || userAllowed.includes('trelica1'))) ||
-                   (m.name === 'Treliça 2' && (userAllowed.includes('TL 2') || userAllowed.includes('trelica2'))) ||
-                   (m.name === 'Malha 1' && (userAllowed.includes('ML 1') || userAllowed.includes('malha1')));
+                (m.name === 'Trefila 1' && (userAllowed.includes('TR 1') || userAllowed.includes('trefila1'))) ||
+                (m.name === 'Trefila 2' && (userAllowed.includes('TR 2') || userAllowed.includes('trefila2'))) ||
+                (m.name === 'Treliça 1' && (userAllowed.includes('TL 1') || userAllowed.includes('trelica1'))) ||
+                (m.name === 'Treliça 2' && (userAllowed.includes('TL 2') || userAllowed.includes('trelica2'))) ||
+                (m.name === 'Malha 1' && (userAllowed.includes('ML 1') || userAllowed.includes('malha1')));
         });
         return filtered.length > 0 ? filtered : MACHINES;
     }, [currentUser?.allowedMachines]);
@@ -481,7 +481,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     if (valid.length > 0) return valid;
                 }
             }
-        } catch {}
+        } catch { }
         return allowedNames;
     });
 
@@ -503,7 +503,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (!isPcpRestrictedAccess) {
             try {
                 localStorage.setItem('pcp_selected_machines_filter', JSON.stringify(selectedMachinesFilter));
-            } catch {}
+            } catch { }
         }
     }, [selectedMachinesFilter, isPcpRestrictedAccess]);
 
@@ -630,8 +630,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // Obter o operador ativo ou status de turno da máquina
     const getMachineOperator = (machName: string) => {
         // 1. Encontra OP ativa/em andamento nesta máquina
-        const liveOp = productionOrders.find(o => 
-            (o.scheduledMachine === machName || o.machine === machName) && 
+        const liveOp = productionOrders.find(o =>
+            (o.scheduledMachine === machName || o.machine === machName) &&
             (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'running')
         );
 
@@ -643,10 +643,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         // 2. Verificar se há log com operador que assumiu/iniciou o turno (sem endTime)
         const logs = (liveOp.operatorLogs || []) as any[];
         const todayStr = formatDateString(liveNow);
-        const openLog = [...logs].reverse().find(l => 
-            !l.endTime && 
-            l.operator && 
-            l.operator !== 'GHOST_ORDER_FLAG' && 
+        const openLog = [...logs].reverse().find(l =>
+            !l.endTime &&
+            l.operator &&
+            l.operator !== 'GHOST_ORDER_FLAG' &&
             l.action !== 'Criada no PCP' &&
             l.operator.toLowerCase() !== 'gestor pcp' &&
             l.operator.toLowerCase() !== 'gestor'
@@ -711,13 +711,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const emp = findEmployeeByIdentifier(activeOpName);
 
         // Buscar se o usuário do operador está online no app
-        const appUser = users.find(u => 
+        const appUser = users.find(u =>
             u.username.toLowerCase() === activeOpName.toLowerCase() ||
             (emp && (u.employeeId === emp.id || u.id === emp.appUserId))
         );
 
         const isAppUserFresh = Boolean(
-            appUser?.isOnline && 
+            appUser?.isOnline &&
             (!appUser.lastSeenAt || (Date.now() - new Date(appUser.lastSeenAt).getTime() < 120000))
         );
         const isCurrentUserFresh = Boolean(
@@ -943,8 +943,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (newShift === currentShift && delta < 0) return;
 
         const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
-        const currentTotal = isTrefila 
-            ? (Number(op.actualProducedWeight) || Number(op.totalProducedWeight) || 0) 
+        const currentTotal = isTrefila
+            ? (Number(op.actualProducedWeight) || Number(op.totalProducedWeight) || 0)
             : (Number(op.actualProducedQuantity) || 0);
         const newTotal = Math.max(0, currentTotal + delta);
 
@@ -957,8 +957,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     };
 
     const handleSaveAdjustQuantity = async (
-        orderId: string, 
-        newTotalQty: number, 
+        orderId: string,
+        newTotalQty: number,
         reason: string,
         details?: {
             mode: 'shift' | 'total';
@@ -1106,7 +1106,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         pieces = Math.max(0, getLogEndQty(log) - getLogStartQty(log));
                     } else {
                         // Log aberto que não pertence à data editada: preserva exclusivamente a produção já apontada nele
-                        const prevTot = isTrefila 
+                        const prevTot = isTrefila
                             ? (Number(targetOrder.actualProducedWeight) || Number(targetOrder.totalProducedWeight) || 0)
                             : (Number(targetOrder.actualProducedQuantity) || 0);
                         // Se havia logs fechados fora de ordem após o log aberto originalmente, descontá-los para não inflar o turno aberto
@@ -1224,8 +1224,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 });
                 if (matchingRep) {
                     try {
-                        const repUpdates: any = isTrefila 
-                            ? { totalProducedWeight: details.shiftQty } 
+                        const repUpdates: any = isTrefila
+                            ? { totalProducedWeight: details.shiftQty }
                             : { totalProducedQuantity: details.shiftQty };
                         await updateItem('shift_reports', matchingRep.id, repUpdates);
                         if (isTrefila) (matchingRep as any).totalProducedWeight = details.shiftQty;
@@ -1252,7 +1252,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         }
                     };
                     localStorage.setItem(localKey, JSON.stringify(newPayload));
-                } catch {}
+                } catch { }
             }
 
             if (showNotification) {
@@ -1372,7 +1372,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         const shiftQty = editedShift !== undefined
                             ? Math.max(0, editedShift.pieces)
                             : Math.max(0, eQty - sQty);
-                        
+
                         const startQ = runningAccumulator;
                         runningAccumulator += shiftQty;
                         return {
@@ -1384,10 +1384,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         };
                     } else {
                         // Turno aberto em andamento
-                        const liveQty = data.activeShiftPieces !== undefined 
+                        const liveQty = data.activeShiftPieces !== undefined
                             ? Math.max(0, data.activeShiftPieces)
                             : Math.max(0, (isTrefila ? Number(targetOrder.actualProducedWeight) : Number(targetOrder.actualProducedQuantity) || 0) - sQty);
-                        
+
                         const startQ = runningAccumulator;
                         runningAccumulator += liveQty;
                         return {
@@ -1433,7 +1433,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             for (const s of data.updatedFinalizedShifts) {
                 if (s.reportId) {
                     try {
-                        const repUpdates: any = isTrefila 
+                        const repUpdates: any = isTrefila
                             ? { totalProducedWeight: s.pieces, order_number: cleanNewOrderNumber }
                             : { totalProducedQuantity: s.pieces, order_number: cleanNewOrderNumber };
                         await updateItem('shift_reports', s.reportId, repUpdates);
@@ -1520,7 +1520,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         try {
             const saved = localStorage.getItem('pcp_lubrication_interval');
             if (saved) return Number(saved);
-        } catch (e) {}
+        } catch (e) { }
         return 180; // a cada 3h
     });
 
@@ -1557,7 +1557,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [createMachine, setCreateMachine] = useState<string>('Trefila 1');
     const [createStartDate, setCreateStartDate] = useState<string>('');
     const [createDuration, setCreateDuration] = useState<number>(1);
-    
+
     // --- Campos de TREFILA (Regras idênticas a ProductionOrder.tsx) ---
     const [isGhostOrder, setIsGhostOrder] = useState(false);
     const [inputBitolaFilter, setInputBitolaFilter] = useState<Bitola | ''>('');
@@ -1565,7 +1565,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
     const [isSavingOrder, setIsSavingOrder] = useState(false);
     const [createOrderError, setCreateOrderError] = useState<string | null>(null);
-    
+
     // Parâmetros operacionais de Trefilação (Velocidade, Troca de Rolo e Setup)
     const [trefilaSpeed, setTrefilaSpeed] = useState<string>('8.5'); // m/s
     const [rollChangeTimeMin, setRollChangeTimeMin] = useState<number>(10); // min por rolo
@@ -1716,18 +1716,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const machType = machineShiftModalTarget.split(' ')[0];
         const defaultsMap: Record<string, string[]> = {
             'Trefila': [
-                'Enrosco de fio', 'Quebra de fio', 'Troca de rolo / Setup', 
-                'Limpeza / Lubrificação', 'Manutenção Mecânica', 'Manutenção Elétrica', 
+                'Enrosco de fio', 'Quebra de fio', 'Troca de rolo / Setup',
+                'Limpeza / Lubrificação', 'Manutenção Mecânica', 'Manutenção Elétrica',
                 'Falta de Matéria-Prima', 'Ajuste de bitola', 'Falta de Energia', 'Refeição / Intervalo'
             ],
             'Treliça': [
-                'Troca de Eletrodo', 'Limpeza de Eletrodos', 'Regulagem de Altura / Ângulo', 
-                'Enrosco de Fio (Porta-Rolos)', 'Quebra de Fio', 'Falha de Solda', 
-                'Setup de Medida', 'Manutenção Mecânica', 'Manutenção Elétrica', 
+                'Troca de Eletrodo', 'Limpeza de Eletrodos', 'Regulagem de Altura / Ângulo',
+                'Enrosco de Fio (Porta-Rolos)', 'Quebra de Fio', 'Falha de Solda',
+                'Setup de Medida', 'Manutenção Mecânica', 'Manutenção Elétrica',
                 'Falta de Matéria-Prima', 'Falta de Energia', 'Refeição / Intervalo'
             ],
             'Malha': [
-                'Troca de Rolo', 'Falha de Solda', 
+                'Troca de Rolo', 'Falha de Solda',
                 'Manutenção Mecânica', 'Manutenção Elétrica', 'Falta de Energia'
             ],
             'Desbobinadeira': [
@@ -1739,8 +1739,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         setIsSavingDowntime(true);
         try {
             for (const reason of list) {
-                const already = localDowntimeConfigs.some(c => 
-                    c.reason.toLowerCase().trim() === reason.toLowerCase().trim() && 
+                const already = localDowntimeConfigs.some(c =>
+                    c.reason.toLowerCase().trim() === reason.toLowerCase().trim() &&
                     (c.machineType === machType || c.machineType === 'Geral')
                 );
                 if (!already) {
@@ -1925,7 +1925,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (isCreateModalOpen && createCategory === 'Treliça' && createMachine.startsWith('Treliça')) {
             fetchTrelicaSpoolStands(createMachine).then(data => {
                 setMachineMountedStands(data || []);
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }, [isCreateModalOpen, createMachine, createCategory]);
 
@@ -2049,8 +2049,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         DefaultMalhaGauges.forEach(d => {
             const defId = d.id || `default_ml_${d.productCode}`;
             if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
-            const exists = result.some(g => 
-                (d.productCode && g.productCode === d.productCode) || 
+            const exists = result.some(g =>
+                (d.productCode && g.productCode === d.productCode) ||
                 (g.description === d.description && g.gauge === d.gauge) ||
                 g.id === defId
             );
@@ -2091,9 +2091,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
     // Modelo de Malha selecionado atualmente
     const selectedMalhaModelObj = useMemo(() => {
-        return availableMalhaModels.find(m => 
-            m.description === malhaModel || 
-            m.productCode === malhaModel || 
+        return availableMalhaModels.find(m =>
+            m.description === malhaModel ||
+            m.productCode === malhaModel ||
             m.id === malhaModel
         ) || null;
     }, [availableMalhaModels, malhaModel]);
@@ -2132,7 +2132,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const days = Math.max(1, durationWorkingDays || 1);
         const cur = new Date(startDateStr + 'T00:00:00');
         if (isNaN(cur.getTime())) return '';
-        
+
         let loopLimit = 0;
         // Se a data de início informada não for dia útil, avança até o primeiro dia útil disponível
         while (!isWorkingDay(cur) && loopLimit < 365) {
@@ -2277,15 +2277,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     const machineLiveStatus = useMemo(() => {
         return availableMachines.filter(m => selectedMachinesFilter.includes(m.name)).map(mach => {
             // Encontra a OP em andamento nesta máquina
-            const liveOp = productionOrders.find(o => 
-                (o.scheduledMachine === mach.name || o.machine === mach.name) && 
+            const liveOp = productionOrders.find(o =>
+                (o.scheduledMachine === mach.name || o.machine === mach.name) &&
                 (o.status === 'in_progress' || o.status === 'Em Produção')
             );
 
             if (!liveOp) {
                 // Verificar se tem OP agendada aguardando início
-                const pendingCount = productionOrders.filter(o => 
-                    (o.scheduledMachine === mach.name || o.machine === mach.name) && 
+                const pendingCount = productionOrders.filter(o =>
+                    (o.scheduledMachine === mach.name || o.machine === mach.name) &&
                     o.status === 'pending'
                 ).length;
 
@@ -2347,15 +2347,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                 // Cálculo de limite/tolerância para a máquina
                 const machCategory = mach.name.toLowerCase().includes('trefila') ? 'trefila' :
-                                     mach.name.toLowerCase().includes('trelica') ? 'trelica' :
-                                     mach.name.toLowerCase().includes('malha') ? 'malha' :
-                                     mach.name.toLowerCase().trim();
+                    mach.name.toLowerCase().includes('trelica') ? 'trelica' :
+                        mach.name.toLowerCase().includes('malha') ? 'malha' :
+                            mach.name.toLowerCase().trim();
 
                 const matchingConfig = (localDowntimeConfigs || []).find(c => {
                     const normConfigReason = (c.reason || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                     const configCategory = (c.machineType || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    return rNorm === normConfigReason && 
-                           (configCategory === 'geral' || !configCategory || configCategory === machCategory);
+                    return rNorm === normConfigReason &&
+                        (configCategory === 'geral' || !configCategory || configCategory === machCategory);
                 });
 
                 const thresholdMinutes = matchingConfig?.thresholdMinutes || 15;
@@ -2686,8 +2686,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const totalWeight = totalSelectedWeight;
 
         // Tempo líquido de trefilação (em minutos)
-        const drawingTimeMinutes = massPerHour > 0 && totalWeight > 0 
-            ? (totalWeight / massPerHour) * 60 
+        const drawingTimeMinutes = massPerHour > 0 && totalWeight > 0
+            ? (totalWeight / massPerHour) * 60
             : 0;
 
         // Tempo de troca de rolos (em minutos)
@@ -2790,7 +2790,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     // ==========================================
     const availableCa60Stock = useMemo(() => {
         return stock
-            .filter(item => 
+            .filter(item =>
                 (item.materialType === 'CA-60' || item.materialType === 'Trefila') &&
                 item.status !== 'Transferido' &&
                 !item.status?.startsWith('Em Produção') &&
@@ -2927,8 +2927,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const getMountedLotId = (roleType: string, bitolaNorm: string): string | undefined => {
             const match = machineMountedStands.find(s => {
                 const raw = s.current_lot_id || s.current_lot_number;
-                return s.role_type === roleType && 
-                    raw && 
+                return s.role_type === roleType &&
+                    raw &&
                     normalizeBitola(s.current_gauge || '') === bitolaNorm;
             });
             if (!match) return undefined;
@@ -2954,7 +2954,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             if (accumulated >= targetWeight) return selected;
 
-            const candidates = availableCa60Stock.filter(l => 
+            const candidates = availableCa60Stock.filter(l =>
                 (trelicaShowAllGauges || normalizeBitola(l.bitola) === bitolaNorm) &&
                 !usedIds.has(l.id)
             );
@@ -3013,7 +3013,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         setCreateMachine(targetMach);
         setCreateStartDate(targetDate);
         setCreateDuration(1);
-        
+
         // Limpar seleções de lotes
         setSelectedLotIds([]);
         setInputBitolaFilter('');
@@ -3247,7 +3247,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             orderData.shiftConfig = shiftConfig;
             orderData.k7Count = k7Count;
             orderData.k7Setup = k7Passes;
-            
+
             const setupPayloadObj = {
                 pass1: { aneisEntrada: k7Passes[0]?.entryRing || '', aneisSaida: k7Passes[0]?.outputRing || '', mmEntrada: k7Passes[0] ? `${k7Passes[0].dEntry.toFixed(2)}mm` : '', mmSaida: k7Passes[0] ? `${k7Passes[0].dOutput.toFixed(2)}mm` : '' },
                 pass2: { aneisEntrada: k7Passes[1]?.entryRing || '', aneisSaida: k7Passes[1]?.outputRing || '', mmEntrada: k7Passes[1] ? `${k7Passes[1].dEntry.toFixed(2)}mm` : '', mmSaida: k7Passes[1] ? `${k7Passes[1].dOutput.toFixed(2)}mm` : '' },
@@ -3255,10 +3255,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 pass4: { aneisEntrada: k7Passes[3]?.entryRing || '', aneisSaida: k7Passes[3]?.outputRing || '', mmEntrada: k7Passes[3] ? `${k7Passes[3].dEntry.toFixed(2)}mm` : '', mmSaida: k7Passes[3] ? `${k7Passes[3].dOutput.toFixed(2)}mm` : '' },
             };
             orderData.setup = setupPayloadObj;
-            
-            orderData.operatorLogs = [{ 
-                operator: currentUser?.username || 'Gestor PCP', 
-                action: isGhostOrder ? 'Criada no PCP (Fantasma)' : 'Criada no PCP', 
+
+            orderData.operatorLogs = [{
+                operator: currentUser?.username || 'Gestor PCP',
+                action: isGhostOrder ? 'Criada no PCP (Fantasma)' : 'Criada no PCP',
                 startTime: new Date().toISOString(),
                 details: {
                     speed: trefilaProductionCalculations.speed,
@@ -3332,8 +3332,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             localStorage.setItem('trefila_op_report_draft', JSON.stringify(reportPayload));
             localStorage.setItem('trefila_op_selected_number', createOrderNumber.trim());
             localStorage.setItem(`trefila_op_report_${createOrderNumber.trim()}`, JSON.stringify(reportPayload));
-        } 
-        
+        }
+
         // --- VALIDAÇÕES E DADOS ESPECÍFICOS DE TRELIÇA ---
         else if (createCategory === 'Treliça') {
             if (!selectedTrelicaModel) {
@@ -3400,8 +3400,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     shiftConfig: shiftConfig
                 }
             }];
-        } 
-        
+        }
+
         // --- VALIDAÇÕES E DADOS ESPECÍFICOS DE MALHA ---
         else if (createCategory === 'Malha') {
             if (!malhaModel.trim()) {
@@ -3417,9 +3417,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 return;
             }
 
-            const selectedModelObj = availableMalhaModels.find(m => 
-                m.description === malhaModel || 
-                m.productCode === malhaModel || 
+            const selectedModelObj = availableMalhaModels.find(m =>
+                m.description === malhaModel ||
+                m.productCode === malhaModel ||
                 m.id === malhaModel
             );
             const rawPeso = selectedModelObj?.peso_peca || selectedModelObj?.peso_final;
@@ -3510,7 +3510,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return;
         }
         if (!confirm('Deseja retirar esta ordem de produção do agendamento?')) return;
-        
+
         const updates: Partial<ProductionOrderData> = {
             scheduledMachine: undefined,
             plannedStartDate: undefined,
@@ -3562,7 +3562,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return true;
         }
         if (op.operatorLogs && op.operatorLogs.length > 0) {
-            const hasRealLog = op.operatorLogs.some(l => 
+            const hasRealLog = op.operatorLogs.some(l =>
                 l.operator && l.operator !== 'GHOST_ORDER_FLAG' && (l.endQuantity || l.startQuantity || l.endTime)
             );
             if (hasRealLog) return true;
@@ -3580,7 +3580,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return;
         }
         if (!op.plannedStartDate) return;
-        
+
         if (hasProductionStarted(op)) {
             showNotification?.('Esta OP já começou a produzir ou possui apontamentos passados. A data inicial não pode ser movida para preservar o histórico. Use o botão ESTENDER para estender o prazo de término.', 'warning');
             return;
@@ -3589,7 +3589,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const newStartStr = shiftWorkingDay(op.plannedStartDate, daysToShift);
         const duration = op.estimatedDurationDays || 1;
         const newEndStr = calculateEndDateByWorkDays(newStartStr, duration);
-        
+
         const updates: Partial<ProductionOrderData> = {
             plannedStartDate: newStartStr,
             plannedEndDate: newEndStr
@@ -3612,8 +3612,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila');
         const unit = isTrefila ? 'kg' : 'pçs';
-        const alreadyProduced = isTrefila 
-            ? (op.actualProducedWeight || op.totalProducedWeight || 0) 
+        const alreadyProduced = isTrefila
+            ? (op.actualProducedWeight || op.totalProducedWeight || 0)
             : (op.actualProducedQuantity || 0);
 
         const reason = window.prompt(
@@ -3642,8 +3642,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             // Identificar as outras ordens agendadas na mesma máquina para sugerir o posicionamento no fim da fila
             const machName = op.scheduledMachine || (op.machine as string);
-            const otherMachOps = productionOrders.filter(o => 
-                o.id !== op.id && 
+            const otherMachOps = productionOrders.filter(o =>
+                o.id !== op.id &&
                 (o.scheduledMachine === machName || o.machine === machName) &&
                 o.status !== 'completed' && o.status !== 'Cancelada' && o.status !== 'cancelled' &&
                 o.plannedEndDate
@@ -3763,8 +3763,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
 
             showNotification?.(
-                newGhostState 
-                    ? `OP #${op.orderNumber} convertida em Ordem Fantasma! Lotes liberados no Estoque.` 
+                newGhostState
+                    ? `OP #${op.orderNumber} convertida em Ordem Fantasma! Lotes liberados no Estoque.`
                     : `Modo fantasma desativado para OP #${op.orderNumber}! Lotes reservados no Estoque.`,
                 'success'
             );
@@ -3981,7 +3981,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             const rNorm = downtimeReason.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
             isOffline = rNorm.includes('final de turno') || rNorm.includes('turno') || isPastDayDowntime;
-            
+
             if (isOffline) {
                 statusLabel = isPastDayDowntime ? 'Desligada: Turno Encerrado' : `Desligada: ${downtimeReason}`;
                 statusColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
@@ -4036,14 +4036,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         }
 
-        return { 
-            target, 
-            produced, 
-            unit, 
-            pct, 
-            isCompleted, 
-            isLive, 
-            isPending, 
+        return {
+            target,
+            produced,
+            unit,
+            pct,
+            isCompleted,
+            isLive,
+            isPending,
             isPaused,
             isActive: isLive, // retrocompatibilidade
             isStopped,
@@ -4051,8 +4051,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             isOffline,
             downtimeReason,
             downtimeDurationMs,
-            statusLabel, 
-            statusColor 
+            statusLabel,
+            statusColor
         };
     };
 
@@ -4120,8 +4120,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // 2. Lotes processados e PESADOS finalizados nesta data (Trefila)
         const dayLotsWeight = rawLots.reduce((acc: number, l: any) => {
-            const w = l.finalWeight !== undefined && l.finalWeight !== null 
-                ? Number(l.finalWeight) 
+            const w = l.finalWeight !== undefined && l.finalWeight !== null
+                ? Number(l.finalWeight)
                 : (l.final_weight !== undefined && l.final_weight !== null ? Number(l.final_weight) : null);
             if (w === null || isNaN(w)) return acc;
             const rawTime = l.endTime || l.end_time || l.startTime || l.start_time || l.weighedAt || l.timestamp;
@@ -4154,8 +4154,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const logOperators = dayLogs.map(l => formatShortName(l.operator)).filter(Boolean)[0] || '';
 
         // Total acumulado real da OP
-        const totalOverall = isTrefila 
-            ? (Number(op.actualProducedWeight || (op as any).actual_produced_weight || op.totalProducedWeight || (op as any).total_produced_weight) || 0) 
+        const totalOverall = isTrefila
+            ? (Number(op.actualProducedWeight || (op as any).actual_produced_weight || op.totalProducedWeight || (op as any).total_produced_weight) || 0)
             : (Number(op.actualProducedQuantity || (op as any).actual_produced_quantity || (op as any).current_quantity || (op as any).total_overall) || 0);
 
         // Se existir qualquer log fechado posicionado APÓS um log aberto no array, calcular a diferença para não inflar o turno aberto
@@ -4195,8 +4195,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             todayProduced = dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty;
         } else {
             // SÓ computa liveShiftPcs se o log aberto tiver sido iniciado estritamente no dia avaliado (dateStr)!
-            const openLog = rawLogs.find((l: any) => 
-                !l.endTime && !l.end_time && 
+            const openLog = rawLogs.find((l: any) =>
+                !l.endTime && !l.end_time &&
                 getIsoDateStr(l.startTime || l.start_time) === dateStr
             );
             const sQty = openLog ? (openLog.startQuantity !== undefined ? Number(openLog.startQuantity) : (openLog.start_quantity !== undefined ? Number(openLog.start_quantity) : undefined)) : undefined;
@@ -4205,8 +4205,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 liveShiftPcs = Math.max(0, totalOverall - trailingClosedPiecesAfterOpen - sQty);
             }
             // Evita duplicação: se já existe relatório de turno gerado para a data, ele consolida os pacotes
-            const isolatedProduction = reportsDayQty > 0 
-                ? Math.max(reportsDayQty, dayPackagesQty) 
+            const isolatedProduction = reportsDayQty > 0
+                ? Math.max(reportsDayQty, dayPackagesQty)
                 : dayPackagesQty;
             todayProduced = Math.max(isolatedProduction, dayLogsPcs, liveShiftPcs);
         }
@@ -4347,7 +4347,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const liveMachStatus = machineLiveStatus.find(m => m.machine === machName);
         const isMachineStoppedNow = isToday && Boolean(liveOperator) && (
-            Boolean(activeOpenStop) || 
+            Boolean(activeOpenStop) ||
             (liveMachStatus && (liveMachStatus.state === 'stopped' || liveMachStatus.state === 'prep'))
         );
 
@@ -4458,9 +4458,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 return sDate === dateStr || eDate === dateStr || (isEvaluatingActiveMonday && (sDate === todayStr || sDate === saturdayStr || sDate === sundayStr));
             });
 
-            const realOpLogs = todayLogs.filter((l: any) => 
-                l.operator && 
-                l.operator !== 'GHOST_ORDER_FLAG' && 
+            const realOpLogs = todayLogs.filter((l: any) =>
+                l.operator &&
+                l.operator !== 'GHOST_ORDER_FLAG' &&
                 l.action !== 'Criada no PCP' &&
                 !l.operator.toLowerCase().includes('gestor')
             );
@@ -4685,7 +4685,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const effectiveHours = effectiveMs > 0 ? (effectiveMs / 3600000) : 0;
         const totalShiftTimeMs = effectiveMs + dayDowntimeMs;
         const totalShiftHours = totalShiftTimeMs > 0 ? (totalShiftTimeMs / 3600000) : 0;
-        
+
         // Se a máquina tiver menos de 10 minutos de turno (0.16h) ou 0 produzido, não projeta número irreal (deixa 0)
         const ratePerHour = (totalShiftHours >= 0.16 && produced > 0) ? Math.round(produced / totalShiftHours) : 0;
         const rateUnit = isTrefila ? 'kg/h' : 'pçs/h';
@@ -4757,7 +4757,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (effectiveSeconds > 0) {
                 speedValue = effectiveSeconds / produced;
                 speedUnit = 's/pç';
-                speedFormatted = speedValue < 10 
+                speedFormatted = speedValue < 10
                     ? speedValue.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
                     : Math.round(speedValue).toLocaleString('pt-BR');
             }
@@ -4971,7 +4971,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
 
             const allTrelicaList = [...(trelicaModels || []), ...DEFAULT_TRELICA_MODELS];
-            const found = allTrelicaList.find(m => 
+            const found = allTrelicaList.find(m =>
                 (m.cod && (m.cod === op.trelicaModel || opText.includes(m.cod.toUpperCase()))) ||
                 (m.modelo && (m.modelo === op.trelicaModel || opText.includes(m.modelo.toUpperCase())))
             );
@@ -5080,12 +5080,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                     // 1. Meta / Planejado (kg)
                     if (!isHoliday) {
-                        const totalTarget = isTrefila 
+                        const totalTarget = isTrefila
                             ? (Number(op.totalWeight) || Number(op.quantityToProduce) || 18000)
                             : (Number(op.quantityToProduce) || Number(op.malhaPieces) || (isTrelica ? 3500 : 5000));
                         const durationDays = Math.max(1, op.estimatedDurationDays || 1);
-                        const dailyPlannedQty = stats.isFuture && stats.produced > 0 
-                            ? stats.produced 
+                        const dailyPlannedQty = stats.isFuture && stats.produced > 0
+                            ? stats.produced
                             : Math.round(totalTarget / durationDays);
 
                         if (isTrefila) {
@@ -5177,12 +5177,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     }, [availableMachines, selectedMachinesFilter, liveNow, weekDays, holidaysMap, scheduledOrders, shiftReports, gauges, trelicaModels, availableMalhaModels]);
 
     return (
-        <div className={`pcp-board-container bg-[#F1F5F9] text-slate-800 flex flex-col select-none ${
-            isPcpFullscreen ? 'h-screen max-h-screen overflow-hidden p-1.5 gap-1.5' : 'min-h-screen p-2 sm:p-4 gap-3'
-        }`}>
-            
+        <div className={`pcp-board-container bg-[#F1F5F9] text-slate-800 flex flex-col select-none ${isPcpFullscreen ? 'h-screen max-h-screen overflow-hidden p-1.5 gap-1.5' : 'min-h-screen p-2 sm:p-4 gap-3'
+            }`}>
+
             {/* ESTILO CUSTOMIZADO LOCAL */}
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 .pcp-glass {
                     background: #FFFFFF;
                     border: 1px solid #CBD5E1;
@@ -5270,25 +5270,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             `}} />
 
             {/* COLUNA PRINCIPAL: TIMELINE PCP SEMANAL */}
-            <div className={`flex-1 pcp-glass rounded-2xl border border-blue-200/80 shadow-xl flex flex-col overflow-hidden relative ${
-                isLargeZoom ? 'pcp-zoom-large' : ''
-            } ${
-                isPcpFullscreen ? 'h-full flex-1' : 'h-[calc(100vh-112px)]'
-            }`}>
-                
+            <div className={`flex-1 pcp-glass rounded-2xl border border-blue-200/80 shadow-xl flex flex-col overflow-hidden relative ${isLargeZoom ? 'pcp-zoom-large' : ''
+                } ${isPcpFullscreen ? 'h-full flex-1' : 'h-[calc(100vh-112px)]'
+                }`}>
+
                 {/* Cabeçalho de Controle e Ações (Identidade Ita Aços: Azul Royal + Faixa Laranja + Branco) */}
                 <div className="py-2 px-3 sm:px-3.5 border-b border-blue-900/40 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0 bg-gradient-to-r from-[#0C2B68] via-[#103E8C] to-[#0A2454] relative text-white shadow-md">
                     {/* Faixa decorativa superior Laranja Ita Aços */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600" />
-                    
+
                     {/* Título com Logo Ita Aços + Setor Trefila + Power by MSM */}
                     <div className="flex items-center gap-3.5">
                         {/* Logo Ita Aços em card com acabamento clean */}
                         <div className="bg-white/95 px-3 py-1.5 rounded-xl border border-white/40 shadow-md backdrop-blur-sm flex items-center justify-center shrink-0 hover:bg-white transition-all">
-                            <img 
-                                src="/ita-acos-logo.png" 
-                                alt="Logo Grupo Ita Aços" 
-                                className="h-7 sm:h-8 w-auto object-contain" 
+                            <img
+                                src="/ita-acos-logo.png"
+                                alt="Logo Grupo Ita Aços"
+                                className="h-7 sm:h-8 w-auto object-contain"
                             />
                         </div>
 
@@ -5319,10 +5317,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                     {/* Controles: Navegação da Semana & Botões de Ação */}
                     <div className="flex items-center flex-wrap gap-2.5">
-                        
+
                         {/* Seletor de Semanas */}
                         <div className="flex items-center gap-1.5 bg-blue-950/70 p-1 rounded-xl border border-blue-400/30 text-white shadow-inner">
-                            <button 
+                            <button
                                 onClick={() => changeWeek(-1)}
                                 className="p-1.5 hover:bg-blue-800/60 rounded-lg text-blue-200 hover:text-white transition-colors"
                                 title="Semana Anterior"
@@ -5332,11 +5330,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                             <button
                                 onClick={resetToToday}
-                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                                    isCurrentWeek
+                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${isCurrentWeek
                                         ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-transparent shadow-sm'
                                         : 'bg-blue-900/50 hover:bg-blue-800/60 text-blue-200 hover:text-white border border-transparent'
-                                }`}
+                                    }`}
                                 title={isWeekend ? "Fim de semana: reconhecendo a próxima semana de produção" : "Ir para a semana atual"}
                             >
                                 <span>Semana Atual</span>
@@ -5369,11 +5366,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     onClick={() => {
                                         setSelectedMachinesFilter(availableMachines.map(m => m.name));
                                     }}
-                                    className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${
-                                        selectedMachinesFilter.length === availableMachines.length
+                                    className={`px-2 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${selectedMachinesFilter.length === availableMachines.length
                                             ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm'
                                             : 'text-blue-300 hover:text-white hover:bg-blue-800/50 border border-transparent'
-                                    }`}
+                                        }`}
                                     title="Exibir todas as máquinas permitidas no quadro PCP"
                                 >
                                     Todas
@@ -5382,7 +5378,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 {availableMachines.map(mach => {
                                     const isSelected = selectedMachinesFilter.includes(mach.name);
                                     const isAllSelected = selectedMachinesFilter.length === availableMachines.length;
-                                    
+
                                     return (
                                         <button
                                             key={mach.name}
@@ -5400,11 +5396,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     setSelectedMachinesFilter(prev => [...prev, mach.name]);
                                                 }
                                             }}
-                                            className={`px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap border ${
-                                                isSelected 
-                                                    ? 'bg-white text-blue-950 border-white shadow-sm font-black' 
+                                            className={`px-2 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all whitespace-nowrap border ${isSelected
+                                                    ? 'bg-white text-blue-950 border-white shadow-sm font-black'
                                                     : 'text-blue-300 hover:text-white hover:bg-blue-800/40 border-transparent'
-                                            }`}
+                                                }`}
                                             title={`Filtrar ${mach.name} (clique para alternar)`}
                                         >
                                             {mach.name.replace('Trefila ', 'TR ').replace('Treliça ', 'TL ').replace('Malha ', 'ML ')}
@@ -5417,11 +5412,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         {/* Botão Tela Cheia / Foco Total */}
                         <button
                             onClick={handleToggleFullscreen}
-                            className={`font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap ${
-                                isPcpFullscreen
+                            className={`font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95 whitespace-nowrap ${isPcpFullscreen
                                     ? 'bg-amber-500 text-white border border-amber-600 hover:bg-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
                                     : 'bg-blue-900/60 hover:bg-blue-800/80 text-blue-100 border border-blue-400/30'
-                            }`}
+                                }`}
                             title={isPcpFullscreen ? "Sair da Tela Cheia e reexibir menus de navegação" : "Tela Cheia (Oculta menu lateral e expande o quadro em 100% da tela)"}
                         >
                             {isPcpFullscreen ? (
@@ -5454,177 +5448,173 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                 {/* Área da Timeline (Fundo Claro de Alta Legibilidade) */}
                 <div className="flex-1 min-h-0 overflow-hidden bg-[#F8FAFC] flex flex-col">
-                        
-                        {/* Cabeçalho dos Dias (Segunda a Sexta) com Destaque Corporativo Ita Aços */}
-                        <div className="pcp-timeline-grid pcp-header-cell border-b-2 border-orange-500 relative z-30 shrink-0 shadow-sm">
-                            <div className={`${isLargeZoom ? 'py-2 px-3 text-xs sm:text-sm' : 'py-1.5 px-2.5 text-xs'} flex items-center justify-between font-black text-white tracking-wider uppercase select-none bg-[#092354]`}>
-                                <span>MÁQUINA</span>
-                                <span className="text-[9px] text-orange-300 font-mono font-bold bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-400/40">SEMANAL</span>
-                            </div>
-                            
-                            {weekDays.map((day, index) => {
-                                const dayDateStr = formatDateString(day);
-                                const isToday = dayDateStr === formatDateString(new Date());
-                                const isHoliday = holidaysMap.has(dayDateStr);
-                                const holidayName = holidaysMap.get(dayDateStr);
-                                const daysNames = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA'];
-                                const isEvenDay = index % 2 === 0; // Col 0 (Segunda), Col 2 (Quarta), Col 4 (Sexta)
-                                return (
-                                    <div 
-                                        key={index} 
-                                        className={`py-1.5 px-2 text-center flex items-center justify-center gap-1.5 border-l relative overflow-hidden select-none ${
-                                            isToday 
-                                                ? 'bg-gradient-to-b from-[#184896] via-[#0F3577] to-[#082252] border-l-orange-500 shadow-md ring-1 ring-orange-500/40' 
-                                                : isHoliday 
-                                                    ? 'bg-rose-950/60 border-l-rose-800/60' 
-                                                    : isEvenDay
-                                                        ? 'bg-[#020b1c] border-l-slate-900' 
-                                                        : 'bg-[#1d59ad] border-l-blue-700/60'
-                                        }`}
-                                    >
-                                        <span className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} font-black tracking-wider uppercase ${
-                                            isToday ? 'text-amber-300 drop-shadow-sm' : isHoliday ? 'text-rose-300' : 'text-blue-100'
-                                        }`}>
-                                            {daysNames[index]}
-                                        </span>
-                                        <span className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} font-mono font-black ${
-                                            isToday ? 'text-white font-black' : isHoliday ? 'text-rose-200' : 'text-blue-200'
-                                        }`}>
-                                            {formatFriendlyDate(day)}
-                                        </span>
-                                        {isToday && (
-                                            <span className="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[8.5px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse ml-0.5">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                                                HOJE
-                                            </span>
-                                        )}
-                                        {isHoliday && (
-                                            <span 
-                                                className="bg-rose-500/30 text-rose-200 text-[8.5px] font-black px-1.5 py-0.5 rounded border border-rose-400/60 shadow-sm truncate max-w-[90px]"
-                                                title={`Feriado: ${holidayName}`}
-                                            >
-                                                🌴 {holidayName}
-                                            </span>
-                                        )}
-                                        {isToday && (
-                                            <div className="absolute bottom-0 left-0 w-full h-[3.5px] bg-gradient-to-r from-orange-500 via-amber-300 to-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.9)]" />
-                                        )}
-                                        {isHoliday && !isToday && (
-                                            <div className="absolute bottom-0 left-0 w-full h-[3px] bg-rose-500" />
-                                        )}
-                                    </div>
-                                );
-                            })}
+
+                    {/* Cabeçalho dos Dias (Segunda a Sexta) com Destaque Corporativo Ita Aços */}
+                    <div className="pcp-timeline-grid pcp-header-cell border-b-2 border-orange-500 relative z-30 shrink-0 shadow-sm">
+                        <div className={`${isLargeZoom ? 'py-2 px-3 text-xs sm:text-sm' : 'py-1.5 px-2.5 text-xs'} flex items-center justify-between font-black text-white tracking-wider uppercase select-none bg-[#092354]`}>
+                            <span>MÁQUINA</span>
+                            <span className="text-[9px] text-orange-300 font-mono font-bold bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-400/40">SEMANAL</span>
                         </div>
 
-                        {/* Linhas das Máquinas */}
-                        <div className="flex-1 flex flex-col relative min-h-0 bg-[#F8FAFC]">
-                            {availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name)).map((mach) => {
-                                const machOps = scheduledOrders
-                                    .filter(op => op.scheduledMachine === mach.name || op.machine === mach.name)
-                                    .sort((a, b) => {
-                                        // 1. Ordem Ao Vivo / Em Produção (in_progress) sempre tem prioridade máxima (trilha 0)
-                                        const aIsLive = a.status === 'in_progress' || a.status === 'Em Produção';
-                                        const bIsLive = b.status === 'in_progress' || b.status === 'Em Produção';
-                                        if (aIsLive && !bIsLive) return -1;
-                                        if (!aIsLive && bIsLive) return 1;
-
-                                        // 2. Ordens pausadas ficam depois das ativas/agendadas normais
-                                        const aIsPaused = a.status === 'paused' || a.status === 'Pausada' || Boolean((a as any).isPaused) || Boolean(a.summary?.isPaused);
-                                        const bIsPaused = b.status === 'paused' || b.status === 'Pausada' || Boolean((b as any).isPaused) || Boolean(b.summary?.isPaused);
-                                        if (!aIsPaused && bIsPaused) return -1;
-                                        if (aIsPaused && !bIsPaused) return 1;
-
-                                        // 3. Ordem cronológica por data de início planejada
-                                        const startA = a.plannedStartDate || '';
-                                        const startB = b.plannedStartDate || '';
-                                        if (startA !== startB) return startA.localeCompare(startB);
-
-                                        // 4. Desempate estável por ID (garante paridade idêntica em todos os computadores)
-                                        return (a.id || '').localeCompare(b.id || '');
-                                    });
-
-                                // Calcula trilhas verticais para OPs simultâneas ou sobrepostas na mesma máquina
-                                const getOpTrack = (op: ProductionOrderData) => {
-                                    const opStart = op.plannedStartDate || '';
-                                    const opEnd = op.plannedEndDate || opStart;
-                                    const priorOps = machOps.slice(0, machOps.findIndex(o => o.id === op.id));
-                                    let track = 0;
-                                    for (const prior of priorOps) {
-                                        const pStart = prior.plannedStartDate || '';
-                                        const pEnd = prior.plannedEndDate || pStart;
-                                        if (opStart <= pEnd && opEnd >= pStart) {
-                                            track++;
-                                        }
-                                    }
-                                    return track;
-                                };
-
-                                const hasOpWithAlert = machOps.some(op => {
-                                    const prog = getOPProgress(op);
-                                    return prog.isLive && (prog.isStopped || prog.isPrep);
-                                });
-                                const hasOpWithLiveLot = machOps.some(op => {
-                                    const isTr = (typeof op.machine === 'string' && op.machine.startsWith('Trefila')) || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
-                                    const prog = getOPProgress(op);
-                                    return isTr && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
-                                });
-                                const hasOpWithPendingWeight = machOps.some(op => {
-                                    const isTr = (typeof op.machine === 'string' && op.machine.startsWith('Trefila')) || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
-                                    return isTr && (op.processedLots || []).some((l: any) => l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0);
-                                });
-
-                                let calculatedMinHeight = isLargeZoom ? 155 : 130;
-                                if (hasOpWithAlert) calculatedMinHeight += 24;
-                                if (hasOpWithLiveLot) calculatedMinHeight += 28;
-                                if (hasOpWithPendingWeight) calculatedMinHeight += 24;
-
-                                let baseTrackHeight = isLargeZoom ? 260 : 200;
-                                if (hasOpWithAlert) baseTrackHeight += (isLargeZoom ? 28 : 24);
-                                if (hasOpWithLiveLot) baseTrackHeight += (isLargeZoom ? 30 : 26);
-                                if (hasOpWithPendingWeight) baseTrackHeight += (isLargeZoom ? 26 : 22);
-
-                                const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
-                                const isMachineEmpty = machOps.length === 0;
-                                const effectiveMinHeight = maxTracks > 1
-                                    ? Math.max(calculatedMinHeight, maxTracks * baseTrackHeight)
-                                    : calculatedMinHeight;
-
-                                return (
-                                    <div 
-                                        key={mach.name} 
-                                        className={`pcp-timeline-grid pcp-track-row relative border-b border-slate-200 ${
-                                            isMachineEmpty 
-                                                ? 'shrink-0' 
-                                                : 'flex-1'
+                        {weekDays.map((day, index) => {
+                            const dayDateStr = formatDateString(day);
+                            const isToday = dayDateStr === formatDateString(new Date());
+                            const isHoliday = holidaysMap.has(dayDateStr);
+                            const holidayName = holidaysMap.get(dayDateStr);
+                            const daysNames = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA'];
+                            const isEvenDay = index % 2 === 0; // Col 0 (Segunda), Col 2 (Quarta), Col 4 (Sexta)
+                            return (
+                                <div
+                                    key={index}
+                                    className={`py-1.5 px-2 text-center flex items-center justify-center gap-1.5 border-l relative overflow-hidden select-none ${isToday
+                                            ? 'bg-gradient-to-b from-[#184896] via-[#0F3577] to-[#082252] border-l-orange-500 shadow-md ring-1 ring-orange-500/40'
+                                            : isHoliday
+                                                ? 'bg-rose-950/60 border-l-rose-800/60'
+                                                : isEvenDay
+                                                    ? 'bg-[#020b1c] border-l-slate-900'
+                                                    : 'bg-[#1d59ad] border-l-blue-700/60'
                                         }`}
-                                        style={{
-                                            minHeight: isMachineEmpty ? '42px' : `${effectiveMinHeight}px`
-                                        }}
-                                    >
-                                        {/* Coluna da Máquina (Fundo Branco Limpo com Indicador Ita Aços) */}
-                                        {isMachineEmpty ? (
-                                            <div className={`px-2 py-1 flex items-center justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-slate-50/90 h-full`}>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-blue-950 text-sm font-black tracking-wider">{mach.name}</span>
-                                                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Sem OP</span>
-                                                </div>
-                                                {!isViewer && (
-                                                    <button
-                                                        onClick={() => handleOpenCreateModal(mach.name)}
-                                                        className="w-5 h-5 rounded bg-slate-200 hover:bg-orange-500 text-slate-600 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-sm text-xs font-bold"
-                                                        title={`Criar OP para ${mach.name}`}
-                                                    >
-                                                        <PlusIcon className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
+                                >
+                                    <span className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} font-black tracking-wider uppercase ${isToday ? 'text-amber-300 drop-shadow-sm' : isHoliday ? 'text-rose-300' : 'text-blue-100'
+                                        }`}>
+                                        {daysNames[index]}
+                                    </span>
+                                    <span className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} font-mono font-black ${isToday ? 'text-white font-black' : isHoliday ? 'text-rose-200' : 'text-blue-200'
+                                        }`}>
+                                        {formatFriendlyDate(day)}
+                                    </span>
+                                    {isToday && (
+                                        <span className="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[8.5px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse ml-0.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                            HOJE
+                                        </span>
+                                    )}
+                                    {isHoliday && (
+                                        <span
+                                            className="bg-rose-500/30 text-rose-200 text-[8.5px] font-black px-1.5 py-0.5 rounded border border-rose-400/60 shadow-sm truncate max-w-[90px]"
+                                            title={`Feriado: ${holidayName}`}
+                                        >
+                                            🌴 {holidayName}
+                                        </span>
+                                    )}
+                                    {isToday && (
+                                        <div className="absolute bottom-0 left-0 w-full h-[3.5px] bg-gradient-to-r from-orange-500 via-amber-300 to-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.9)]" />
+                                    )}
+                                    {isHoliday && !isToday && (
+                                        <div className="absolute bottom-0 left-0 w-full h-[3px] bg-rose-500" />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Linhas das Máquinas */}
+                    <div className="flex-1 flex flex-col relative min-h-0 bg-[#F8FAFC]">
+                        {availableMachines.filter(mach => selectedMachinesFilter.includes(mach.name)).map((mach) => {
+                            const machOps = scheduledOrders
+                                .filter(op => op.scheduledMachine === mach.name || op.machine === mach.name)
+                                .sort((a, b) => {
+                                    // 1. Ordem Ao Vivo / Em Produção (in_progress) sempre tem prioridade máxima (trilha 0)
+                                    const aIsLive = a.status === 'in_progress' || a.status === 'Em Produção';
+                                    const bIsLive = b.status === 'in_progress' || b.status === 'Em Produção';
+                                    if (aIsLive && !bIsLive) return -1;
+                                    if (!aIsLive && bIsLive) return 1;
+
+                                    // 2. Ordens pausadas ficam depois das ativas/agendadas normais
+                                    const aIsPaused = a.status === 'paused' || a.status === 'Pausada' || Boolean((a as any).isPaused) || Boolean(a.summary?.isPaused);
+                                    const bIsPaused = b.status === 'paused' || b.status === 'Pausada' || Boolean((b as any).isPaused) || Boolean(b.summary?.isPaused);
+                                    if (!aIsPaused && bIsPaused) return -1;
+                                    if (aIsPaused && !bIsPaused) return 1;
+
+                                    // 3. Ordem cronológica por data de início planejada
+                                    const startA = a.plannedStartDate || '';
+                                    const startB = b.plannedStartDate || '';
+                                    if (startA !== startB) return startA.localeCompare(startB);
+
+                                    // 4. Desempate estável por ID (garante paridade idêntica em todos os computadores)
+                                    return (a.id || '').localeCompare(b.id || '');
+                                });
+
+                            // Calcula trilhas verticais para OPs simultâneas ou sobrepostas na mesma máquina
+                            const getOpTrack = (op: ProductionOrderData) => {
+                                const opStart = op.plannedStartDate || '';
+                                const opEnd = op.plannedEndDate || opStart;
+                                const priorOps = machOps.slice(0, machOps.findIndex(o => o.id === op.id));
+                                let track = 0;
+                                for (const prior of priorOps) {
+                                    const pStart = prior.plannedStartDate || '';
+                                    const pEnd = prior.plannedEndDate || pStart;
+                                    if (opStart <= pEnd && opEnd >= pStart) {
+                                        track++;
+                                    }
+                                }
+                                return track;
+                            };
+
+                            const hasOpWithAlert = machOps.some(op => {
+                                const prog = getOPProgress(op);
+                                return prog.isLive && (prog.isStopped || prog.isPrep);
+                            });
+                            const hasOpWithLiveLot = machOps.some(op => {
+                                const isTr = (typeof op.machine === 'string' && op.machine.startsWith('Trefila')) || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
+                                const prog = getOPProgress(op);
+                                return isTr && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
+                            });
+                            const hasOpWithPendingWeight = machOps.some(op => {
+                                const isTr = (typeof op.machine === 'string' && op.machine.startsWith('Trefila')) || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
+                                return isTr && (op.processedLots || []).some((l: any) => l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0);
+                            });
+
+                            let calculatedMinHeight = isLargeZoom ? 155 : 130;
+                            if (hasOpWithAlert) calculatedMinHeight += 24;
+                            if (hasOpWithLiveLot) calculatedMinHeight += 28;
+                            if (hasOpWithPendingWeight) calculatedMinHeight += 24;
+
+                            let baseTrackHeight = isLargeZoom ? 260 : 200;
+                            if (hasOpWithAlert) baseTrackHeight += (isLargeZoom ? 28 : 24);
+                            if (hasOpWithLiveLot) baseTrackHeight += (isLargeZoom ? 30 : 26);
+                            if (hasOpWithPendingWeight) baseTrackHeight += (isLargeZoom ? 26 : 22);
+
+                            const maxTracks = Math.max(1, ...machOps.map(op => getOpTrack(op) + 1));
+                            const isMachineEmpty = machOps.length === 0;
+                            const effectiveMinHeight = maxTracks > 1
+                                ? Math.max(calculatedMinHeight, maxTracks * baseTrackHeight)
+                                : calculatedMinHeight;
+
+                            return (
+                                <div
+                                    key={mach.name}
+                                    className={`pcp-timeline-grid pcp-track-row relative border-b border-slate-200 ${isMachineEmpty
+                                            ? 'shrink-0'
+                                            : 'flex-1'
+                                        }`}
+                                    style={{
+                                        minHeight: isMachineEmpty ? '42px' : `${effectiveMinHeight}px`
+                                    }}
+                                >
+                                    {/* Coluna da Máquina (Fundo Branco Limpo com Indicador Ita Aços) */}
+                                    {isMachineEmpty ? (
+                                        <div className={`px-2 py-1 flex items-center justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-slate-50/90 h-full`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-blue-950 text-sm font-black tracking-wider">{mach.name}</span>
+                                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Sem OP</span>
                                             </div>
-                                        ) : (
-                                            <div className={`p-1.5 sm:p-2 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
+                                            {!isViewer && (
+                                                <button
+                                                    onClick={() => handleOpenCreateModal(mach.name)}
+                                                    className="w-5 h-5 rounded bg-slate-200 hover:bg-orange-500 text-slate-600 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-sm text-xs font-bold"
+                                                    title={`Criar OP para ${mach.name}`}
+                                                >
+                                                    <PlusIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className={`p-1.5 sm:p-2 flex flex-col justify-between border-r border-slate-200 border-l-4 ${mach.color} sticky left-0 z-20 shrink-0 shadow-sm bg-white`}>
                                             {/* Topo: Nome da Máquina (clicável para abrir turnos e paradas se não for visualizador) + Botão Nova OP */}
                                             <div className="flex items-center justify-between gap-2 pb-1">
                                                 {isViewer ? (
-                                                    <div 
+                                                    <div
                                                         className={`text-blue-950 ${isLargeZoom ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'} font-black tracking-wider block shrink-0 select-none`}
                                                         title={`Máquina ${mach.name}`}
                                                     >
@@ -5658,7 +5648,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     const operator = getMachineOperator(mach.name);
                                                     if (!operator) {
                                                         return (
-                                                            <div 
+                                                            <div
                                                                 className="p-1.5 rounded-xl border border-slate-200 bg-slate-50/90 flex items-center justify-between gap-1.5 text-slate-500 hover:border-slate-300 transition-all shadow-sm"
                                                                 title={`Nenhum operador com turno ativo na máquina ${mach.name}. Turno Encerrado.`}
                                                             >
@@ -5684,7 +5674,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                                     if ((operator as any).isAutoStartedWaitingCheckin) {
                                                         return (
-                                                            <div 
+                                                            <div
                                                                 className="p-1.5 rounded-xl border border-amber-300 bg-amber-50 flex items-center justify-between gap-1.5 text-amber-800 shadow-sm transition-all animate-pulse"
                                                                 title={`Turno iniciado automaticamente pelo sistema para ${mach.name}. Aguardando check-in do operador no aplicativo.`}
                                                             >
@@ -5712,76 +5702,70 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     const isOnline = operator.isOnline;
 
                                                     return (
-                                                        <div 
+                                                        <div
                                                             onClick={isViewer ? undefined : () => {
                                                                 localStorage.setItem('msm_active_machine', mach.name);
                                                                 if (mach.name.startsWith('Trefila')) setPage('trefilaInProgress');
                                                                 else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
                                                                 else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
                                                             }}
-                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 overflow-hidden w-full ${
-                                                                isViewer 
-                                                                    ? 'cursor-default' 
+                                                            className={`p-1.5 rounded-xl border transition-all flex items-center gap-2 overflow-hidden w-full ${isViewer
+                                                                    ? 'cursor-default'
                                                                     : 'cursor-pointer hover:shadow-md active:scale-[0.98]'
-                                                            } ${
-                                                                isOperating 
-                                                                    ? 'bg-emerald-50 border-emerald-300 shadow-sm' 
-                                                                    : isOnline 
-                                                                        ? 'bg-blue-50 border-blue-300 shadow-sm' 
+                                                                } ${isOperating
+                                                                    ? 'bg-emerald-50 border-emerald-300 shadow-sm'
+                                                                    : isOnline
+                                                                        ? 'bg-blue-50 border-blue-300 shadow-sm'
                                                                         : 'bg-slate-50 border-slate-200 shadow-sm'
-                                                            }`}
+                                                                }`}
                                                             title={`${operator.name} (${operator.jobTitle}) - ${operator.statusLabel} ${isOnline ? '(Online no App)' : '(Offline no App)'}.${isViewer ? '' : ' Clique para abrir o painel da máquina.'}`}
                                                         >
                                                             {/* Avatar com Foto do Operador */}
                                                             <div className="relative shrink-0">
                                                                 {operator.photoUrl ? (
-                                                                    <img 
-                                                                        src={operator.photoUrl} 
-                                                                        alt={operator.name} 
-                                                                        className={`${isLargeZoom ? 'w-8 h-8' : 'w-7 h-7'} rounded-full object-cover border-2 shadow-sm ${
-                                                                            isOperating 
-                                                                                ? 'border-emerald-500 ring-1 ring-emerald-400/40' 
-                                                                                : isOnline 
-                                                                                    ? 'border-blue-500 ring-1 ring-blue-400/40' 
+                                                                    <img
+                                                                        src={operator.photoUrl}
+                                                                        alt={operator.name}
+                                                                        className={`${isLargeZoom ? 'w-8 h-8' : 'w-7 h-7'} rounded-full object-cover border-2 shadow-sm ${isOperating
+                                                                                ? 'border-emerald-500 ring-1 ring-emerald-400/40'
+                                                                                : isOnline
+                                                                                    ? 'border-blue-500 ring-1 ring-blue-400/40'
                                                                                     : 'border-slate-400'
-                                                                        }`}
+                                                                            }`}
                                                                     />
                                                                 ) : (
-                                                                    <div className={`${isLargeZoom ? 'w-8 h-8 text-xs' : 'w-7 h-7 text-[10px]'} rounded-full flex items-center justify-center font-black border-2 uppercase shadow-sm ${
-                                                                        isOperating 
-                                                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-400' 
-                                                                            : isOnline 
-                                                                                ? 'bg-blue-100 text-blue-800 border-blue-400' 
+                                                                    <div className={`${isLargeZoom ? 'w-8 h-8 text-xs' : 'w-7 h-7 text-[10px]'} rounded-full flex items-center justify-center font-black border-2 uppercase shadow-sm ${isOperating
+                                                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-400'
+                                                                            : isOnline
+                                                                                ? 'bg-blue-100 text-blue-800 border-blue-400'
                                                                                 : 'bg-slate-200 text-slate-700 border-slate-400'
-                                                                    }`}>
+                                                                        }`}>
                                                                         {operator.displayName.slice(0, 2)}
                                                                     </div>
                                                                 )}
                                                                 {/* Ponto Indicador de Status */}
-                                                                <span 
-                                                                    className={`w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -right-0.5 border border-white ${
-                                                                        isOperating 
-                                                                            ? 'bg-emerald-500 animate-pulse' 
-                                                                            : isOnline 
-                                                                                ? 'bg-blue-500 animate-pulse' 
+                                                                <span
+                                                                    className={`w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -right-0.5 border border-white ${isOperating
+                                                                            ? 'bg-emerald-500 animate-pulse'
+                                                                            : isOnline
+                                                                                ? 'bg-blue-500 animate-pulse'
                                                                                 : 'bg-slate-400'
-                                                                    }`} 
+                                                                        }`}
                                                                     title={isOnline ? 'Online no App' : 'Offline no App'}
                                                                 />
                                                             </div>
 
                                                             {/* Nome do Operador (Linha 1) / Status (Linha 2) / Relógio (Linha 3 em baixo do status) */}
                                                             <div className="flex flex-col min-w-0 flex-1 justify-center">
-                                                                <span 
+                                                                <span
                                                                     className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-[13px]'} font-black text-slate-900 truncate leading-tight block`}
                                                                     title={operator.displayName}
                                                                 >
                                                                     {operator.displayName}
                                                                 </span>
                                                                 <div className="flex items-center gap-1 min-w-0 mt-0.5">
-                                                                    <span className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px] sm:text-[11px]'} font-bold tracking-tight truncate flex items-center gap-1 min-w-0 ${
-                                                                        isOperating ? 'text-emerald-700' : isOnline ? 'text-blue-700' : 'text-slate-500'
-                                                                    }`}>
+                                                                    <span className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px] sm:text-[11px]'} font-bold tracking-tight truncate flex items-center gap-1 min-w-0 ${isOperating ? 'text-emerald-700' : isOnline ? 'text-blue-700' : 'text-slate-500'
+                                                                        }`}>
                                                                         {isOperating && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping shrink-0" />}
                                                                         {!isOperating && isOnline && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse shrink-0" />}
                                                                         <span className="truncate">{operator.statusLabel}</span>
@@ -5789,8 +5773,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 </div>
                                                                 {operator.lastUpdateFormatted && (
                                                                     <div className="mt-1 flex items-center">
-                                                                        <span 
-                                                                            className={`inline-flex items-center gap-1 ${isLargeZoom ? 'text-[11px] sm:text-xs' : 'text-[10px] sm:text-[11px]'} font-mono font-black text-slate-700 bg-white/95 px-1.5 py-0.5 rounded-md border border-slate-300 shadow-2xs shrink-0`} 
+                                                                        <span
+                                                                            className={`inline-flex items-center gap-1 ${isLargeZoom ? 'text-[11px] sm:text-xs' : 'text-[10px] sm:text-[11px]'} font-mono font-black text-slate-700 bg-white/95 px-1.5 py-0.5 rounded-md border border-slate-300 shadow-2xs shrink-0`}
                                                                             title={`Último registro do operador hoje: ${operator.lastUpdateFormatted}`}
                                                                         >
                                                                             <ClockIcon className={`${isLargeZoom ? 'w-3.5 h-3.5' : 'w-3 h-3'} text-slate-500 shrink-0`} />
@@ -5812,22 +5796,20 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 if (liveInfo.state === 'stopped' || liveInfo.state === 'prep') {
                                                     const isExceeded = Boolean((liveInfo as any).isOverLimit);
                                                     return (
-                                                        <div 
+                                                        <div
                                                             onClick={isViewer ? undefined : () => {
                                                                 localStorage.setItem('msm_active_machine', mach.name);
                                                                 if (mach.name.startsWith('Trefila')) setPage('trefilaInProgress');
                                                                 else if (mach.name.startsWith('Treliça')) setPage('trelicaInProgress');
                                                                 else if (mach.name.startsWith('Malha')) setPage('malhaInProgress');
                                                             }}
-                                                            className={`mt-1.5 p-1 rounded-md transition-all shadow-sm ${
-                                                                isViewer 
-                                                                    ? 'cursor-default' 
+                                                            className={`mt-1.5 p-1 rounded-md transition-all shadow-sm ${isViewer
+                                                                    ? 'cursor-default'
                                                                     : 'cursor-pointer hover:bg-rose-100'
-                                                            } ${
-                                                                isExceeded 
-                                                                    ? 'bg-rose-50 border-2 border-rose-500 text-rose-900 animate-pulse shadow-rose-500/20' 
+                                                                } ${isExceeded
+                                                                    ? 'bg-rose-50 border-2 border-rose-500 text-rose-900 animate-pulse shadow-rose-500/20'
                                                                     : 'bg-amber-50 border-2 border-amber-500 text-amber-950 animate-pulse shadow-amber-500/20'
-                                                            }`}
+                                                                }`}
                                                             title={isExceeded ? "Tempo Ultrapassado!" : "Alerta de Parada/Preparação"}
                                                         >
                                                             <div className={`flex items-center gap-1 font-black ${isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[8px]'} uppercase tracking-wide ${isExceeded ? 'text-rose-600' : 'text-amber-700'}`}>
@@ -5845,1108 +5827,1089 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 }
 
                                                 return null;
-                                             })()}
-                                         </div>
-                                        )}
+                                            })()}
+                                        </div>
+                                    )}
 
-                                        {/* Grade de fundo (5 Colunas de dias com visual alternado para distinguir cada dia) */}
-                                        {Array.from({ length: 5 }).map((_, colIndex) => {
-                                            const targetDay = weekDays[colIndex];
-                                            const targetDayStr = formatDateString(targetDay);
-                                            const dayMachProd = getMachineDayProduction(mach.name, targetDay);
-                                            const isHolidayCell = holidaysMap.has(targetDayStr);
-                                            const holidayCellName = holidaysMap.get(targetDayStr);
-                                            const isEvenCol = colIndex % 2 === 0; // Col 0 (Segunda), Col 2 (Quarta), Col 4 (Sexta)
-                                            return (
-                                                <div 
-                                                    key={colIndex}
-                                                    onClick={() => !isViewer && handleOpenCreateModal(mach.name, targetDayStr)}
-                                                    className={`border-l relative flex flex-col justify-between p-2 group/cell transition-colors ${
-                                                        isViewer ? 'cursor-default' : 'cursor-pointer'
-                                                    } ${
-                                                        dayMachProd.isToday 
-                                                            ? 'bg-blue-50/70 hover:bg-blue-100/70 border-l-blue-400' 
-                                                            : isHolidayCell 
-                                                                ? 'bg-rose-50/70 hover:bg-rose-100/70 border-l-rose-300' 
-                                                                : dayMachProd.isPast
-                                                                    ? 'bg-emerald-50/30 hover:bg-emerald-100/40 border-l-emerald-300'
-                                                                    : 'bg-amber-50/25 hover:bg-amber-100/40 border-l-amber-200'
+                                    {/* Grade de fundo (5 Colunas de dias com visual alternado para distinguir cada dia) */}
+                                    {Array.from({ length: 5 }).map((_, colIndex) => {
+                                        const targetDay = weekDays[colIndex];
+                                        const targetDayStr = formatDateString(targetDay);
+                                        const dayMachProd = getMachineDayProduction(mach.name, targetDay);
+                                        const isHolidayCell = holidaysMap.has(targetDayStr);
+                                        const holidayCellName = holidaysMap.get(targetDayStr);
+                                        const isEvenCol = colIndex % 2 === 0; // Col 0 (Segunda), Col 2 (Quarta), Col 4 (Sexta)
+                                        return (
+                                            <div
+                                                key={colIndex}
+                                                onClick={() => !isViewer && handleOpenCreateModal(mach.name, targetDayStr)}
+                                                className={`border-l relative flex flex-col justify-between p-2 group/cell transition-colors ${isViewer ? 'cursor-default' : 'cursor-pointer'
+                                                    } ${dayMachProd.isToday
+                                                        ? 'bg-blue-50/70 hover:bg-blue-100/70 border-l-blue-400'
+                                                        : isHolidayCell
+                                                            ? 'bg-rose-50/70 hover:bg-rose-100/70 border-l-rose-300'
+                                                            : dayMachProd.isPast
+                                                                ? 'bg-emerald-50/30 hover:bg-emerald-100/40 border-l-emerald-300'
+                                                                : 'bg-amber-50/25 hover:bg-amber-100/40 border-l-amber-200'
                                                     }`}
-                                                    title={isViewer ? `Produção de ${mach.name} no dia ${formatFriendlyDate(targetDay)}` : isHolidayCell ? `Feriado: ${holidayCellName}. Clique para programar OP` : `Clique para programar OP em ${mach.name} no dia ${formatFriendlyDate(targetDay)}`}
-                                                >
-                                                    {/* Monitor Diário na Célula da Grade */}
-                                                    <div className="flex items-center justify-between gap-1 z-0 select-none">
-                                                        {dayMachProd.totalProduced > 0 || dayMachProd.isLive ? (
-                                                            <div className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black font-mono border flex items-center gap-1.5 shadow-sm ${
-                                                                dayMachProd.isLive 
-                                                                    ? 'bg-blue-600 text-white border-blue-700 shadow-[0_2px_8px_rgba(37,99,235,0.25)]' 
-                                                                    : dayMachProd.isPast 
-                                                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
-                                                                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                                                title={isViewer ? `Produção de ${mach.name} no dia ${formatFriendlyDate(targetDay)}` : isHolidayCell ? `Feriado: ${holidayCellName}. Clique para programar OP` : `Clique para programar OP em ${mach.name} no dia ${formatFriendlyDate(targetDay)}`}
+                                            >
+                                                {/* Monitor Diário na Célula da Grade */}
+                                                <div className="flex items-center justify-between gap-1 z-0 select-none">
+                                                    {dayMachProd.totalProduced > 0 || dayMachProd.isLive ? (
+                                                        <div className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black font-mono border flex items-center gap-1.5 shadow-sm ${dayMachProd.isLive
+                                                                ? 'bg-blue-600 text-white border-blue-700 shadow-[0_2px_8px_rgba(37,99,235,0.25)]'
+                                                                : dayMachProd.isPast
+                                                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                                    : 'bg-slate-100 text-slate-700 border-slate-200'
                                                             }`}>
-                                                                {dayMachProd.isLive && <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />}
-                                                                {dayMachProd.isPast && <span className="text-emerald-700 font-bold">✓</span>}
-                                                                <span>{dayMachProd.totalProduced.toLocaleString('pt-BR')} {dayMachProd.unit}</span>
-                                                            </div>
-                                                        ) : isHolidayCell ? (
-                                                            <span className="text-[9px] text-rose-600 font-bold font-mono pl-1 flex items-center gap-1 truncate max-w-[120px]" title={holidayCellName}>
-                                                                🌴 {holidayCellName}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[8px] text-slate-400 font-mono pl-1 opacity-70">
-                                                                {['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][colIndex]}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {!isViewer && (
-                                                        <div className="opacity-0 group-hover/cell:opacity-100 transition-opacity duration-150 absolute inset-0 flex items-center justify-center bg-blue-900/5">
-                                                            <span className="text-[10px] font-black text-blue-950 bg-white border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1 shadow-md">
-                                                                <PlusIcon className="w-3 h-3 text-orange-500 group-hover:text-white" />
-                                                                Nova OP
-                                                            </span>
+                                                            {dayMachProd.isLive && <span className="w-1.5 h-1.5 rounded-full bg-white pulse-live" />}
+                                                            {dayMachProd.isPast && <span className="text-emerald-700 font-bold">✓</span>}
+                                                            <span>{dayMachProd.totalProduced.toLocaleString('pt-BR')} {dayMachProd.unit}</span>
                                                         </div>
+                                                    ) : isHolidayCell ? (
+                                                        <span className="text-[9px] text-rose-600 font-bold font-mono pl-1 flex items-center gap-1 truncate max-w-[120px]" title={holidayCellName}>
+                                                            🌴 {holidayCellName}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[8px] text-slate-400 font-mono pl-1 opacity-70">
+                                                            {['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][colIndex]}
+                                                        </span>
                                                     )}
                                                 </div>
-                                            );
-                                        })}
 
-                                        {/* Elementos de Barra de OPs sobrepostos na linha (Estilo Moderno Ita Aços: Cartões Brancos com Bordas Marcantes) */}
-                                        {machOps.map(op => {
-                                            const startStr = op.plannedStartDate!;
-                                            let endStr = op.plannedEndDate || startStr;
-                                            
-                                            // Se a OP está Ao Vivo / Em Produção hoje e a data final planejada for anterior a hoje,
-                                            // estendemos dinamicamente até hoje para que a OP permaneça visível na coluna do dia atual
-                                            const isOpLive = op.status === 'in_progress' || op.status === 'Em Produção';
-                                            if (isOpLive && todayStr > endStr) {
-                                                endStr = todayStr;
-                                            }
+                                                {!isViewer && (
+                                                    <div className="opacity-0 group-hover/cell:opacity-100 transition-opacity duration-150 absolute inset-0 flex items-center justify-center bg-blue-900/5">
+                                                        <span className="text-[10px] font-black text-blue-950 bg-white border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1 shadow-md">
+                                                            <PlusIcon className="w-3 h-3 text-orange-500 group-hover:text-white" />
+                                                            Nova OP
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
 
-                                            let colStart = 0;
-                                            if (startStr >= mondayStr) {
-                                                const startIdx = weekDays.findIndex(d => formatDateString(d) === startStr);
-                                                if (startIdx !== -1) colStart = startIdx;
-                                            }
+                                    {/* Elementos de Barra de OPs sobrepostos na linha (Estilo Moderno Ita Aços: Cartões Brancos com Bordas Marcantes) */}
+                                    {machOps.map(op => {
+                                        const startStr = op.plannedStartDate!;
+                                        let endStr = op.plannedEndDate || startStr;
 
-                                            let colEnd = 4;
-                                            if (endStr <= fridayStr) {
-                                                const endIdx = weekDays.findIndex(d => formatDateString(d) === endStr);
-                                                if (endIdx !== -1) colEnd = endIdx;
-                                            }
+                                        // Se a OP está Ao Vivo / Em Produção hoje e a data final planejada for anterior a hoje,
+                                        // estendemos dinamicamente até hoje para que a OP permaneça visível na coluna do dia atual
+                                        const isOpLive = op.status === 'in_progress' || op.status === 'Em Produção';
+                                        if (isOpLive && todayStr > endStr) {
+                                            endStr = todayStr;
+                                        }
 
-                                            const spanColumns = colEnd - colStart + 1;
-                                            if (spanColumns <= 0) return null;
+                                        let colStart = 0;
+                                        if (startStr >= mondayStr) {
+                                            const startIdx = weekDays.findIndex(d => formatDateString(d) === startStr);
+                                            if (startIdx !== -1) colStart = startIdx;
+                                        }
 
-                                            const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
-                                            const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
-                                            const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
+                                        let colEnd = 4;
+                                        if (endStr <= fridayStr) {
+                                            const endIdx = weekDays.findIndex(d => formatDateString(d) === endStr);
+                                            if (endIdx !== -1) colEnd = endIdx;
+                                        }
 
-                                            const prog = getOPProgress(op);
-                                            const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
-                                            // Lotes que aguardam pesagem na Trefila (finalizados na máquina, mas sem peso balança ainda)
-                                            const pendingWeightLots = isTrefila 
-                                                ? (op.processedLots || []).filter((l: any) => 
-                                                    l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0
-                                                  )
-                                                : [];
+                                        const spanColumns = colEnd - colStart + 1;
+                                        if (spanColumns <= 0) return null;
 
-                                            const opHasAlert = prog.isLive && (prog.isStopped || prog.isPrep);
-                                            const opHasLiveLot = isTrefila && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
-                                            const opHasPendingWeight = pendingWeightLots.length > 0;
-                                            
-                                            let opCardHeight = isLargeZoom ? 282 : 215;
-                                            if (opHasAlert) opCardHeight += (isLargeZoom ? 34 : 30);
-                                            if (opHasLiveLot) opCardHeight += (isLargeZoom ? 36 : 32);
-                                            if (opHasPendingWeight) opCardHeight += (isLargeZoom ? 32 : 28);
+                                        const isTrelica = typeof op.machine === 'string' && op.machine.startsWith('Treliça') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Treliça'));
+                                        const isMalha = typeof op.machine === 'string' && op.machine.startsWith('Malha') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Malha'));
+                                        const isTrefila = typeof op.machine === 'string' && op.machine.startsWith('Trefila') || (typeof op.scheduledMachine === 'string' && op.scheduledMachine.startsWith('Trefila'));
 
-                                            const track = getOpTrack(op);
-                                            const machColWidth = 220;
-                                            const leftStyle = `calc(220px + (100% - 220px) * ${colStart / 5})`;
-                                            const widthStyle = `calc((100% - 220px) * ${spanColumns / 5})`;
-                                            const cardVerticalStyle = maxTracks > 1
-                                                ? { top: `${track * baseTrackHeight}px`, height: `${opCardHeight}px` }
-                                                : { top: '0px', bottom: '0px' };
-                                            const title = op.orderNumber;
-                                            
-                                            let displayProductCode = op.productCode || '';
-                                            let displayProductDescription = op.productDescription || '';
+                                        const prog = getOPProgress(op);
+                                        const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
+                                        // Lotes que aguardam pesagem na Trefila (finalizados na máquina, mas sem peso balança ainda)
+                                        const pendingWeightLots = isTrefila
+                                            ? (op.processedLots || []).filter((l: any) =>
+                                                l.finalWeight === null || l.finalWeight === undefined || isNaN(Number(l.finalWeight)) || Number(l.finalWeight) <= 0
+                                            )
+                                            : [];
 
-                                            // Sincronização inteligente com o cadastro oficial de produtos (gauges / stock_gauges):
-                                            // Garante que o código do produto exibido no card seja o código oficial cadastrado (ex: 8702 para Espaçador Treliçado ET10 Pesada)
-                                            if (gauges && gauges.length > 0) {
-                                                const descToMatch = (op.productDescription || op.trelicaModel || op.malhaModel || '').trim().toUpperCase();
-                                                if (descToMatch) {
-                                                    const matchedGauge = (gauges || []).find((g: any) => {
-                                                        const gDesc = String(g.description || g.gaugeDescription || g.gauge || '').trim().toUpperCase();
-                                                        if (!gDesc) return false;
-                                                        return gDesc === descToMatch || (descToMatch.length > 6 && gDesc.includes(descToMatch)) || (gDesc.length > 6 && descToMatch.includes(gDesc));
-                                                    });
-                                                    if (matchedGauge) {
-                                                        const officialCode = matchedGauge.productCode || matchedGauge.product_code || (matchedGauge as any).code;
-                                                        if (officialCode) {
-                                                            displayProductCode = officialCode;
-                                                        }
-                                                        if (!displayProductDescription && (matchedGauge.description || (matchedGauge as any).gaugeDescription)) {
-                                                            displayProductDescription = matchedGauge.description || (matchedGauge as any).gaugeDescription;
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                        const opHasAlert = prog.isLive && (prog.isStopped || prog.isPrep);
+                                        const opHasLiveLot = isTrefila && prog.isLive && Boolean(op.activeLotProcessing?.lotId);
+                                        const opHasPendingWeight = pendingWeightLots.length > 0;
 
-                                            // Fallback para Trefila buscando descrição e código exatos do cadastro no gauges
-                                            if (isTrefila && (!displayProductDescription || !displayProductCode)) {
-                                                const cleanTarget = String(op.targetBitola || '').replace('mm', '').trim();
-                                                const is340 = cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || cleanTarget === '3,4' || op.orderNumber === '87493';
-                                                const matched = (gauges || []).find((g: any) => {
-                                                    const mat = String(g.materialType || g.material_type || '').toLowerCase();
-                                                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila') || mat.includes('ca') || mat.includes('arame') || mat.includes('semi');
-                                                    if (!isCa60) return false;
-                                                    const gClean = String(g.gauge || '').replace('mm', '').trim();
-                                                    return g.gauge === op.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
+                                        let opCardHeight = isLargeZoom ? 282 : 215;
+                                        if (opHasAlert) opCardHeight += (isLargeZoom ? 34 : 30);
+                                        if (opHasLiveLot) opCardHeight += (isLargeZoom ? 36 : 32);
+                                        if (opHasPendingWeight) opCardHeight += (isLargeZoom ? 32 : 28);
+
+                                        const track = getOpTrack(op);
+                                        const machColWidth = 220;
+                                        const leftStyle = `calc(220px + (100% - 220px) * ${colStart / 5})`;
+                                        const widthStyle = `calc((100% - 220px) * ${spanColumns / 5})`;
+                                        const cardVerticalStyle = maxTracks > 1
+                                            ? { top: `${track * baseTrackHeight}px`, height: `${opCardHeight}px` }
+                                            : { top: '0px', bottom: '0px' };
+                                        const title = op.orderNumber;
+
+                                        let displayProductCode = op.productCode || '';
+                                        let displayProductDescription = op.productDescription || '';
+
+                                        // Sincronização inteligente com o cadastro oficial de produtos (gauges / stock_gauges):
+                                        // Garante que o código do produto exibido no card seja o código oficial cadastrado (ex: 8702 para Espaçador Treliçado ET10 Pesada)
+                                        if (gauges && gauges.length > 0) {
+                                            const descToMatch = (op.productDescription || op.trelicaModel || op.malhaModel || '').trim().toUpperCase();
+                                            if (descToMatch) {
+                                                const matchedGauge = (gauges || []).find((g: any) => {
+                                                    const gDesc = String(g.description || g.gaugeDescription || g.gauge || '').trim().toUpperCase();
+                                                    if (!gDesc) return false;
+                                                    return gDesc === descToMatch || (descToMatch.length > 6 && gDesc.includes(descToMatch)) || (gDesc.length > 6 && descToMatch.includes(gDesc));
                                                 });
-                                                if (matched) {
-                                                    if (!displayProductCode) displayProductCode = matched.productCode || matched.product_code || (matched as any).code || '';
-                                                    if (!displayProductDescription) displayProductDescription = matched.description || (matched as any).gaugeDescription || '';
-                                                }
-                                                if ((!displayProductCode || !displayProductDescription) && is340) {
-                                                    displayProductCode = displayProductCode || '8624';
-                                                    displayProductDescription = displayProductDescription || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
-                                                }
-                                            }
-
-                                            const subtitleParts = [];
-                                            if (displayProductCode && !displayProductDescription?.startsWith(displayProductCode)) {
-                                                subtitleParts.push(displayProductCode);
-                                            }
-                                            
-                                            if (displayProductDescription) {
-                                                subtitleParts.push(displayProductDescription);
-                                            } else {
-                                                if (isTrelica) subtitleParts.push(op.trelicaModel);
-                                                else if (isMalha) subtitleParts.push(op.malhaModel);
-                                                else subtitleParts.push(`Bitola ${op.targetBitola}mm`);
-                                            }
-                                            
-                                            const tamanhoStr = op.tamanho;
-                                            if (tamanhoStr) {
-                                                const desc = (op.productDescription || op.trelicaModel || op.malhaModel || '').toUpperCase();
-                                                if (!desc.includes(tamanhoStr.toUpperCase())) {
-                                                    subtitleParts.push(tamanhoStr);
-                                                }
-                                            }
-                                            
-                                            const subtitle = subtitleParts.filter(Boolean).join(' - ');
-
-                                            let trefilaDashStats = null;
-                                            if (isTrefila && prog.isLive && op.activeLotProcessing && op.activeLotProcessing.lotId) {
-                                                const activeLotInfo = stock.find(s => s.id === op.activeLotProcessing!.lotId);
-                                                const lotIdStr = activeLotInfo?.internalLot || op.activeLotProcessing.lotId || '---';
-                                                const initialWeight = activeLotInfo?.initialQuantity || op.totalWeight || 0;
-                                                const speed = op.activeLotProcessing.speed || 1.5;
-                                                const bitola = op.targetBitola ? parseFloat(op.targetBitola.replace(',', '.')) : 0;
-
-                                                if (bitola > 0 && speed > 0) {
-                                                    const lotStartTime = new Date(op.activeLotProcessing.startTime).getTime();
-                                                    const linearMass = bitola * bitola * 0.006162;
-                                                    const massPerSecond = speed * linearMass;
-                                                    
-                                                    if (massPerSecond > 0) {
-                                                        const totalDurationSeconds = initialWeight > 0 ? (initialWeight / massPerSecond) : 0;
-                                                        // Identificar se a máquina está pausada agora (Parada, Preparação, Fim de Turno, Desligada ou sem operador)
-                                                        const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
-                                                        const activeOpOperator = getMachineOperator(mach.name);
-                                                        const openStopEvent = [...(op.downtimeEvents || [])].reverse().find((e: any) => 
-                                                            !e.resumeTime && (activeOpOperator ? (e.reason !== 'Final de Turno' && !e.reason?.toLowerCase().includes('turno')) : true)
-                                                        );
-
-                                                        const isTrefilaPausedNow = Boolean(
-                                                            openStopEvent || 
-                                                            prog.isStopped || 
-                                                            prog.isPrep || 
-                                                            (prog.isOffline && !activeOpOperator) || 
-                                                            !activeOpOperator || 
-                                                            (liveMach && liveMach.state !== 'producing')
-                                                        );
-
-                                                        const pauseReason = openStopEvent?.reason 
-                                                            || prog.downtimeReason 
-                                                            || (prog.isOffline && !activeOpOperator ? 'Final de Turno' : '') 
-                                                            || (liveMach?.reason || '') 
-                                                            || (!activeOpOperator ? 'Sem Operador Ativo' : 'Parada');
-
-                                                        // Somar paradas e intervalos sem produção desde o início do lote
-                                                        let lotDowntimeMs = 0;
-                                                        (op.downtimeEvents || []).forEach((e: any) => {
-                                                            if (!e || !e.stopTime) return;
-                                                            const stop = new Date(e.stopTime).getTime();
-                                                            if (isNaN(stop)) return;
-                                                            const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : liveNow.getTime();
-                                                            if (isNaN(resume)) return;
-
-                                                            const startInLot = Math.max(stop, lotStartTime);
-                                                            const endInLot = Math.min(resume, liveNow.getTime());
-                                                            if (endInLot > startInLot) {
-                                                                lotDowntimeMs += (endInLot - startInLot);
-                                                            }
-                                                        });
-
-                                                        // Se estiver pausada agora (ex: fim de turno / desligada) sem parada aberta em downtimeEvents
-                                                        if (isTrefilaPausedNow && !openStopEvent) {
-                                                            const closedLogs = (op.operatorLogs || []).filter((l: any) => l.endTime);
-                                                            const lastLogEnd = closedLogs.length > 0 
-                                                                ? Math.max(...closedLogs.map((l: any) => new Date(l.endTime).getTime()).filter((t: number) => !isNaN(t)))
-                                                                : 0;
-                                                            const pauseStart = lastLogEnd > lotStartTime ? lastLogEnd : lotStartTime;
-                                                            const unloggedPauseMs = Math.max(0, liveNow.getTime() - pauseStart);
-                                                            if (unloggedPauseMs > 0 && lotDowntimeMs < unloggedPauseMs) {
-                                                                lotDowntimeMs = Math.max(lotDowntimeMs, unloggedPauseMs);
-                                                            }
-                                                        }
-                                                        const totalElapsedMs = Math.max(0, liveNow.getTime() - lotStartTime);
-                                                        const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
-                                                        const elapsedUptimeSeconds = elapsedUptimeMs / 1000;
-                                                        const remainingSecondsRaw = totalDurationSeconds - elapsedUptimeSeconds;
-                                                        const remainingSeconds = Math.max(0, remainingSecondsRaw);
-                                                        const delayedSeconds = Math.max(0, -remainingSecondsRaw);
-                                                        const isDelayed = totalDurationSeconds > 0 && elapsedUptimeSeconds > totalDurationSeconds;
-
-                                                        trefilaDashStats = {
-                                                            lotIdStr,
-                                                            lotWeight: initialWeight,
-                                                            elapsedMs: elapsedUptimeMs,
-                                                            remainingSeconds,
-                                                            delayedSeconds,
-                                                            isDelayed,
-                                                            isPaused: isTrefilaPausedNow,
-                                                            pauseReason
-                                                        };
+                                                if (matchedGauge) {
+                                                    const officialCode = matchedGauge.productCode || matchedGauge.product_code || (matchedGauge as any).code;
+                                                    if (officialCode) {
+                                                        displayProductCode = officialCode;
+                                                    }
+                                                    if (!displayProductDescription && (matchedGauge.description || (matchedGauge as any).gaugeDescription)) {
+                                                        displayProductDescription = matchedGauge.description || (matchedGauge as any).gaugeDescription;
                                                     }
                                                 }
                                             }
+                                        }
 
-                                            // Estilos de Cartão OP adaptados para tema Ita Aços (Azul, Laranja, Branco, Sombra Premium)
-                                            let barBg = 'bg-white border-2 border-slate-200 border-l-8 border-l-slate-400 text-slate-800 shadow-sm';
-                                            let barProgressColor = 'bg-slate-400';
-                                            let barGlowRing = '';
-
-                                            // Verificação de tempo ultrapassado de parada/preparação
-                                            const normalizeDowntime = (s: string) => (s || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                                            const normOpReason = normalizeDowntime(prog.downtimeReason);
-                                            const machCategory = mach.name.toLowerCase().includes('trefila') ? 'trefila' :
-                                                                 mach.name.toLowerCase().includes('trelica') ? 'trelica' :
-                                                                 mach.name.toLowerCase().includes('malha') ? 'malha' :
-                                                                 mach.name.toLowerCase().trim();
-
-                                            const matchingConfig = (localDowntimeConfigs || []).find(c => {
-                                                const normConfigReason = normalizeDowntime(c.reason);
-                                                const configCategory = normalizeDowntime(c.machineType || '');
-                                                return normOpReason === normConfigReason && 
-                                                       (configCategory === 'geral' || !configCategory || configCategory === machCategory);
+                                        // Fallback para Trefila buscando descrição e código exatos do cadastro no gauges
+                                        if (isTrefila && (!displayProductDescription || !displayProductCode)) {
+                                            const cleanTarget = String(op.targetBitola || '').replace('mm', '').trim();
+                                            const is340 = cleanTarget === '3.40' || cleanTarget === '3.4' || cleanTarget === '3,40' || cleanTarget === '3,4' || op.orderNumber === '87493';
+                                            const matched = (gauges || []).find((g: any) => {
+                                                const mat = String(g.materialType || g.material_type || '').toLowerCase();
+                                                const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila') || mat.includes('ca') || mat.includes('arame') || mat.includes('semi');
+                                                if (!isCa60) return false;
+                                                const gClean = String(g.gauge || '').replace('mm', '').trim();
+                                                return g.gauge === op.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
                                             });
+                                            if (matched) {
+                                                if (!displayProductCode) displayProductCode = matched.productCode || matched.product_code || (matched as any).code || '';
+                                                if (!displayProductDescription) displayProductDescription = matched.description || (matched as any).gaugeDescription || '';
+                                            }
+                                            if ((!displayProductCode || !displayProductDescription) && is340) {
+                                                displayProductCode = displayProductCode || '8624';
+                                                displayProductDescription = displayProductDescription || 'CA 60 ROLO 3.40 MM - 2 TON - M.P. *SEMI ACABADO*';
+                                            }
+                                        }
 
-                                            const thresholdMinutes = matchingConfig?.thresholdMinutes || 15;
-                                            const limitMs = thresholdMinutes * 60 * 1000;
-                                            const isDowntimeOverLimit = (prog.isStopped || prog.isPrep) && prog.downtimeDurationMs > limitMs;
+                                        const subtitleParts = [];
+                                        if (displayProductCode && !displayProductDescription?.startsWith(displayProductCode)) {
+                                            subtitleParts.push(displayProductCode);
+                                        }
 
-                                            if (prog.isPaused) {
-                                                barBg = 'bg-amber-50/95 border-2 border-amber-400 border-l-8 border-l-amber-600 text-slate-900 shadow-md';
-                                                barProgressColor = 'bg-gradient-to-r from-amber-500 to-amber-600';
-                                                barGlowRing = 'shadow-[0_4px_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-300';
-                                            } else if (prog.isCompleted) {
-                                                barBg = 'bg-white border-2 border-emerald-300 border-l-8 border-l-emerald-600 hover:border-emerald-400 text-slate-800 shadow-sm';
-                                                barProgressColor = 'bg-emerald-500';
-                                            } else if (prog.isLive) {
-                                                if (prog.isStopped) {
-                                                    if (isDowntimeOverLimit) {
-                                                        barBg = 'bg-white border-2 border-rose-300 border-l-8 border-l-rose-600 text-slate-900 shadow-md';
-                                                        barProgressColor = 'bg-rose-500';
-                                                        barGlowRing = 'shadow-[0_4px_20px_rgba(244,63,94,0.18)]';
-                                                    } else {
-                                                        barBg = 'bg-white border-2 border-amber-300 border-l-8 border-l-amber-500 text-slate-900 shadow-md';
-                                                        barProgressColor = 'bg-amber-500';
-                                                        barGlowRing = 'shadow-[0_4px_16px_rgba(245,158,11,0.18)]';
+                                        if (displayProductDescription) {
+                                            subtitleParts.push(displayProductDescription);
+                                        } else {
+                                            if (isTrelica) subtitleParts.push(op.trelicaModel);
+                                            else if (isMalha) subtitleParts.push(op.malhaModel);
+                                            else subtitleParts.push(`Bitola ${op.targetBitola}mm`);
+                                        }
+
+                                        const tamanhoStr = op.tamanho;
+                                        if (tamanhoStr) {
+                                            const desc = (op.productDescription || op.trelicaModel || op.malhaModel || '').toUpperCase();
+                                            if (!desc.includes(tamanhoStr.toUpperCase())) {
+                                                subtitleParts.push(tamanhoStr);
+                                            }
+                                        }
+
+                                        const subtitle = subtitleParts.filter(Boolean).join(' - ');
+
+                                        let trefilaDashStats = null;
+                                        if (isTrefila && prog.isLive && op.activeLotProcessing && op.activeLotProcessing.lotId) {
+                                            const activeLotInfo = stock.find(s => s.id === op.activeLotProcessing!.lotId);
+                                            const lotIdStr = activeLotInfo?.internalLot || op.activeLotProcessing.lotId || '---';
+                                            const initialWeight = activeLotInfo?.initialQuantity || op.totalWeight || 0;
+                                            const speed = op.activeLotProcessing.speed || 1.5;
+                                            const bitola = op.targetBitola ? parseFloat(op.targetBitola.replace(',', '.')) : 0;
+
+                                            if (bitola > 0 && speed > 0) {
+                                                const lotStartTime = new Date(op.activeLotProcessing.startTime).getTime();
+                                                const linearMass = bitola * bitola * 0.006162;
+                                                const massPerSecond = speed * linearMass;
+
+                                                if (massPerSecond > 0) {
+                                                    const totalDurationSeconds = initialWeight > 0 ? (initialWeight / massPerSecond) : 0;
+                                                    // Identificar se a máquina está pausada agora (Parada, Preparação, Fim de Turno, Desligada ou sem operador)
+                                                    const liveMach = machineLiveStatus.find(m => m.machine === mach.name);
+                                                    const activeOpOperator = getMachineOperator(mach.name);
+                                                    const openStopEvent = [...(op.downtimeEvents || [])].reverse().find((e: any) =>
+                                                        !e.resumeTime && (activeOpOperator ? (e.reason !== 'Final de Turno' && !e.reason?.toLowerCase().includes('turno')) : true)
+                                                    );
+
+                                                    const isTrefilaPausedNow = Boolean(
+                                                        openStopEvent ||
+                                                        prog.isStopped ||
+                                                        prog.isPrep ||
+                                                        (prog.isOffline && !activeOpOperator) ||
+                                                        !activeOpOperator ||
+                                                        (liveMach && liveMach.state !== 'producing')
+                                                    );
+
+                                                    const pauseReason = openStopEvent?.reason
+                                                        || prog.downtimeReason
+                                                        || (prog.isOffline && !activeOpOperator ? 'Final de Turno' : '')
+                                                        || (liveMach?.reason || '')
+                                                        || (!activeOpOperator ? 'Sem Operador Ativo' : 'Parada');
+
+                                                    // Somar paradas e intervalos sem produção desde o início do lote
+                                                    let lotDowntimeMs = 0;
+                                                    (op.downtimeEvents || []).forEach((e: any) => {
+                                                        if (!e || !e.stopTime) return;
+                                                        const stop = new Date(e.stopTime).getTime();
+                                                        if (isNaN(stop)) return;
+                                                        const resume = e.resumeTime ? new Date(e.resumeTime).getTime() : liveNow.getTime();
+                                                        if (isNaN(resume)) return;
+
+                                                        const startInLot = Math.max(stop, lotStartTime);
+                                                        const endInLot = Math.min(resume, liveNow.getTime());
+                                                        if (endInLot > startInLot) {
+                                                            lotDowntimeMs += (endInLot - startInLot);
+                                                        }
+                                                    });
+
+                                                    // Se estiver pausada agora (ex: fim de turno / desligada) sem parada aberta em downtimeEvents
+                                                    if (isTrefilaPausedNow && !openStopEvent) {
+                                                        const closedLogs = (op.operatorLogs || []).filter((l: any) => l.endTime);
+                                                        const lastLogEnd = closedLogs.length > 0
+                                                            ? Math.max(...closedLogs.map((l: any) => new Date(l.endTime).getTime()).filter((t: number) => !isNaN(t)))
+                                                            : 0;
+                                                        const pauseStart = lastLogEnd > lotStartTime ? lastLogEnd : lotStartTime;
+                                                        const unloggedPauseMs = Math.max(0, liveNow.getTime() - pauseStart);
+                                                        if (unloggedPauseMs > 0 && lotDowntimeMs < unloggedPauseMs) {
+                                                            lotDowntimeMs = Math.max(lotDowntimeMs, unloggedPauseMs);
+                                                        }
                                                     }
-                                                } else if (prog.isPrep) {
-                                                    if (isDowntimeOverLimit) {
-                                                        barBg = 'bg-white border-2 border-rose-300 border-l-8 border-l-rose-600 text-slate-900 shadow-md';
-                                                        barProgressColor = 'bg-rose-500';
-                                                        barGlowRing = 'shadow-[0_4px_20px_rgba(244,63,94,0.18)]';
-                                                    } else {
-                                                        barBg = 'bg-white border-2 border-amber-300 border-l-8 border-l-amber-500 text-slate-900 shadow-md';
-                                                        barProgressColor = 'bg-amber-500';
-                                                        barGlowRing = 'shadow-[0_4px_16px_rgba(245,158,11,0.15)]';
-                                                    }
-                                                } else {
-                                                    // PRODUZINDO NORMALMENTE: Azul Royal com destaque Laranja Ita Aços
-                                                    barBg = 'bg-white border-2 border-blue-400 border-l-8 border-l-orange-500 hover:border-blue-500 text-slate-900 shadow-md';
-                                                    barProgressColor = 'bg-gradient-to-r from-orange-500 to-amber-500';
-                                                    barGlowRing = 'shadow-[0_4px_20px_rgba(37,99,235,0.12)] ring-1 ring-blue-200';
+                                                    const totalElapsedMs = Math.max(0, liveNow.getTime() - lotStartTime);
+                                                    const elapsedUptimeMs = Math.max(0, totalElapsedMs - lotDowntimeMs);
+                                                    const elapsedUptimeSeconds = elapsedUptimeMs / 1000;
+                                                    const remainingSecondsRaw = totalDurationSeconds - elapsedUptimeSeconds;
+                                                    const remainingSeconds = Math.max(0, remainingSecondsRaw);
+                                                    const delayedSeconds = Math.max(0, -remainingSecondsRaw);
+                                                    const isDelayed = totalDurationSeconds > 0 && elapsedUptimeSeconds > totalDurationSeconds;
+
+                                                    trefilaDashStats = {
+                                                        lotIdStr,
+                                                        lotWeight: initialWeight,
+                                                        elapsedMs: elapsedUptimeMs,
+                                                        remainingSeconds,
+                                                        delayedSeconds,
+                                                        isDelayed,
+                                                        isPaused: isTrefilaPausedNow,
+                                                        pauseReason
+                                                    };
                                                 }
                                             }
+                                        }
 
-                                            return (
-                                                <div
-                                                    key={op.id}
-                                                    onClick={() => !isViewer && setDrawerOP(op)}
-                                                    className={`pcp-op-bar absolute animate-fade ${barBg} ${barGlowRing} ${isViewer ? 'cursor-default' : 'cursor-pointer'}`}
-                                                    style={{
-                                                        left: leftStyle,
-                                                        width: widthStyle,
-                                                        ...cardVerticalStyle
-                                                    }}
-                                                >
-                                                    <div className="flex flex-col h-full justify-between gap-1">
-                                                        <div className="flex items-center justify-between gap-1.5 shrink-0 pb-0.5 border-b border-slate-200/80 flex-nowrap overflow-hidden">
-                                                            {/* Lado Esquerdo: #OP# + Descrição Completa + Status Badges */}
-                                                            <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
-                                                                {isViewer ? (
-                                                                    <span className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} font-black text-blue-900 tracking-wide select-none shrink-0`}>
-                                                                        <span>#{title}#</span>
-                                                                    </span>
-                                                                ) : (
-                                                                    <span 
-                                                                        className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center gap-1 shrink-0`}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setEditingInProgressOP(op);
-                                                                        }}
-                                                                        title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
-                                                                    >
-                                                                        <span>#{title}#</span>
-                                                                    </span>
-                                                                )}
-                                                                {subtitle && (
-                                                                    <div className="min-w-0 flex-1 max-w-full overflow-hidden flex items-center">
-                                                                        <PCPTickerText 
-                                                                            text={subtitle}
-                                                                            className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} text-slate-800 font-bold tracking-normal`}
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                {prog.isPaused && (
-                                                                    <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-500/20 text-amber-950 rounded border border-amber-400 shadow-sm shrink-0 font-mono`}>
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                                                                        ⏸️ PAUSADA
-                                                                    </span>
-                                                                )}
-                                                                {prog.isPending && (
-                                                                    <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-100 text-amber-900 rounded border border-amber-300 shadow-sm shrink-0`}>
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                                                        AGENDADA
-                                                                    </span>
-                                                                )}
-                                                                {prog.isLive && prog.isOffline && (
-                                                                    <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-slate-100 text-slate-700 rounded border border-slate-300 shrink-0`}>
-                                                                        DESLIGADA
-                                                                    </span>
-                                                                )}
-                                                                {prog.isCompleted && (
-                                                                    <span className={`text-[9px] ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-emerald-100 text-emerald-800 rounded border border-emerald-300 shrink-0`}>
-                                                                        CONCLUÍDA
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                        // Estilos de Cartão OP adaptados para tema Ita Aços (Azul, Laranja, Branco, Sombra Premium)
+                                        let barBg = 'bg-white border-2 border-slate-200 border-l-8 border-l-slate-400 text-slate-800 shadow-sm';
+                                        let barProgressColor = 'bg-slate-400';
+                                        let barGlowRing = '';
 
-                                                            {/* Lado Direito do Topo: Mover / Estender Duração + Barra de Progresso Real */}
-                                                            <div className="flex items-center gap-1 shrink-0 ml-auto select-none flex-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                                {!isViewer && !hasProductionStarted(op) && (
-                                                                    <div className="flex items-center gap-0.5 bg-white/95 px-1 py-0.5 rounded border border-slate-200/90 shadow-xs">
-                                                                        <button 
-                                                                            onClick={() => handleShiftOP(op, -1)}
-                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer" 
-                                                                            title="Mover OP 1 dia antes"
-                                                                        >
-                                                                            ◀
-                                                                        </button>
-                                                                        <span className="text-[8.5px] uppercase font-bold text-slate-500 tracking-wider">Mover</span>
-                                                                        <button 
-                                                                            onClick={() => handleShiftOP(op, 1)}
-                                                                            className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer"
-                                                                            title="Mover OP 1 dia depois"
-                                                                        >
-                                                                            ▶
-                                                                        </button>
-                                                                    </div>
-                                                                )}
+                                        // Verificação de tempo ultrapassado de parada/preparação
+                                        const normalizeDowntime = (s: string) => (s || '').toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                        const normOpReason = normalizeDowntime(prog.downtimeReason);
+                                        const machCategory = mach.name.toLowerCase().includes('trefila') ? 'trefila' :
+                                            mach.name.toLowerCase().includes('trelica') ? 'trelica' :
+                                                mach.name.toLowerCase().includes('malha') ? 'malha' :
+                                                    mach.name.toLowerCase().trim();
 
-                                                                {/* Pill de Duração / Extensão */}
-                                                                <div 
-                                                                    className="flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs text-slate-700 select-none"
-                                                                    title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Clique no número para digitar a duração.` : "Duração estimada em dias úteis. Clique no número para digitar a duração."}
-                                                                >
-                                                                    <span className="text-[9px] text-slate-600 font-bold flex items-center gap-0.5">
-                                                                        <span>⏱️</span>
-                                                                        <span className="hidden sm:inline">{hasProductionStarted(op) ? 'Estender:' : 'Dur:'}</span>
-                                                                    </span>
-                                                                    {isViewer ? (
-                                                                        <span className="font-black text-xs text-slate-900 px-0.5 font-mono">{op.estimatedDurationDays || 1}d</span>
-                                                                    ) : (
-                                                                        <div className="flex items-center gap-0.5">
-                                                                            <button 
-                                                                                onClick={() => handleAdjustDuration(op, -1)}
-                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
-                                                                                title="Diminuir duração (-1 dia)"
-                                                                            >
-                                                                                -
-                                                                            </button>
-                                                                            <span 
-                                                                                onClick={() => handleDirectSetDuration(op)}
-                                                                                className="font-black text-xs text-slate-900 hover:text-blue-600 px-1 font-mono cursor-pointer hover:underline"
-                                                                                title="Clique para digitar a duração em dias"
-                                                                            >
-                                                                                {op.estimatedDurationDays || 1}d
-                                                                            </span>
-                                                                            <button 
-                                                                                onClick={() => handleAdjustDuration(op, 1)}
-                                                                                className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
-                                                                                title="Estender duração (+1 dia)"
-                                                                            >
-                                                                                +
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
+                                        const matchingConfig = (localDowntimeConfigs || []).find(c => {
+                                            const normConfigReason = normalizeDowntime(c.reason);
+                                            const configCategory = normalizeDowntime(c.machineType || '');
+                                            return normOpReason === normConfigReason &&
+                                                (configCategory === 'geral' || !configCategory || configCategory === machCategory);
+                                        });
 
-                                                                {/* Barra de Progresso Real Compacta e Precisa */}
-                                                                <div 
+                                        const thresholdMinutes = matchingConfig?.thresholdMinutes || 15;
+                                        const limitMs = thresholdMinutes * 60 * 1000;
+                                        const isDowntimeOverLimit = (prog.isStopped || prog.isPrep) && prog.downtimeDurationMs > limitMs;
+
+                                        if (prog.isPaused) {
+                                            barBg = 'bg-amber-50/95 border-2 border-amber-400 border-l-8 border-l-amber-600 text-slate-900 shadow-md';
+                                            barProgressColor = 'bg-gradient-to-r from-amber-500 to-amber-600';
+                                            barGlowRing = 'shadow-[0_4px_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-300';
+                                        } else if (prog.isCompleted) {
+                                            barBg = 'bg-white border-2 border-emerald-300 border-l-8 border-l-emerald-600 hover:border-emerald-400 text-slate-800 shadow-sm';
+                                            barProgressColor = 'bg-emerald-500';
+                                        } else if (prog.isLive) {
+                                            if (prog.isStopped) {
+                                                if (isDowntimeOverLimit) {
+                                                    barBg = 'bg-white border-2 border-rose-300 border-l-8 border-l-rose-600 text-slate-900 shadow-md';
+                                                    barProgressColor = 'bg-rose-500';
+                                                    barGlowRing = 'shadow-[0_4px_20px_rgba(244,63,94,0.18)]';
+                                                } else {
+                                                    barBg = 'bg-white border-2 border-amber-300 border-l-8 border-l-amber-500 text-slate-900 shadow-md';
+                                                    barProgressColor = 'bg-amber-500';
+                                                    barGlowRing = 'shadow-[0_4px_16px_rgba(245,158,11,0.18)]';
+                                                }
+                                            } else if (prog.isPrep) {
+                                                if (isDowntimeOverLimit) {
+                                                    barBg = 'bg-white border-2 border-rose-300 border-l-8 border-l-rose-600 text-slate-900 shadow-md';
+                                                    barProgressColor = 'bg-rose-500';
+                                                    barGlowRing = 'shadow-[0_4px_20px_rgba(244,63,94,0.18)]';
+                                                } else {
+                                                    barBg = 'bg-white border-2 border-amber-300 border-l-8 border-l-amber-500 text-slate-900 shadow-md';
+                                                    barProgressColor = 'bg-amber-500';
+                                                    barGlowRing = 'shadow-[0_4px_16px_rgba(245,158,11,0.15)]';
+                                                }
+                                            } else {
+                                                // PRODUZINDO NORMALMENTE: Azul Royal com destaque Laranja Ita Aços
+                                                barBg = 'bg-white border-2 border-blue-400 border-l-8 border-l-orange-500 hover:border-blue-500 text-slate-900 shadow-md';
+                                                barProgressColor = 'bg-gradient-to-r from-orange-500 to-amber-500';
+                                                barGlowRing = 'shadow-[0_4px_20px_rgba(37,99,235,0.12)] ring-1 ring-blue-200';
+                                            }
+                                        }
+
+                                        return (
+                                            <div
+                                                key={op.id}
+                                                onClick={() => !isViewer && setDrawerOP(op)}
+                                                className={`pcp-op-bar absolute animate-fade ${barBg} ${barGlowRing} ${isViewer ? 'cursor-default' : 'cursor-pointer'}`}
+                                                style={{
+                                                    left: leftStyle,
+                                                    width: widthStyle,
+                                                    ...cardVerticalStyle
+                                                }}
+                                            >
+                                                <div className="flex flex-col h-full justify-between gap-1">
+                                                    <div className="flex items-center justify-between gap-1.5 shrink-0 pb-0.5 border-b border-slate-200/80 flex-nowrap overflow-hidden">
+                                                        {/* Lado Esquerdo: #OP# + Descrição Completa + Status Badges */}
+                                                        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
+                                                            {isViewer ? (
+                                                                <span className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} font-black text-blue-900 tracking-wide select-none shrink-0`}>
+                                                                    <span>#{title}#</span>
+                                                                </span>
+                                                            ) : (
+                                                                <span
+                                                                    className={`${isLargeZoom ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} font-black text-blue-900 tracking-wide hover:text-orange-600 cursor-pointer transition-colors flex items-center gap-1 shrink-0`}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (isViewer) return;
-                                                                        handleOpenAdjustQuantity(op, { mode: 'total' });
+                                                                        setEditingInProgressOP(op);
                                                                     }}
-                                                                    className={`flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs min-w-[125px] sm:min-w-[155px] select-none ${
-                                                                        isViewer ? 'cursor-default' : 'hover:bg-white transition-all hover:border-slate-300 cursor-pointer'
-                                                                    }`}
-                                                                    title={isViewer ? `Progresso: ${prog.produced.toLocaleString('pt-BR')} / ${prog.target.toLocaleString('pt-BR')} ${prog.unit} (${prog.pct}%)` : "Clique para ajustar quantidade total produzida da OP (Gestor)"}
+                                                                    title="Clique para editar OP em produção (Nome, Meta, Turnos Finalizados)"
                                                                 >
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center justify-between text-[9.5px] font-mono font-bold text-slate-700 leading-none">
-                                                                            <span className="truncate">
-                                                                                {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
-                                                                            </span>
-                                                                            <span className="font-black text-slate-900 ml-1">{prog.pct}%</span>
-                                                                        </div>
-                                                                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden border border-slate-300 mt-0.5">
-                                                                            <div 
-                                                                                className={`h-full ${barProgressColor} rounded-full transition-all duration-500`}
-                                                                                style={{ width: `${prog.pct}%` }}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
+                                                                    <span>#{title}#</span>
+                                                                </span>
+                                                            )}
+                                                            {subtitle && (
+                                                                <div className="min-w-0 flex-1 max-w-full overflow-hidden flex items-center">
+                                                                    <PCPTickerText
+                                                                        text={subtitle}
+                                                                        className={`${isLargeZoom ? 'text-xs sm:text-sm' : 'text-[11px] sm:text-xs'} text-slate-800 font-bold tracking-normal`}
+                                                                    />
                                                                 </div>
+                                                            )}
 
-                                                                {/* Botão de Encerrar Ordem diretamente na barra da OP */}
-                                                                {!isViewer && (
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleCompleteOP(op);
-                                                                        }}
-                                                                        className={`flex items-center gap-1 px-2 py-0.5 rounded border shadow-xs text-[10px] font-black transition-all active:scale-95 cursor-pointer shrink-0 ${
-                                                                            prog.isCompleted
-                                                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                                                                                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border-rose-300'
-                                                                        }`}
-                                                                        title={prog.isCompleted ? "OP Concluída (Clique para reabrir se necessário)" : "Encerrar Ordem de Produção (libera a máquina no PCP)"}
-                                                                    >
-                                                                        <span>{prog.isCompleted ? '✅' : '🏁'}</span>
-                                                                        <span className="hidden md:inline">{prog.isCompleted ? 'Concluída' : 'Encerrar'}</span>
-                                                                    </button>
-                                                                )}
-                                                            </div>
+                                                            {prog.isPaused && (
+                                                                <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-500/20 text-amber-950 rounded border border-amber-400 shadow-sm shrink-0 font-mono`}>
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                                                    ⏸️ PAUSADA
+                                                                </span>
+                                                            )}
+                                                            {prog.isPending && (
+                                                                <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-amber-100 text-amber-900 rounded border border-amber-300 shadow-sm shrink-0`}>
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                                                    AGENDADA
+                                                                </span>
+                                                            )}
+                                                            {prog.isLive && prog.isOffline && (
+                                                                <span className={`flex items-center gap-1 ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-slate-100 text-slate-700 rounded border border-slate-300 shrink-0`}>
+                                                                    DESLIGADA
+                                                                </span>
+                                                            )}
+                                                            {prog.isCompleted && (
+                                                                <span className={`text-[9px] ${isLargeZoom ? 'text-xs px-2 py-0.5' : 'text-[9px] px-1.5 py-0.5'} font-black uppercase bg-emerald-100 text-emerald-800 rounded border border-emerald-300 shrink-0`}>
+                                                                    CONCLUÍDA
+                                                                </span>
+                                                            )}
                                                         </div>
 
-                                                        {trefilaDashStats && (
-                                                            <div className={`flex items-center justify-between gap-1.5 text-[10.5px] sm:text-[11px] font-mono font-bold px-2 py-0.5 rounded border shadow-xs shrink-0 overflow-hidden ${
-                                                                trefilaDashStats.isPaused 
-                                                                    ? "bg-amber-50/95 border-amber-300 text-slate-800" 
-                                                                    : "bg-blue-50/90 border-blue-200 text-slate-800"
-                                                            }`}>
-                                                                <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                                                    <span className="text-blue-900 font-black text-xs truncate">
-                                                                        Lote {trefilaDashStats.lotIdStr}
-                                                                    </span>
-                                                                    <span className="text-slate-600 font-bold text-[11px]">
-                                                                        ({trefilaDashStats.lotWeight.toLocaleString('pt-BR')}kg)
-                                                                    </span>
-                                                                    {trefilaDashStats.isPaused && (
-                                                                        <span className="inline-flex items-center gap-1 text-[8px] uppercase font-black px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0" title={trefilaDashStats.pauseReason || 'Pausado em parada / fim de turno'}>
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-                                                                            Pausado
-                                                                        </span>
-                                                                    )}
+                                                        {/* Lado Direito do Topo: Mover / Estender Duração + Barra de Progresso Real */}
+                                                        <div className="flex items-center gap-1 shrink-0 ml-auto select-none flex-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                            {!isViewer && !hasProductionStarted(op) && (
+                                                                <div className="flex items-center gap-0.5 bg-white/95 px-1 py-0.5 rounded border border-slate-200/90 shadow-xs">
+                                                                    <button
+                                                                        onClick={() => handleShiftOP(op, -1)}
+                                                                        className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer"
+                                                                        title="Mover OP 1 dia antes"
+                                                                    >
+                                                                        ◀
+                                                                    </button>
+                                                                    <span className="text-[8.5px] uppercase font-bold text-slate-500 tracking-wider">Mover</span>
+                                                                    <button
+                                                                        onClick={() => handleShiftOP(op, 1)}
+                                                                        className="text-slate-500 hover:text-orange-600 font-black text-xs transition-colors active:scale-90 px-0.5 cursor-pointer"
+                                                                        title="Mover OP 1 dia depois"
+                                                                    >
+                                                                        ▶
+                                                                    </button>
                                                                 </div>
-                                                                <div className="flex items-center gap-2 shrink-0 text-[10.5px] sm:text-[11px]">
-                                                                    <span className="text-slate-600">
-                                                                        Feito: <strong className={trefilaDashStats.isPaused ? "text-amber-900 font-black" : "text-blue-900 font-black"}>{formatDuration(trefilaDashStats.elapsedMs)}</strong>
-                                                                    </span>
-                                                                    <span className={`px-1.5 py-0.5 rounded font-black text-[9.5px] sm:text-[10px] ${
-                                                                        trefilaDashStats.isDelayed 
-                                                                            ? "bg-rose-100 text-rose-800 border border-rose-300 shadow-sm" 
-                                                                            : trefilaDashStats.isPaused
-                                                                                ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                                                                : "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                                                    }`}>
-                                                                        {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration((trefilaDashStats.isDelayed ? trefilaDashStats.delayedSeconds : trefilaDashStats.remainingSeconds) * 1000)}
-                                                                    </span>
+                                                            )}
+
+                                                            {/* Pill de Duração / Extensão */}
+                                                            <div
+                                                                className="flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs text-slate-700 select-none"
+                                                                title={hasProductionStarted(op) ? `OP iniciada em ${formatFriendlyDate(op.plannedStartDate)}. Clique no número para digitar a duração.` : "Duração estimada em dias úteis. Clique no número para digitar a duração."}
+                                                            >
+                                                                <span className="text-[9px] text-slate-600 font-bold flex items-center gap-0.5">
+                                                                    <span>⏱️</span>
+                                                                    <span className="hidden sm:inline">{hasProductionStarted(op) ? 'Estender:' : 'Dur:'}</span>
+                                                                </span>
+                                                                {isViewer ? (
+                                                                    <span className="font-black text-xs text-slate-900 px-0.5 font-mono">{op.estimatedDurationDays || 1}d</span>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-0.5">
+                                                                        <button
+                                                                            onClick={() => handleAdjustDuration(op, -1)}
+                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                            title="Diminuir duração (-1 dia)"
+                                                                        >
+                                                                            -
+                                                                        </button>
+                                                                        <span
+                                                                            onClick={() => handleDirectSetDuration(op)}
+                                                                            className="font-black text-xs text-slate-900 hover:text-blue-600 px-1 font-mono cursor-pointer hover:underline"
+                                                                            title="Clique para digitar a duração em dias"
+                                                                        >
+                                                                            {op.estimatedDurationDays || 1}d
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => handleAdjustDuration(op, 1)}
+                                                                            className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-700 font-black text-xs flex items-center justify-center transition-colors active:scale-90 cursor-pointer"
+                                                                            title="Estender duração (+1 dia)"
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Barra de Progresso Real Compacta e Precisa */}
+                                                            <div
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (isViewer) return;
+                                                                    handleOpenAdjustQuantity(op, { mode: 'total' });
+                                                                }}
+                                                                className={`flex items-center gap-1 bg-white/95 px-1.5 py-0.5 rounded border border-slate-200/90 shadow-xs min-w-[125px] sm:min-w-[155px] select-none ${isViewer ? 'cursor-default' : 'hover:bg-white transition-all hover:border-slate-300 cursor-pointer'
+                                                                    }`}
+                                                                title={isViewer ? `Progresso: ${prog.produced.toLocaleString('pt-BR')} / ${prog.target.toLocaleString('pt-BR')} ${prog.unit} (${prog.pct}%)` : "Clique para ajustar quantidade total produzida da OP (Gestor)"}
+                                                            >
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between text-[9.5px] font-mono font-bold text-slate-700 leading-none">
+                                                                        <span className="truncate">
+                                                                            {prog.produced.toLocaleString('pt-BR')} / {prog.target.toLocaleString('pt-BR')} {prog.unit}
+                                                                        </span>
+                                                                        <span className="font-black text-slate-900 ml-1">{prog.pct}%</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden border border-slate-300 mt-0.5">
+                                                                        <div
+                                                                            className={`h-full ${barProgressColor} rounded-full transition-all duration-500`}
+                                                                            style={{ width: `${prog.pct}%` }}
+                                                                        />
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        )}
 
-                                                        {/* Lotes Aguardando Pesagem (Trefila 1 e 2) */}
-                                                        {isTrefila && pendingWeightLots.length > 0 && (
-                                                            <div className="flex flex-col gap-1 shrink-0 select-none" onClick={(e) => e.stopPropagation()}>
-                                                                {pendingWeightLots.length === 1 ? (
-                                                                    (() => {
-                                                                        const pLot = pendingWeightLots[0];
-                                                                        const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
-                                                                        const lotName = lotStock?.internalLot || pLot.lotId || '---';
-                                                                        const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
-                                                                        const endTimeStr = pLot.endTime ? new Date(pLot.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                                                            {/* Botão de Encerrar Ordem diretamente na barra da OP */}
+                                                            {!isViewer && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleCompleteOP(op);
+                                                                    }}
+                                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border shadow-xs text-[10px] font-black transition-all active:scale-95 cursor-pointer shrink-0 ${prog.isCompleted
+                                                                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                                                            : 'bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border-rose-300'
+                                                                        }`}
+                                                                    title={prog.isCompleted ? "OP Concluída (Clique para reabrir se necessário)" : "Encerrar Ordem de Produção (libera a máquina no PCP)"}
+                                                                >
+                                                                    <span>{prog.isCompleted ? '✅' : '🏁'}</span>
+                                                                    <span className="hidden md:inline">{prog.isCompleted ? 'Concluída' : 'Encerrar'}</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
 
-                                                                        return (
-                                                                            <div className="flex items-center justify-between gap-2 text-xs font-mono font-bold px-3 py-1 rounded-lg border border-amber-300 bg-amber-50/95 text-slate-800 shadow-xs shrink-0 overflow-hidden">
-                                                                                <div className="flex items-center gap-2 min-w-0 truncate">
-                                                                                    <span className="inline-flex items-center gap-1 text-[9px] uppercase font-black px-2 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
-                                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                                                                                        ⚖️ Aguarda Peso
+                                                    {trefilaDashStats && (
+                                                        <div className={`flex items-center justify-between gap-1.5 text-[10.5px] sm:text-[11px] font-mono font-bold px-2 py-0.5 rounded border shadow-xs shrink-0 overflow-hidden ${trefilaDashStats.isPaused
+                                                                ? "bg-amber-50/95 border-amber-300 text-slate-800"
+                                                                : "bg-blue-50/90 border-blue-200 text-slate-800"
+                                                            }`}>
+                                                            <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                                                <span className="text-blue-900 font-black text-xs truncate">
+                                                                    Lote {trefilaDashStats.lotIdStr}
+                                                                </span>
+                                                                <span className="text-slate-600 font-bold text-[11px]">
+                                                                    ({trefilaDashStats.lotWeight.toLocaleString('pt-BR')}kg)
+                                                                </span>
+                                                                {trefilaDashStats.isPaused && (
+                                                                    <span className="inline-flex items-center gap-1 text-[8px] uppercase font-black px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0" title={trefilaDashStats.pauseReason || 'Pausado em parada / fim de turno'}>
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                                                        Pausado
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 shrink-0 text-[10.5px] sm:text-[11px]">
+                                                                <span className="text-slate-600">
+                                                                    Feito: <strong className={trefilaDashStats.isPaused ? "text-amber-900 font-black" : "text-blue-900 font-black"}>{formatDuration(trefilaDashStats.elapsedMs)}</strong>
+                                                                </span>
+                                                                <span className={`px-1.5 py-0.5 rounded font-black text-[9.5px] sm:text-[10px] ${trefilaDashStats.isDelayed
+                                                                        ? "bg-rose-100 text-rose-800 border border-rose-300 shadow-sm"
+                                                                        : trefilaDashStats.isPaused
+                                                                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                                                            : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                                                    }`}>
+                                                                    {trefilaDashStats.isDelayed ? 'Atraso: ' : 'Rest: '}{formatDuration((trefilaDashStats.isDelayed ? trefilaDashStats.delayedSeconds : trefilaDashStats.remainingSeconds) * 1000)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Lotes Aguardando Pesagem (Trefila 1 e 2) */}
+                                                    {isTrefila && pendingWeightLots.length > 0 && (
+                                                        <div className="flex flex-col gap-1 shrink-0 select-none" onClick={(e) => e.stopPropagation()}>
+                                                            {pendingWeightLots.length === 1 ? (
+                                                                (() => {
+                                                                    const pLot = pendingWeightLots[0];
+                                                                    const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
+                                                                    const lotName = lotStock?.internalLot || pLot.lotId || '---';
+                                                                    const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
+                                                                    const endTimeStr = pLot.endTime ? new Date(pLot.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+
+                                                                    return (
+                                                                        <div className="flex items-center justify-between gap-2 text-xs font-mono font-bold px-3 py-1 rounded-lg border border-amber-300 bg-amber-50/95 text-slate-800 shadow-xs shrink-0 overflow-hidden">
+                                                                            <div className="flex items-center gap-2 min-w-0 truncate">
+                                                                                <span className="inline-flex items-center gap-1 text-[9px] uppercase font-black px-2 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
+                                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                                                                    ⚖️ Aguarda Peso
+                                                                                </span>
+                                                                                <span className="text-amber-950 font-black text-xs sm:text-sm truncate">
+                                                                                    Lote {lotName}
+                                                                                </span>
+                                                                                {entryWeight > 0 && (
+                                                                                    <span className="text-slate-600 font-bold text-xs">
+                                                                                        (~{entryWeight.toLocaleString('pt-BR')}kg)
                                                                                     </span>
-                                                                                    <span className="text-amber-950 font-black text-xs sm:text-sm truncate">
-                                                                                        Lote {lotName}
+                                                                                )}
+                                                                                {endTimeStr && (
+                                                                                    <span className="text-slate-500 font-normal text-[10px] hidden sm:inline">
+                                                                                        às {endTimeStr}
                                                                                     </span>
-                                                                                    {entryWeight > 0 && (
-                                                                                        <span className="text-slate-600 font-bold text-xs">
-                                                                                            (~{entryWeight.toLocaleString('pt-BR')}kg)
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {endTimeStr && (
-                                                                                        <span className="text-slate-500 font-normal text-[10px] hidden sm:inline">
-                                                                                            às {endTimeStr}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                                {isViewer ? (
-                                                                                    <span className="px-2.5 py-0.5 rounded-md bg-amber-200 text-amber-900 font-black text-[10px] uppercase tracking-wider shrink-0">
-                                                                                        Aguardando Pesagem ⚖️
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
-                                                                                        }}
-                                                                                        className="px-2.5 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider shadow-xs transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
-                                                                                        title="Clique para lançar o peso deste lote"
-                                                                                    >
-                                                                                        <span>Pesar</span>
-                                                                                        <span className="text-xs">⚖️</span>
-                                                                                    </button>
                                                                                 )}
                                                                             </div>
-                                                                        );
-                                                                    })()
-                                                                ) : (
-                                                                    <div className="flex items-center justify-between gap-2 text-xs font-mono font-bold px-3 py-1 rounded-lg border border-amber-300 bg-amber-50/95 text-slate-800 shadow-xs shrink-0 overflow-hidden">
-                                                                        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                                                                            <span className="inline-flex items-center gap-1 text-[9px] uppercase font-black px-2 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
-                                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                                                                                ⚖️ Aguarda Peso ({pendingWeightLots.length}):
-                                                                            </span>
-                                                                            {pendingWeightLots.map((pLot: any) => {
-                                                                                const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
-                                                                                const lotName = lotStock?.internalLot || pLot.lotId || '---';
-                                                                                const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
-                                                                                if (isViewer) {
-                                                                                    return (
-                                                                                        <span
-                                                                                            key={pLot.lotId}
-                                                                                            className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-white text-amber-950 border border-amber-300 shadow-xs"
-                                                                                        >
-                                                                                            <span>Lote {lotName}</span>
-                                                                                            <span className="text-[9px] text-amber-600">⚖️</span>
-                                                                                        </span>
-                                                                                    );
-                                                                                }
+                                                                            {isViewer ? (
+                                                                                <span className="px-2.5 py-0.5 rounded-md bg-amber-200 text-amber-900 font-black text-[10px] uppercase tracking-wider shrink-0">
+                                                                                    Aguardando Pesagem ⚖️
+                                                                                </span>
+                                                                            ) : (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
+                                                                                    }}
+                                                                                    className="px-2.5 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider shadow-xs transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+                                                                                    title="Clique para lançar o peso deste lote"
+                                                                                >
+                                                                                    <span>Pesar</span>
+                                                                                    <span className="text-xs">⚖️</span>
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()
+                                                            ) : (
+                                                                <div className="flex items-center justify-between gap-2 text-xs font-mono font-bold px-3 py-1 rounded-lg border border-amber-300 bg-amber-50/95 text-slate-800 shadow-xs shrink-0 overflow-hidden">
+                                                                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                                                        <span className="inline-flex items-center gap-1 text-[9px] uppercase font-black px-2 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                                                            ⚖️ Aguarda Peso ({pendingWeightLots.length}):
+                                                                        </span>
+                                                                        {pendingWeightLots.map((pLot: any) => {
+                                                                            const lotStock = stock.find(s => s.id === pLot.lotId || s.internalLot === pLot.lotId);
+                                                                            const lotName = lotStock?.internalLot || pLot.lotId || '---';
+                                                                            const entryWeight = lotStock?.initialQuantity || lotStock?.weight || 0;
+                                                                            if (isViewer) {
                                                                                 return (
-                                                                                    <button
+                                                                                    <span
                                                                                         key={pLot.lotId}
-                                                                                        type="button"
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
-                                                                                        }}
-                                                                                        className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-xs transition active:scale-95 cursor-pointer"
-                                                                                        title={`Clique para pesar Lote ${lotName}`}
+                                                                                        className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-white text-amber-950 border border-amber-300 shadow-xs"
                                                                                     >
                                                                                         <span>Lote {lotName}</span>
                                                                                         <span className="text-[9px] text-amber-600">⚖️</span>
-                                                                                    </button>
+                                                                                    </span>
                                                                                 );
-                                                                            })}
-                                                                        </div>
+                                                                            }
+                                                                            return (
+                                                                                <button
+                                                                                    key={pLot.lotId}
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleOpenWeighLot(op, pLot.lotId, lotName, entryWeight);
+                                                                                    }}
+                                                                                    className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-xs transition active:scale-95 cursor-pointer"
+                                                                                    title={`Clique para pesar Lote ${lotName}`}
+                                                                                >
+                                                                                    <span>Lote {lotName}</span>
+                                                                                    <span className="text-[9px] text-amber-600">⚖️</span>
+                                                                                </button>
+                                                                            );
+                                                                        })}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
-                                                        {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
-                                                        <div 
-                                                            className="grid gap-0.5 p-0.5 bg-slate-100/90 rounded-lg border border-slate-200 flex-1 min-h-[56px]"
-                                                            style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            {Array.from({ length: spanColumns }).map((_, idx) => {
-                                                                const dayIdx = colStart + idx;
-                                                                const currentDay = weekDays[dayIdx];
-                                                                const dayStats = getOpDayStats(op, currentDay, mach.name);
-                                                                const dayColName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][dayIdx] || '';
-                                                                const isEvenDayCol = dayIdx % 2 === 0; // Seg (0), Qua (2), Sex (4)
+                                                    {/* Faixa de Segmentação Diária da OP (Produção por dia alinhada às colunas) */}
+                                                    <div
+                                                        className="grid gap-0.5 p-0.5 bg-slate-100/90 rounded-lg border border-slate-200 flex-1 min-h-[56px]"
+                                                        style={{ gridTemplateColumns: `repeat(${spanColumns}, minmax(0, 1fr))` }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {Array.from({ length: spanColumns }).map((_, idx) => {
+                                                            const dayIdx = colStart + idx;
+                                                            const currentDay = weekDays[dayIdx];
+                                                            const dayStats = getOpDayStats(op, currentDay, mach.name);
+                                                            const dayColName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][dayIdx] || '';
+                                                            const isEvenDayCol = dayIdx % 2 === 0; // Seg (0), Qua (2), Sex (4)
 
-                                                                const hasRealPastProd = dayStats.isPast && dayStats.produced > 0;
-                                                                const isIdlePast = dayStats.isPast && dayStats.produced === 0;
+                                                            const hasRealPastProd = dayStats.isPast && dayStats.produced > 0;
+                                                            const isIdlePast = dayStats.isPast && dayStats.produced === 0;
 
-                                                                const activeMachOp = getMachineOperator(mach.name);
-                                                                const isDayCardStopped = dayStats.isToday && Boolean(activeMachOp) && !prog.isOffline && (
-                                                                    (prog.isLive && (prog.isStopped || prog.isPrep)) ||
-                                                                    dayStats.isMachineStoppedNow ||
-                                                                    Boolean(liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep'))
-                                                                );
+                                                            const activeMachOp = getMachineOperator(mach.name);
+                                                            const isDayCardStopped = dayStats.isToday && Boolean(activeMachOp) && !prog.isOffline && (
+                                                                (prog.isLive && (prog.isStopped || prog.isPrep)) ||
+                                                                dayStats.isMachineStoppedNow ||
+                                                                Boolean(liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep'))
+                                                            );
 
-                                                                const dayStopReason = (prog.isLive && (prog.isStopped || prog.isPrep) && prog.downtimeReason)
-                                                                    || (liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep') ? liveMach.reason : '')
-                                                                    || (trefilaDashStats?.isPaused ? trefilaDashStats.pauseReason : '')
-                                                                    || 'Parada';
+                                                            const dayStopReason = (prog.isLive && (prog.isStopped || prog.isPrep) && prog.downtimeReason)
+                                                                || (liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep') ? liveMach.reason : '')
+                                                                || (trefilaDashStats?.isPaused ? trefilaDashStats.pauseReason : '')
+                                                                || 'Parada';
 
-                                                                const isDayStopExceeded = isDowntimeOverLimit || Boolean((liveMach as any)?.isOverLimit);
-                                                                const isDayPrepState = (prog.isLive && prog.isPrep) || (liveMach?.state === 'prep');
+                                                            const isDayStopExceeded = isDowntimeOverLimit || Boolean((liveMach as any)?.isOverLimit);
+                                                            const isDayPrepState = (prog.isLive && prog.isPrep) || (liveMach?.state === 'prep');
 
-                                                                const stopDurationMs = (liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep') && liveMach.durationMs > 0)
-                                                                    ? liveMach.durationMs
-                                                                    : (prog.downtimeDurationMs > 0 ? prog.downtimeDurationMs : 0);
+                                                            const stopDurationMs = (liveMach && (liveMach.state === 'stopped' || liveMach.state === 'prep') && liveMach.durationMs > 0)
+                                                                ? liveMach.durationMs
+                                                                : (prog.downtimeDurationMs > 0 ? prog.downtimeDurationMs : 0);
 
-                                                                const stopTimerFormatted = stopDurationMs > 0 
-                                                                    ? formatDuration(stopDurationMs) 
-                                                                    : (dayStats.downtimeFormatted || '00:00:00');
+                                                            const stopTimerFormatted = stopDurationMs > 0
+                                                                ? formatDuration(stopDurationMs)
+                                                                : (dayStats.downtimeFormatted || '00:00:00');
 
-                                                                return (
-                                                                    <div 
-                                                                        key={dayIdx} 
-                                                                        onClick={() => {
-                                                                            if (isViewer) return;
-                                                                            setSelectedDailyReport({
-                                                                                op,
-                                                                                date: currentDay,
-                                                                                dateStr: formatDateString(currentDay),
-                                                                                dayName: dayColName,
-                                                                                produced: dayStats.produced,
-                                                                                unit: dayStats.unit,
-                                                                                dayStats
-                                                                            });
-                                                                        }}
-                                                                        className={`[container-type:inline-size] flex items-center justify-between p-1 sm:p-1.5 rounded-lg border text-left transition-all select-none h-full min-h-0 overflow-hidden ${
-                                                                            isViewer ? 'cursor-default' : 'cursor-pointer hover:shadow-lg hover:brightness-95 active:scale-[0.99]'
-                                                                        } ${
-                                                                            dayStats.isToday 
-                                                                                ? isDayCardStopped
-                                                                                    ? (isDayStopExceeded
-                                                                                        ? 'bg-rose-50 border-2 border-rose-600 text-rose-950 shadow-md ring-2 ring-rose-400 animate-pulse'
-                                                                                        : 'bg-amber-50 border-2 border-amber-500 text-amber-950 shadow-md ring-2 ring-amber-400 animate-pulse')
-                                                                                    : dayStats.status === 'live'
-                                                                                        ? 'bg-gradient-to-br from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] border-2 border-blue-800 text-blue-950 shadow-md ring-2 ring-blue-500/80 hover:border-blue-900'
-                                                                                        : dayStats.produced > 0
-                                                                                            ? 'bg-emerald-50/85 border-2 border-emerald-400 text-emerald-950 shadow-xs hover:border-emerald-500 hover:bg-emerald-100/70'
-                                                                                            : 'bg-[#FEFCE8]/90 border-2 border-dashed border-amber-300/90 text-amber-950 shadow-2xs hover:bg-[#FEF9C3] hover:border-amber-400'
-                                                                                : dayStats.isPast
-                                                                                    ? hasRealPastProd
+                                                            return (
+                                                                <div
+                                                                    key={dayIdx}
+                                                                    onClick={() => {
+                                                                        if (isViewer) return;
+                                                                        setSelectedDailyReport({
+                                                                            op,
+                                                                            date: currentDay,
+                                                                            dateStr: formatDateString(currentDay),
+                                                                            dayName: dayColName,
+                                                                            produced: dayStats.produced,
+                                                                            unit: dayStats.unit,
+                                                                            dayStats
+                                                                        });
+                                                                    }}
+                                                                    className={`[container-type:inline-size] flex items-center justify-between p-1 sm:p-1.5 rounded-lg border text-left transition-all select-none h-full min-h-0 overflow-hidden ${isViewer ? 'cursor-default' : 'cursor-pointer hover:shadow-lg hover:brightness-95 active:scale-[0.99]'
+                                                                        } ${dayStats.isToday
+                                                                            ? isDayCardStopped
+                                                                                ? (isDayStopExceeded
+                                                                                    ? 'bg-rose-50 border-2 border-rose-600 text-rose-950 shadow-md ring-2 ring-rose-400 animate-pulse'
+                                                                                    : 'bg-amber-50 border-2 border-amber-500 text-amber-950 shadow-md ring-2 ring-amber-400 animate-pulse')
+                                                                                : dayStats.status === 'live'
+                                                                                    ? 'bg-gradient-to-br from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] border-2 border-blue-800 text-blue-950 shadow-md ring-2 ring-blue-500/80 hover:border-blue-900'
+                                                                                    : dayStats.produced > 0
                                                                                         ? 'bg-emerald-50/85 border-2 border-emerald-400 text-emerald-950 shadow-xs hover:border-emerald-500 hover:bg-emerald-100/70'
-                                                                                        : 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
-                                                                                    : 'bg-[#FEFCE8]/90 border-2 border-dashed border-amber-300/90 text-amber-950 shadow-2xs hover:bg-[#FEF9C3] hover:border-amber-400'
+                                                                                        : 'bg-[#FEFCE8]/90 border-2 border-dashed border-amber-300/90 text-amber-950 shadow-2xs hover:bg-[#FEF9C3] hover:border-amber-400'
+                                                                            : dayStats.isPast
+                                                                                ? hasRealPastProd
+                                                                                    ? 'bg-emerald-50/85 border-2 border-emerald-400 text-emerald-950 shadow-xs hover:border-emerald-500 hover:bg-emerald-100/70'
+                                                                                    : 'bg-slate-50/70 border border-slate-200 text-slate-400 hover:border-slate-300'
+                                                                                : 'bg-[#FEFCE8]/90 border-2 border-dashed border-amber-300/90 text-amber-950 shadow-2xs hover:bg-[#FEF9C3] hover:border-amber-400'
                                                                         }`}
-                                                                        title={isViewer ? `Produção de ${dayColName} ${formatFriendlyDate(currentDay)}: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : `Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
-                                                                    >
-                                                                        <div className="flex items-center justify-between gap-2 min-w-0 w-full h-full">
-                                                                            {dayStats.isHoliday && dayStats.produced === 0 ? (
-                                                                                <div className="flex items-center justify-center w-full">
-                                                                                    <span className={`${isLargeZoom ? 'text-sm' : 'text-xs'} font-black text-rose-600 font-mono tracking-tight`}>
-                                                                                        Folga / Feriado
+                                                                    title={isViewer ? `Produção de ${dayColName} ${formatFriendlyDate(currentDay)}: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : `Clique para ver paradas e relatório de ${dayColName} ${formatFriendlyDate(currentDay)}`}
+                                                                >
+                                                                    <div className="flex items-center justify-between gap-2 min-w-0 w-full h-full">
+                                                                        {dayStats.isHoliday && dayStats.produced === 0 ? (
+                                                                            <div className="flex items-center justify-center w-full">
+                                                                                <span className={`${isLargeZoom ? 'text-sm' : 'text-xs'} font-black text-rose-600 font-mono tracking-tight`}>
+                                                                                    Folga / Feriado
+                                                                                </span>
+                                                                            </div>
+                                                                        ) : isDayCardStopped ? (
+                                                                            /* Layout Especial em Caso de Parada / Preparação: Destaque total para o Motivo da Parada em largura total com Ticker inteligente, engrenagem parada e luz de alerta */
+                                                                            <div className="flex flex-col justify-between w-full h-full min-w-0 p-1 gap-1 select-none">
+                                                                                {/* Top Row: Engrenagem Parada + Sinal de Alerta com Luz Vermelha Pulsante */}
+                                                                                <div className="flex items-center justify-between gap-1.5 w-full px-0.5">
+                                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                                        {/* Engrenagem Estática / Travada */}
+                                                                                        <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-5 h-5' : 'w-4 h-4'}`} title="Máquina Parada / Interrompida">
+                                                                                            <svg
+                                                                                                className={`${isLargeZoom ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} ${isDayStopExceeded ? 'text-rose-700' : 'text-amber-800'} drop-shadow-2xs`}
+                                                                                                viewBox="0 0 24 24"
+                                                                                                fill="currentColor"
+                                                                                            >
+                                                                                                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
+                                                                                            </svg>
+                                                                                            <span className="absolute -bottom-0.5 -right-0.5 text-[8px] sm:text-[9px] leading-none">⛔</span>
+                                                                                        </div>
+
+                                                                                        {/* Tag Máquina Parada com Pulso Vermelho */}
+                                                                                        <div className={`flex items-center gap-1 px-1.5 py-0.2 rounded-full ${isDayStopExceeded
+                                                                                                ? 'bg-rose-900/15 border border-rose-600/30'
+                                                                                                : 'bg-amber-900/15 border border-amber-600/30'
+                                                                                            } backdrop-blur-2xs shadow-2xs`}>
+                                                                                            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+                                                                                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isDayStopExceeded ? 'bg-rose-500' : 'bg-amber-500'} opacity-75`} />
+                                                                                                <span className={`relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 ${isDayStopExceeded ? 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.9)]' : 'bg-amber-600 shadow-[0_0_8px_rgba(217,119,6,0.9)]'}`} />
+                                                                                            </span>
+                                                                                            <span className={`${isLargeZoom ? 'text-[8.5px] sm:text-[9.5px]' : 'text-[7px] sm:text-[7.5px]'} font-black uppercase tracking-wider ${isDayStopExceeded ? 'text-rose-950' : 'text-amber-950'} font-mono leading-none`}>
+                                                                                                {isDayStopExceeded ? 'Parada Crítica' : isDayPrepState ? 'Preparação' : 'Máquina Parada'}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    <span className={`${isLargeZoom ? 'text-xs' : 'text-[10px]'} animate-bounce shrink-0`}>
+                                                                                        {isDayStopExceeded ? '🚨' : '⚠️'}
                                                                                     </span>
                                                                                 </div>
-                                                                            ) : isDayCardStopped ? (
-                                                                                /* Layout Especial em Caso de Parada / Preparação: Destaque total para o Motivo da Parada em largura total com Ticker inteligente, engrenagem parada e luz de alerta */
-                                                                                <div className="flex flex-col justify-between w-full h-full min-w-0 p-1 gap-1 select-none">
-                                                                                    {/* Top Row: Engrenagem Parada + Sinal de Alerta com Luz Vermelha Pulsante */}
-                                                                                    <div className="flex items-center justify-between gap-1.5 w-full px-0.5">
-                                                                                        <div className="flex items-center gap-1.5 min-w-0">
-                                                                                            {/* Engrenagem Estática / Travada */}
-                                                                                            <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-5 h-5' : 'w-4 h-4'}`} title="Máquina Parada / Interrompida">
-                                                                                                <svg 
-                                                                                                    className={`${isLargeZoom ? 'w-4.5 h-4.5' : 'w-3.5 h-3.5'} ${isDayStopExceeded ? 'text-rose-700' : 'text-amber-800'} drop-shadow-2xs`} 
-                                                                                                    viewBox="0 0 24 24" 
-                                                                                                    fill="currentColor"
-                                                                                                >
-                                                                                                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
-                                                                                                </svg>
-                                                                                                <span className="absolute -bottom-0.5 -right-0.5 text-[8px] sm:text-[9px] leading-none">⛔</span>
-                                                                                            </div>
 
-                                                                                            {/* Tag Máquina Parada com Pulso Vermelho */}
-                                                                                            <div className={`flex items-center gap-1 px-1.5 py-0.2 rounded-full ${
-                                                                                                isDayStopExceeded 
-                                                                                                    ? 'bg-rose-900/15 border border-rose-600/30' 
-                                                                                                    : 'bg-amber-900/15 border border-amber-600/30'
-                                                                                            } backdrop-blur-2xs shadow-2xs`}>
-                                                                                                <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                                                                                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isDayStopExceeded ? 'bg-rose-500' : 'bg-amber-500'} opacity-75`} />
-                                                                                                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 ${isDayStopExceeded ? 'bg-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.9)]' : 'bg-amber-600 shadow-[0_0_8px_rgba(217,119,6,0.9)]'}`} />
-                                                                                                </span>
-                                                                                                <span className={`${isLargeZoom ? 'text-[8.5px] sm:text-[9.5px]' : 'text-[7px] sm:text-[7.5px]'} font-black uppercase tracking-wider ${isDayStopExceeded ? 'text-rose-950' : 'text-amber-950'} font-mono leading-none`}>
-                                                                                                    {isDayStopExceeded ? 'Parada Crítica' : isDayPrepState ? 'Preparação' : 'Máquina Parada'}
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        </div>
-
-                                                                                        <span className={`${isLargeZoom ? 'text-xs' : 'text-[10px]'} animate-bounce shrink-0`}>
-                                                                                            {isDayStopExceeded ? '🚨' : '⚠️'}
-                                                                                        </span>
-                                                                                    </div>
-
-                                                                                    {/* Center: Faixa de Alerta com Motivo da Parada Centralizado */}
-                                                                                    <div className={`flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg border shadow-xs min-w-0 w-full overflow-hidden ${
-                                                                                        isDayStopExceeded
-                                                                                            ? 'bg-rose-100/95 text-rose-950 border-rose-400 ring-1 ring-rose-400/40'
-                                                                                            : isDayPrepState
-                                                                                                ? 'bg-amber-100/95 text-amber-950 border-amber-400 ring-1 ring-amber-400/40'
-                                                                                                : 'bg-amber-100/95 text-amber-950 border-amber-400 ring-1 ring-amber-400/40'
+                                                                                {/* Center: Faixa de Alerta com Motivo da Parada Centralizado */}
+                                                                                <div className={`flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg border shadow-xs min-w-0 w-full overflow-hidden ${isDayStopExceeded
+                                                                                        ? 'bg-rose-100/95 text-rose-950 border-rose-400 ring-1 ring-rose-400/40'
+                                                                                        : isDayPrepState
+                                                                                            ? 'bg-amber-100/95 text-amber-950 border-amber-400 ring-1 ring-amber-400/40'
+                                                                                            : 'bg-amber-100/95 text-amber-950 border-amber-400 ring-1 ring-amber-400/40'
                                                                                     }`}>
-                                                                                        <div className="min-w-0 flex-1 overflow-hidden text-center">
-                                                                                            <PCPTickerText 
-                                                                                                text={dayStopReason.toUpperCase()}
-                                                                                                className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px] sm:text-[11px]'} font-black uppercase tracking-tight text-slate-900 leading-tight`}
-                                                                                            />
+                                                                                    <div className="min-w-0 flex-1 overflow-hidden text-center">
+                                                                                        <PCPTickerText
+                                                                                            text={dayStopReason.toUpperCase()}
+                                                                                            className={`${isLargeZoom ? 'text-xs sm:text-[13px]' : 'text-[10px] sm:text-[11px]'} font-black uppercase tracking-tight text-slate-900 leading-tight`}
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Bottom Row: Produção Feita vs Cronômetro de Tempo Parado */}
+                                                                                <div className="flex items-center justify-between gap-1 min-w-0 w-full px-0.5">
+                                                                                    {/* Lado Esquerdo: Quantidade Produzida */}
+                                                                                    <div className="flex items-baseline gap-1 min-w-0 shrink-0">
+                                                                                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-slate-500 font-mono">
+                                                                                            Prod:
+                                                                                        </span>
+                                                                                        <div className="flex items-baseline gap-0.5">
+                                                                                            {isGestor && !dayStats.isFuture && (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
+                                                                                                    className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0 mr-0.5"
+                                                                                                    title={`Subtrair 1 ${dayStats.unit}`}
+                                                                                                >
+                                                                                                    -
+                                                                                                </button>
+                                                                                            )}
+                                                                                            <span
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    if (isViewer) return;
+                                                                                                    handleOpenAdjustQuantity(op, {
+                                                                                                        mode: 'shift',
+                                                                                                        dayStats: dayStats,
+                                                                                                        targetDay: currentDay,
+                                                                                                        dayColName: dayColName,
+                                                                                                        operatorName: dayStats.operatorName,
+                                                                                                        shiftProduced: dayStats.produced
+                                                                                                    });
+                                                                                                }}
+                                                                                                className={`font-black font-mono text-base sm:text-lg md:text-xl text-slate-950 tracking-tight whitespace-nowrap leading-none ${isViewer ? '' : 'cursor-pointer hover:underline'
+                                                                                                    }`}
+                                                                                                title={isViewer ? `Produção: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Ajustar contagem"}
+                                                                                            >
+                                                                                                {dayStats.produced.toLocaleString('pt-BR')}
+                                                                                            </span>
+                                                                                            <span className="text-xs font-black text-slate-700 font-mono">
+                                                                                                {dayStats.unit}
+                                                                                            </span>
+                                                                                            {isGestor && !dayStats.isFuture && (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
+                                                                                                    className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0 ml-0.5"
+                                                                                                    title={`Adicionar 1 ${dayStats.unit}`}
+                                                                                                >
+                                                                                                    +
+                                                                                                </button>
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
 
-                                                                                    {/* Bottom Row: Produção Feita vs Cronômetro de Tempo Parado */}
-                                                                                    <div className="flex items-center justify-between gap-1 min-w-0 w-full px-0.5">
-                                                                                        {/* Lado Esquerdo: Quantidade Produzida */}
-                                                                                        <div className="flex items-baseline gap-1 min-w-0 shrink-0">
-                                                                                            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-slate-500 font-mono">
-                                                                                                Prod:
+                                                                                    {/* Lado Direito: Cronômetro Parado em Destaque */}
+                                                                                    <div className={`flex items-center gap-1 font-mono px-1.5 py-0.5 rounded-md border shadow-2xs shrink-0 ${isDayStopExceeded
+                                                                                            ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                                                                            : 'bg-amber-50 text-amber-900 border-amber-300'
+                                                                                        }`}>
+                                                                                        <span className="text-[8.5px] sm:text-[9.5px] font-bold">⏱️</span>
+                                                                                        <strong className="text-xs sm:text-[13px] font-black tracking-tight">
+                                                                                            {stopTimerFormatted}
+                                                                                        </strong>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex flex-col items-center justify-center min-w-0 flex-1 overflow-hidden h-full">
+                                                                                {/* Engrenagens Animadas e Status "Em Produção" */}
+                                                                                {dayStats.isToday && !isDayCardStopped && dayStats.status === 'live' && (
+                                                                                    <div className={`flex items-center gap-1.5 select-none ${isLargeZoom ? 'mb-1' : 'mb-0.5'}`}>
+                                                                                        {/* Par de Engrenagens Intertravadas Girando */}
+                                                                                        <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-6 h-5' : 'w-4 h-3.5'}`} title="Máquina em Produção Ativa">
+                                                                                            {/* Engrenagem Maior (Sentido Horário) */}
+                                                                                            <svg
+                                                                                                className={`${isLargeZoom ? 'w-4.5 h-4.5 -top-0.5 -right-0.5' : 'w-3 h-3 -top-0.5 -right-0.5'} text-blue-950 animate-spin absolute drop-shadow-xs`}
+                                                                                                style={{ animationDuration: '3.5s' }}
+                                                                                                viewBox="0 0 24 24"
+                                                                                                fill="currentColor"
+                                                                                            >
+                                                                                                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
+                                                                                            </svg>
+                                                                                            {/* Engrenagem Menor (Sentido Anti-Horário) */}
+                                                                                            <svg
+                                                                                                className={`${isLargeZoom ? 'w-3.5 h-3.5 -bottom-0.5 -left-0.5' : 'w-2.5 h-2.5 -bottom-0.5 -left-0.5'} text-blue-800 animate-spin absolute drop-shadow-xs`}
+                                                                                                style={{ animationDuration: '2.5s', animationDirection: 'reverse' }}
+                                                                                                viewBox="0 0 24 24"
+                                                                                                fill="currentColor"
+                                                                                            >
+                                                                                                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
+                                                                                            </svg>
+                                                                                        </div>
+
+                                                                                        {/* Tag Em Produção com Pulso Verde */}
+                                                                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-900/15 border border-blue-900/20 backdrop-blur-2xs shadow-2xs">
+                                                                                            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+                                                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
                                                                                             </span>
-                                                                                            <div className="flex items-baseline gap-0.5">
-                                                                                                {isGestor && !dayStats.isFuture && (
-                                                                                                    <button
-                                                                                                        type="button"
-                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
-                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0 mr-0.5"
-                                                                                                        title={`Subtrair 1 ${dayStats.unit}`}
-                                                                                                    >
-                                                                                                        -
-                                                                                                    </button>
-                                                                                                )}
-                                                                                                <span 
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        if (isViewer) return;
-                                                                                                        handleOpenAdjustQuantity(op, {
-                                                                                                            mode: 'shift',
-                                                                                                            dayStats: dayStats,
-                                                                                                            targetDay: currentDay,
-                                                                                                            dayColName: dayColName,
-                                                                                                            operatorName: dayStats.operatorName,
-                                                                                                            shiftProduced: dayStats.produced
-                                                                                                        });
-                                                                                                    }}
-                                                                                                    className={`font-black font-mono text-base sm:text-lg md:text-xl text-slate-950 tracking-tight whitespace-nowrap leading-none ${
-                                                                                                        isViewer ? '' : 'cursor-pointer hover:underline'
-                                                                                                    }`}
-                                                                                                    title={isViewer ? `Produção: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Ajustar contagem"}
+                                                                                            <span className={`${isLargeZoom ? 'text-[8.5px] sm:text-[9.5px]' : 'text-[7px] sm:text-[7.5px]'} font-black uppercase tracking-wider text-blue-950 font-mono leading-none`}>
+                                                                                                Em Produção
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {/* Quantidade Produzida */}
+                                                                                {(() => {
+                                                                                    const formattedQtyStr = dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR');
+                                                                                    const isVeryLongQty = formattedQtyStr.length >= 6; // ex: 10.315 ou 22.000
+                                                                                    const isLongQty = formattedQtyStr.length >= 4; // ex: 2.000 ou 6.929
+
+                                                                                    const qtyTextSizeClass = dayStats.hasTimeStats
+                                                                                        ? (isFullscreenZoom
+                                                                                            ? (isVeryLongQty ? 'text-xl sm:text-2xl lg:text-3xl' : isLongQty ? 'text-2xl sm:text-3xl lg:text-[34px]' : 'text-2xl sm:text-3xl lg:text-4xl')
+                                                                                            : isLargeZoom
+                                                                                                ? (isVeryLongQty ? 'text-base sm:text-lg lg:text-xl' : isLongQty ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl')
+                                                                                                : (isVeryLongQty ? 'text-sm sm:text-base' : isLongQty ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'))
+                                                                                        : (isFullscreenZoom
+                                                                                            ? (isVeryLongQty ? 'text-2xl sm:text-3.5xl lg:text-4xl' : 'text-3xl sm:text-4xl lg:text-5xl')
+                                                                                            : isLargeZoom
+                                                                                                ? (isVeryLongQty ? 'text-xl sm:text-2.5xl lg:text-3xl' : 'text-2xl sm:text-3xl lg:text-4xl')
+                                                                                                : (isVeryLongQty ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'));
+
+                                                                                    return (
+                                                                                        <div className="flex items-center justify-center gap-1 min-w-0 w-full overflow-hidden">
+                                                                                            {/* Botão Menos Rápido para Gestor */}
+                                                                                            {isGestor && !dayStats.isFuture && (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
+                                                                                                    className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 hover:border-rose-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
+                                                                                                    title={`Subtrair 1 ${dayStats.unit} deste turno`}
                                                                                                 >
-                                                                                                    {dayStats.produced.toLocaleString('pt-BR')}
+                                                                                                    -
+                                                                                                </button>
+                                                                                            )}
+
+                                                                                            <div
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    if (isViewer) return;
+                                                                                                    handleOpenAdjustQuantity(op, {
+                                                                                                        mode: 'shift',
+                                                                                                        dayStats: dayStats,
+                                                                                                        targetDay: currentDay,
+                                                                                                        dayColName: dayColName,
+                                                                                                        operatorName: dayStats.operatorName,
+                                                                                                        shiftProduced: dayStats.produced
+                                                                                                    });
+                                                                                                }}
+                                                                                                className={`flex items-baseline justify-center gap-0.5 select-none min-w-0 ${isViewer ? 'cursor-default' : 'cursor-pointer group/qty hover:bg-white/80 px-1 py-0.5 rounded-md transition-all'
+                                                                                                    }`}
+                                                                                                title={isViewer ? `Total produzido no turno: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Clique para abrir ajuste de contagem (Gestor)"}
+                                                                                            >
+                                                                                                <span className={`${qtyTextSizeClass} font-mono font-black tracking-tight whitespace-nowrap leading-none ${dayStats.isToday
+                                                                                                        ? 'text-blue-950'
+                                                                                                        : dayStats.isPast
+                                                                                                            ? 'text-emerald-600/70 font-bold'
+                                                                                                            : 'text-amber-600/60 font-bold'
+                                                                                                    }`}>
+                                                                                                    {formattedQtyStr}
                                                                                                 </span>
-                                                                                                <span className="text-xs font-black text-slate-700 font-mono">
+                                                                                                <span className={`${isFullscreenZoom ? (isVeryLongQty ? 'text-xs sm:text-sm' : 'text-sm sm:text-base') : 'text-xs sm:text-sm'} font-semibold font-mono shrink-0 ml-0.5 leading-none ${dayStats.isToday
+                                                                                                        ? 'text-blue-700 font-black'
+                                                                                                        : dayStats.isPast
+                                                                                                            ? 'text-emerald-500/60'
+                                                                                                            : 'text-amber-500/55'
+                                                                                                    }`}>
                                                                                                     {dayStats.unit}
                                                                                                 </span>
-                                                                                                {isGestor && !dayStats.isFuture && (
-                                                                                                    <button
-                                                                                                        type="button"
-                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
-                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0 ml-0.5"
-                                                                                                        title={`Adicionar 1 ${dayStats.unit}`}
-                                                                                                    >
-                                                                                                        +
-                                                                                                    </button>
+                                                                                                {!isViewer && (
+                                                                                                    <span className="opacity-0 group-hover/qty:opacity-100 text-[9px] text-orange-500 transition-opacity shrink-0 ml-0.5" title="Ajustar Quantidade">✏️</span>
                                                                                                 )}
                                                                                             </div>
-                                                                                        </div>
 
-                                                                                        {/* Lado Direito: Cronômetro Parado em Destaque */}
-                                                                                        <div className={`flex items-center gap-1 font-mono px-1.5 py-0.5 rounded-md border shadow-2xs shrink-0 ${
-                                                                                            isDayStopExceeded
-                                                                                                ? 'bg-rose-50 text-rose-800 border-rose-300'
-                                                                                                : 'bg-amber-50 text-amber-900 border-amber-300'
-                                                                                        }`}>
-                                                                                            <span className="text-[8.5px] sm:text-[9.5px] font-bold">⏱️</span>
-                                                                                            <strong className="text-xs sm:text-[13px] font-black tracking-tight">
-                                                                                                {stopTimerFormatted}
-                                                                                            </strong>
+                                                                                            {/* Botão Mais Rápido para Gestor */}
+                                                                                            {isGestor && !dayStats.isFuture && (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
+                                                                                                    className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
+                                                                                                    title={`Adicionar 1 ${dayStats.unit} a este turno`}
+                                                                                                >
+                                                                                                    +
+                                                                                                </button>
+                                                                                            )}
                                                                                         </div>
-                                                                                    </div>
+                                                                                    );
+                                                                                })()}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Estatística de Tempo (Efetivo e Parado) - Calibração Responsiva e Sem Cortes */}
+                                                                        {!isDayCardStopped && dayStats.hasTimeStats && (
+                                                                            <div
+                                                                                className={`flex flex-col justify-center ${isFullscreenZoom ? 'gap-0.5 px-2 py-0.5 min-w-[115px] sm:min-w-[130px] lg:min-w-[140px]' : isLargeZoom ? 'gap-0.5 px-1.5 py-0.5 min-w-[105px] sm:min-w-[120px]' : 'gap-0.5 px-1.5 py-0.5 min-w-[85px] sm:min-w-[95px]'} rounded-xl border shrink-0 select-none pointer-events-none transition-all h-full max-h-full overflow-hidden shadow-xs ${dayStats.isMachineStoppedNow
+                                                                                        ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30 text-amber-900'
+                                                                                        : (dayStats.isToday && dayStats.status === 'live')
+                                                                                            ? 'bg-white/95 border-2 border-blue-400 shadow-xs ring-1 ring-blue-300/60 text-blue-950'
+                                                                                            : 'bg-emerald-50/60 border border-emerald-200/60 text-emerald-700/80 shadow-2xs'
+                                                                                    }`}
+                                                                                title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ ${dayStats.speedUnit === 's/pç' ? 'Tempo por Peça' : 'Velocidade'}: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
+                                                                            >
+                                                                                <div className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px] pb-0.2' : isLargeZoom ? 'text-[8px] sm:text-[8.5px] pb-0.2' : 'text-[7px] sm:text-[7.5px] pb-0.2'} font-black uppercase tracking-wider border-b text-center leading-none ${dayStats.isToday ? 'text-blue-700 border-blue-200' : 'text-emerald-500/70 border-emerald-100'
+                                                                                    }`}>
+                                                                                    Estatísticas
                                                                                 </div>
-                                                                            ) : (
-                                                                                <div className="flex flex-col items-center justify-center min-w-0 flex-1 overflow-hidden h-full">
-                                                                                    {/* Engrenagens Animadas e Status "Em Produção" */}
-                                                                                    {dayStats.isToday && !isDayCardStopped && dayStats.status === 'live' && (
-                                                                                        <div className={`flex items-center gap-1.5 select-none ${isLargeZoom ? 'mb-1' : 'mb-0.5'}`}>
-                                                                                            {/* Par de Engrenagens Intertravadas Girando */}
-                                                                                            <div className={`relative flex items-center justify-center shrink-0 ${isLargeZoom ? 'w-6 h-5' : 'w-4 h-3.5'}`} title="Máquina em Produção Ativa">
-                                                                                                {/* Engrenagem Maior (Sentido Horário) */}
-                                                                                                <svg 
-                                                                                                    className={`${isLargeZoom ? 'w-4.5 h-4.5 -top-0.5 -right-0.5' : 'w-3 h-3 -top-0.5 -right-0.5'} text-blue-950 animate-spin absolute drop-shadow-xs`} 
-                                                                                                    style={{ animationDuration: '3.5s' }}
-                                                                                                    viewBox="0 0 24 24" 
-                                                                                                    fill="currentColor"
-                                                                                                >
-                                                                                                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
-                                                                                                </svg>
-                                                                                                {/* Engrenagem Menor (Sentido Anti-Horário) */}
-                                                                                                <svg 
-                                                                                                    className={`${isLargeZoom ? 'w-3.5 h-3.5 -bottom-0.5 -left-0.5' : 'w-2.5 h-2.5 -bottom-0.5 -left-0.5'} text-blue-800 animate-spin absolute drop-shadow-xs`} 
-                                                                                                    style={{ animationDuration: '2.5s', animationDirection: 'reverse' }}
-                                                                                                    viewBox="0 0 24 24" 
-                                                                                                    fill="currentColor"
-                                                                                                >
-                                                                                                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.65.07-.97 0-.32-.03-.66-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 13.5 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.31-.07.65-.07.97 0 .32.03.65.07.97l-2.11 1.63c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z" />
-                                                                                                </svg>
-                                                                                            </div>
-
-                                                                                            {/* Tag Em Produção com Pulso Verde */}
-                                                                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-900/15 border border-blue-900/20 backdrop-blur-2xs shadow-2xs">
-                                                                                                <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                                                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                                                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
-                                                                                                </span>
-                                                                                                <span className={`${isLargeZoom ? 'text-[8.5px] sm:text-[9.5px]' : 'text-[7px] sm:text-[7.5px]'} font-black uppercase tracking-wider text-blue-950 font-mono leading-none`}>
-                                                                                                    Em Produção
-                                                                                                </span>
-                                                                                            </div>
+                                                                                <div className={`grid grid-cols-[auto_1fr] items-center ${isFullscreenZoom ? 'gap-x-2 gap-y-0 text-[11px] sm:text-xs' : isLargeZoom ? 'gap-x-1.5 gap-y-0 text-[10px] sm:text-[11px]' : 'gap-x-1 gap-y-0 text-[8px] sm:text-[8.5px]'} leading-tight font-mono`}>
+                                                                                    <span className={`font-black uppercase tracking-wider text-left ${dayStats.isToday ? 'text-blue-800' : 'text-emerald-600/70'}`}>EF:</span>
+                                                                                    <strong className={`font-black ${isFullscreenZoom ? 'text-[15.5px] sm:text-[17px] lg:text-[18.5px]' : isLargeZoom ? 'text-[13.5px] sm:text-[15px] lg:text-[16px]' : 'text-[10.5px] sm:text-[11.5px]'} text-right leading-none ${dayStats.isToday ? 'text-emerald-700' : 'text-emerald-600/80'}`}>{dayStats.effectiveFormatted}</strong>
+                                                                                    <span className={`font-black uppercase tracking-wider text-left ${dayStats.isToday ? 'text-blue-800' : 'text-emerald-600/70'}`}>PAR:</span>
+                                                                                    <strong className={`font-black ${isFullscreenZoom ? 'text-[15.5px] sm:text-[17px] lg:text-[18.5px]' : isLargeZoom ? 'text-[13.5px] sm:text-[15px] lg:text-[16px]' : 'text-[10.5px] sm:text-[11.5px]'} text-right leading-none ${dayStats.isMachineStoppedNow ? 'text-amber-700 font-extrabold' : dayStats.isToday ? 'text-slate-600' : 'text-emerald-600/60'}`}>{dayStats.downtimeFormatted}</strong>
+                                                                                </div>
+                                                                                <div className={`flex flex-col border-t border-slate-200/70 ${isLargeZoom ? 'gap-0.2 pt-0.5' : 'gap-0.2 pt-0.2'}`}>
+                                                                                    {dayStats.ratePerHour > 0 && (
+                                                                                        <div className="flex items-center justify-between gap-1 leading-none font-mono">
+                                                                                            <span className={`${isFullscreenZoom ? 'text-[10.5px] sm:text-xs' : isLargeZoom ? 'text-[9.5px] sm:text-[10.5px]' : 'text-[8px]'} text-slate-500`}>🚀</span>
+                                                                                            <strong className={`text-slate-800 font-black ${isFullscreenZoom ? 'text-[11px] sm:text-xs' : isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9.5px]'} text-right leading-none`}>{dayStats.ratePerHour.toLocaleString('pt-BR')} <span className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px]' : isLargeZoom ? 'text-[8px] sm:text-[8.5px]' : 'text-[7px] sm:text-[7.5px]'} font-semibold text-slate-500`}>{dayStats.rateUnit}</span></strong>
                                                                                         </div>
                                                                                     )}
-
-                                                                                    {/* Quantidade Produzida */}
-                                                                                    {(() => {
-                                                                                        const formattedQtyStr = dayStats.isFuture ? `~${dayStats.produced.toLocaleString('pt-BR')}` : dayStats.produced.toLocaleString('pt-BR');
-                                                                                        const isVeryLongQty = formattedQtyStr.length >= 6; // ex: 10.315 ou 22.000
-                                                                                        const isLongQty = formattedQtyStr.length >= 4; // ex: 2.000 ou 6.929
-
-                                                                                        const qtyTextSizeClass = dayStats.hasTimeStats
-                                                                                            ? (isFullscreenZoom
-                                                                                                ? (isVeryLongQty ? 'text-xl sm:text-2xl lg:text-3xl' : isLongQty ? 'text-2xl sm:text-3xl lg:text-[34px]' : 'text-2xl sm:text-3xl lg:text-4xl')
-                                                                                                : isLargeZoom
-                                                                                                    ? (isVeryLongQty ? 'text-base sm:text-lg lg:text-xl' : isLongQty ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl')
-                                                                                                    : (isVeryLongQty ? 'text-sm sm:text-base' : isLongQty ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'))
-                                                                                            : (isFullscreenZoom
-                                                                                                ? (isVeryLongQty ? 'text-2xl sm:text-3.5xl lg:text-4xl' : 'text-3xl sm:text-4xl lg:text-5xl')
-                                                                                                : isLargeZoom
-                                                                                                    ? (isVeryLongQty ? 'text-xl sm:text-2.5xl lg:text-3xl' : 'text-2xl sm:text-3xl lg:text-4xl')
-                                                                                                    : (isVeryLongQty ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'));
-
-                                                                                        return (
-                                                                                            <div className="flex items-center justify-center gap-1 min-w-0 w-full overflow-hidden">
-                                                                                                {/* Botão Menos Rápido para Gestor */}
-                                                                                                {isGestor && !dayStats.isFuture && (
-                                                                                                    <button
-                                                                                                        type="button"
-                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? -50 : -1)}
-                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 border border-slate-200 hover:border-rose-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
-                                                                                                        title={`Subtrair 1 ${dayStats.unit} deste turno`}
-                                                                                                    >
-                                                                                                        -
-                                                                                                    </button>
-                                                                                                )}
-
-                                                                                                <div 
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        if (isViewer) return;
-                                                                                                        handleOpenAdjustQuantity(op, {
-                                                                                                            mode: 'shift',
-                                                                                                            dayStats: dayStats,
-                                                                                                            targetDay: currentDay,
-                                                                                                            dayColName: dayColName,
-                                                                                                            operatorName: dayStats.operatorName,
-                                                                                                            shiftProduced: dayStats.produced
-                                                                                                        });
-                                                                                                    }}
-                                                                                                    className={`flex items-baseline justify-center gap-0.5 select-none min-w-0 ${
-                                                                                                        isViewer ? 'cursor-default' : 'cursor-pointer group/qty hover:bg-white/80 px-1 py-0.5 rounded-md transition-all'
-                                                                                                    }`}
-                                                                                                    title={isViewer ? `Total produzido no turno: ${dayStats.produced.toLocaleString('pt-BR')} ${dayStats.unit}` : "Clique para abrir ajuste de contagem (Gestor)"}
-                                                                                                >
-                                                                                                    <span className={`${qtyTextSizeClass} font-mono font-black tracking-tight whitespace-nowrap leading-none ${
-                                                                                                        dayStats.isToday 
-                                                                                                            ? 'text-blue-950' 
-                                                                                                            : dayStats.isPast 
-                                                                                                                ? 'text-emerald-600/70 font-bold' 
-                                                                                                                : 'text-amber-600/60 font-bold'
-                                                                                                    }`}>
-                                                                                                        {formattedQtyStr}
-                                                                                                    </span>
-                                                                                                    <span className={`${isFullscreenZoom ? (isVeryLongQty ? 'text-xs sm:text-sm' : 'text-sm sm:text-base') : 'text-xs sm:text-sm'} font-semibold font-mono shrink-0 ml-0.5 leading-none ${
-                                                                                                        dayStats.isToday 
-                                                                                                            ? 'text-blue-700 font-black' 
-                                                                                                            : dayStats.isPast 
-                                                                                                                ? 'text-emerald-500/60' 
-                                                                                                                : 'text-amber-500/55'
-                                                                                                    }`}>
-                                                                                                        {dayStats.unit}
-                                                                                                    </span>
-                                                                                                    {!isViewer && (
-                                                                                                        <span className="opacity-0 group-hover/qty:opacity-100 text-[9px] text-orange-500 transition-opacity shrink-0 ml-0.5" title="Ajustar Quantidade">✏️</span>
-                                                                                                    )}
-                                                                                                </div>
-
-                                                                                                {/* Botão Mais Rápido para Gestor */}
-                                                                                                {isGestor && !dayStats.isFuture && (
-                                                                                                    <button
-                                                                                                        type="button"
-                                                                                                        onClick={(e) => handleQuickAdjustShift(e, op, dayStats, currentDay, isTrefila ? 50 : 1)}
-                                                                                                        className="w-4 h-4 rounded bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-black flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 active:scale-90 cursor-pointer select-none shrink-0"
-                                                                                                        title={`Adicionar 1 ${dayStats.unit} a este turno`}
-                                                                                                    >
-                                                                                                        +
-                                                                                                    </button>
-                                                                                                )}
-                                                                                            </div>
-                                                                                        );
-                                                                                    })()}
+                                                                                    {Boolean(dayStats.speedUnit) && (
+                                                                                        <div className="flex items-center justify-between gap-1 leading-none font-mono">
+                                                                                            <span className={`${isFullscreenZoom ? 'text-[10.5px] sm:text-xs' : isLargeZoom ? 'text-[9.5px] sm:text-[10.5px]' : 'text-[8px]'} text-slate-500`}>⚡</span>
+                                                                                            <strong className={`text-slate-800 font-black ${isFullscreenZoom ? 'text-[11px] sm:text-xs' : isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9.5px]'} text-right leading-none`}>{dayStats.speedValue > 0 ? dayStats.speedFormatted : '—'} <span className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px]' : isLargeZoom ? 'text-[8px] sm:text-[8.5px]' : 'text-[7px] sm:text-[7.5px]'} font-semibold text-slate-500`}>{dayStats.speedUnit}</span></strong>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
-                                                                            )}
-
-                                                                            {/* Estatística de Tempo (Efetivo e Parado) - Calibração Responsiva e Sem Cortes */}
-                                                                            {!isDayCardStopped && dayStats.hasTimeStats && (
-                                                                                <div 
-                                                                                    className={`flex flex-col justify-center ${isFullscreenZoom ? 'gap-0.5 px-2 py-0.5 min-w-[115px] sm:min-w-[130px] lg:min-w-[140px]' : isLargeZoom ? 'gap-0.5 px-1.5 py-0.5 min-w-[105px] sm:min-w-[120px]' : 'gap-0.5 px-1.5 py-0.5 min-w-[85px] sm:min-w-[95px]'} rounded-xl border shrink-0 select-none pointer-events-none transition-all h-full max-h-full overflow-hidden shadow-xs ${
-                                                                                        dayStats.isMachineStoppedNow
-                                                                                            ? 'bg-amber-50/95 border-amber-300 ring-1 ring-amber-400/30 text-amber-900'
-                                                                                            : (dayStats.isToday && dayStats.status === 'live')
-                                                                                                ? 'bg-white/95 border-2 border-blue-400 shadow-xs ring-1 ring-blue-300/60 text-blue-950'
-                                                                                                : 'bg-emerald-50/60 border border-emerald-200/60 text-emerald-700/80 shadow-2xs'
-                                                                                    }`}
-                                                                                    title={`Cronômetro do Turno (Tempo Real):\n⚡ Efetivo: ${dayStats.effectiveFormatted} ${dayStats.isProducingNow ? '(Correndo)' : '(Pausado)'}\n⏱️ Parado: ${dayStats.downtimeFormatted} ${dayStats.isMachineStoppedNow ? '(Correndo)' : '(Pausado)'}${dayStats.ratePerHour > 0 ? `\n🚀 Ritmo: ${dayStats.rateFormatted}` : ''}${dayStats.speedValue > 0 ? `\n⚡ ${dayStats.speedUnit === 's/pç' ? 'Tempo por Peça' : 'Velocidade'}: ${dayStats.speedFormatted} ${dayStats.speedUnit}` : ''}`}
-                                                                                >
-                                                                                    <div className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px] pb-0.2' : isLargeZoom ? 'text-[8px] sm:text-[8.5px] pb-0.2' : 'text-[7px] sm:text-[7.5px] pb-0.2'} font-black uppercase tracking-wider border-b text-center leading-none ${
-                                                                                        dayStats.isToday ? 'text-blue-700 border-blue-200' : 'text-emerald-500/70 border-emerald-100'
-                                                                                    }`}>
-                                                                                        Estatísticas
-                                                                                    </div>
-                                                                                    <div className={`grid grid-cols-[auto_1fr] items-center ${isFullscreenZoom ? 'gap-x-2 gap-y-0 text-[11px] sm:text-xs' : isLargeZoom ? 'gap-x-1.5 gap-y-0 text-[10px] sm:text-[11px]' : 'gap-x-1 gap-y-0 text-[8px] sm:text-[8.5px]'} leading-tight font-mono`}>
-                                                                                        <span className={`font-black uppercase tracking-wider text-left ${dayStats.isToday ? 'text-blue-800' : 'text-emerald-600/70'}`}>EF:</span>
-                                                                                        <strong className={`font-black ${isFullscreenZoom ? 'text-[15.5px] sm:text-[17px] lg:text-[18.5px]' : isLargeZoom ? 'text-[13.5px] sm:text-[15px] lg:text-[16px]' : 'text-[10.5px] sm:text-[11.5px]'} text-right leading-none ${dayStats.isToday ? 'text-emerald-700' : 'text-emerald-600/80'}`}>{dayStats.effectiveFormatted}</strong>
-                                                                                        <span className={`font-black uppercase tracking-wider text-left ${dayStats.isToday ? 'text-blue-800' : 'text-emerald-600/70'}`}>PAR:</span>
-                                                                                        <strong className={`font-black ${isFullscreenZoom ? 'text-[15.5px] sm:text-[17px] lg:text-[18.5px]' : isLargeZoom ? 'text-[13.5px] sm:text-[15px] lg:text-[16px]' : 'text-[10.5px] sm:text-[11.5px]'} text-right leading-none ${dayStats.isMachineStoppedNow ? 'text-amber-700 font-extrabold' : dayStats.isToday ? 'text-slate-600' : 'text-emerald-600/60'}`}>{dayStats.downtimeFormatted}</strong>
-                                                                                    </div>
-                                                                                    <div className={`flex flex-col border-t border-slate-200/70 ${isLargeZoom ? 'gap-0.2 pt-0.5' : 'gap-0.2 pt-0.2'}`}>
-                                                                                        {dayStats.ratePerHour > 0 && (
-                                                                                            <div className="flex items-center justify-between gap-1 leading-none font-mono">
-                                                                                                <span className={`${isFullscreenZoom ? 'text-[10.5px] sm:text-xs' : isLargeZoom ? 'text-[9.5px] sm:text-[10.5px]' : 'text-[8px]'} text-slate-500`}>🚀</span>
-                                                                                                <strong className={`text-slate-800 font-black ${isFullscreenZoom ? 'text-[11px] sm:text-xs' : isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9.5px]'} text-right leading-none`}>{dayStats.ratePerHour.toLocaleString('pt-BR')} <span className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px]' : isLargeZoom ? 'text-[8px] sm:text-[8.5px]' : 'text-[7px] sm:text-[7.5px]'} font-semibold text-slate-500`}>{dayStats.rateUnit}</span></strong>
-                                                                                            </div>
-                                                                                        )}
-                                                                                        {Boolean(dayStats.speedUnit) && (
-                                                                                            <div className="flex items-center justify-between gap-1 leading-none font-mono">
-                                                                                                <span className={`${isFullscreenZoom ? 'text-[10.5px] sm:text-xs' : isLargeZoom ? 'text-[9.5px] sm:text-[10.5px]' : 'text-[8px]'} text-slate-500`}>⚡</span>
-                                                                                                <strong className={`text-slate-800 font-black ${isFullscreenZoom ? 'text-[11px] sm:text-xs' : isLargeZoom ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[9.5px]'} text-right leading-none`}>{dayStats.speedValue > 0 ? dayStats.speedFormatted : '—'} <span className={`${isFullscreenZoom ? 'text-[9px] sm:text-[9.5px]' : isLargeZoom ? 'text-[8px] sm:text-[8.5px]' : 'text-[7px] sm:text-[7.5px]'} font-semibold text-slate-500`}>{dayStats.speedUnit}</span></strong>
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                );
-                                                            })}
-                                                        </div>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
+                    </div>
 
-                        {/* RODAPÉ DE TOTAIS DIÁRIOS (SOMA DE TODAS AS MÁQUINAS: PLANEJADO vs PRODUZIDO EM KG) */}
-                        <div className="pcp-timeline-grid relative z-30 shrink-0 bg-white/95 backdrop-blur-md border-t-2 border-orange-500 shadow-[0_-4px_20px_rgba(11,43,104,0.12)]">
-                            {/* Coluna 1: Indicador Geral e Resumo da Semana */}
-                            <div className="px-3 py-1 flex items-center justify-between border-r border-slate-700/60 border-l-4 border-l-orange-500 sticky left-0 z-40 bg-gradient-to-br from-[#092354] via-[#0C2B68] to-[#0A1F48] text-white shadow-md select-none min-h-[44px] overflow-hidden">
-                                <div className="flex flex-col justify-center min-w-0">
-                                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-white flex items-center gap-1 leading-none">
-                                        <span>📊 TOTAIS</span>
-                                    </span>
-                                    <span className="text-[9.5px] sm:text-[10px] font-mono text-blue-200/80 leading-tight mt-1 truncate">
-                                        {selectedMachinesFilter.length} Máquinas
-                                    </span>
-                                </div>
-                                
-                                <div className="flex flex-col items-end justify-center shrink-0">
-                                    {weekDailyTotals.weekTotalPlannedKg > 0 && (
-                                        <div className="flex items-center gap-1 font-mono leading-none mb-0.5">
-                                            <span className="text-[8.5px] uppercase font-bold text-slate-300">Meta:</span>
-                                            <span className="text-xs sm:text-sm font-black text-orange-400">{weekDailyTotals.weekPercent}%</span>
-                                        </div>
-                                    )}
-                                    <div className="text-[10px] sm:text-xs font-mono font-black text-emerald-300 leading-none">
-                                        {weekDailyTotals.weekTotalProducedKg.toLocaleString('pt-BR')} kg
-                                    </div>
-                                </div>
+                    {/* RODAPÉ DE TOTAIS DIÁRIOS (SOMA DE TODAS AS MÁQUINAS: PLANEJADO vs PRODUZIDO EM KG) */}
+                    <div className="pcp-timeline-grid relative z-30 shrink-0 bg-white/95 backdrop-blur-md border-t-2 border-orange-500 shadow-[0_-4px_20px_rgba(11,43,104,0.12)]">
+                        {/* Coluna 1: Indicador Geral e Resumo da Semana */}
+                        <div className="px-3 py-1 flex items-center justify-between border-r border-slate-700/60 border-l-4 border-l-orange-500 sticky left-0 z-40 bg-gradient-to-br from-[#092354] via-[#0C2B68] to-[#0A1F48] text-white shadow-md select-none min-h-[44px] overflow-hidden">
+                            <div className="flex flex-col justify-center min-w-0">
+                                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-white flex items-center gap-1 leading-none">
+                                    <span>📊 TOTAIS</span>
+                                </span>
+                                <span className="text-[9.5px] sm:text-[10px] font-mono text-blue-200/80 leading-tight mt-1 truncate">
+                                    {selectedMachinesFilter.length} Máquinas
+                                </span>
                             </div>
 
-                            {/* Colunas 2 a 6: Cada dia da semana (Segunda a Sexta) - Prod e Plan em linha e com fontes ampliadas */}
-                            {weekDailyTotals.days.map((d, index) => {
-                                const isEvenCol = index % 2 === 0;
-                                return (
-                                    <div 
-                                        key={index} 
-                                        className={`px-3 py-1 flex items-center justify-between border-l text-left transition-all select-none gap-2 min-h-[44px] ${
-                                            d.isToday 
-                                                ? (isEvenCol
-                                                    ? 'bg-[#CBDDF2] border-l-blue-500 shadow-inner'
-                                                    : 'bg-blue-50/90 border-l-blue-500 shadow-inner') 
-                                                : d.isHoliday 
-                                                    ? 'bg-rose-50/70 border-l-rose-300' 
-                                                    : isEvenCol
-                                                        ? 'bg-[#CBDDF2] border-l-slate-400/80'
-                                                        : 'bg-white border-l-slate-200'
-                                        }`}
-                                    >
-                                        {/* Produzido */}
-                                        <div className="flex items-center gap-1.5 font-mono leading-none min-w-0">
-                                            <span className="text-[9.5px] sm:text-[10.5px] lg:text-xs text-slate-500 uppercase font-black shrink-0">PROD:</span>
-                                            <strong className={`text-sm sm:text-base lg:text-lg font-black tracking-tight truncate ${d.dayProducedKg > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                                                {d.dayProducedKg > 0 ? `${d.dayProducedKg.toLocaleString('pt-BR')} kg` : d.isFuture ? '-' : '0 kg'}
-                                            </strong>
-                                        </div>
-
-                                        {/* Divisor vertical */}
-                                        <div className="h-5 w-px bg-slate-300 shrink-0" />
-
-                                        {/* Programado / Planejado */}
-                                        <div className="flex items-center gap-1.5 font-mono leading-none min-w-0">
-                                            <span className="text-[9.5px] sm:text-[10.5px] lg:text-xs text-slate-500 uppercase font-black shrink-0">PLAN:</span>
-                                            <strong className="text-sm sm:text-base lg:text-lg font-black text-blue-950 tracking-tight truncate">
-                                                {d.dayPlannedKg > 0 ? `~${d.dayPlannedKg.toLocaleString('pt-BR')} kg` : '-'}
-                                            </strong>
-                                        </div>
+                            <div className="flex flex-col items-end justify-center shrink-0">
+                                {weekDailyTotals.weekTotalPlannedKg > 0 && (
+                                    <div className="flex items-center gap-1 font-mono leading-none mb-0.5">
+                                        <span className="text-[8.5px] uppercase font-bold text-slate-300">Meta:</span>
+                                        <span className="text-xs sm:text-sm font-black text-orange-400">{weekDailyTotals.weekPercent}%</span>
                                     </div>
-                                );
-                            })}
+                                )}
+                                <div className="text-[10px] sm:text-xs font-mono font-black text-emerald-300 leading-none">
+                                    {weekDailyTotals.weekTotalProducedKg.toLocaleString('pt-BR')} kg
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Colunas 2 a 6: Cada dia da semana (Segunda a Sexta) - Prod e Plan em linha e com fontes ampliadas */}
+                        {weekDailyTotals.days.map((d, index) => {
+                            const isEvenCol = index % 2 === 0;
+                            return (
+                                <div
+                                    key={index}
+                                    className={`px-3 py-1 flex items-center justify-between border-l text-left transition-all select-none gap-2 min-h-[44px] ${d.isToday
+                                            ? (isEvenCol
+                                                ? 'bg-[#CBDDF2] border-l-blue-500 shadow-inner'
+                                                : 'bg-blue-50/90 border-l-blue-500 shadow-inner')
+                                            : d.isHoliday
+                                                ? 'bg-rose-50/70 border-l-rose-300'
+                                                : isEvenCol
+                                                    ? 'bg-[#CBDDF2] border-l-slate-400/80'
+                                                    : 'bg-white border-l-slate-200'
+                                        }`}
+                                >
+                                    {/* Produzido */}
+                                    <div className="flex items-center gap-1.5 font-mono leading-none min-w-0">
+                                        <span className="text-[9.5px] sm:text-[10.5px] lg:text-xs text-slate-500 uppercase font-black shrink-0">PROD:</span>
+                                        <strong className={`text-sm sm:text-base lg:text-lg font-black tracking-tight truncate ${d.dayProducedKg > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                            {d.dayProducedKg > 0 ? `${d.dayProducedKg.toLocaleString('pt-BR')} kg` : d.isFuture ? '-' : '0 kg'}
+                                        </strong>
+                                    </div>
+
+                                    {/* Divisor vertical */}
+                                    <div className="h-5 w-px bg-slate-300 shrink-0" />
+
+                                    {/* Programado / Planejado */}
+                                    <div className="flex items-center gap-1.5 font-mono leading-none min-w-0">
+                                        <span className="text-[9.5px] sm:text-[10.5px] lg:text-xs text-slate-500 uppercase font-black shrink-0">PLAN:</span>
+                                        <strong className="text-sm sm:text-base lg:text-lg font-black text-blue-950 tracking-tight truncate">
+                                            {d.dayPlannedKg > 0 ? `~${d.dayPlannedKg.toLocaleString('pt-BR')} kg` : '-'}
+                                        </strong>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
+            </div>
 
             {/* ========================================================================= */}
             {/* MODAL 1: CRIAR NOVA ORDEM DIRETA NO PCP COM TODAS AS REGRAS DAS MÁQUINAS */}
@@ -6954,26 +6917,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {isCreateModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-2 sm:p-4 overflow-y-auto">
                     <div className={`w-full ${createCategory === 'Treliça' ? 'max-w-6xl' : 'max-w-5xl'} pcp-glass-card rounded-2xl border border-white/10 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl my-auto transition-all duration-300`}>
-                        
+
                         {/* Topo do Modal */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-3">
                             <div className="flex items-center gap-2.5">
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                                    createCategory === 'Trefila' ? 'bg-cyan-500/15 text-[#00E5FF]' :
-                                    createCategory === 'Treliça' ? 'bg-emerald-500/15 text-emerald-400' :
-                                    'bg-purple-500/15 text-purple-400'
-                                }`}>
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${createCategory === 'Trefila' ? 'bg-cyan-500/15 text-[#00E5FF]' :
+                                        createCategory === 'Treliça' ? 'bg-emerald-500/15 text-emerald-400' :
+                                            'bg-purple-500/15 text-purple-400'
+                                    }`}>
                                     <PlusIcon className="w-5 h-5 stroke-[3]" />
                                 </div>
                                 <div>
                                     <h3 className="text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
                                         Criar e Programar Ordem de Produção
                                         {isMachineLocked && (
-                                            <span className={`text-xs px-2.5 py-0.5 rounded-md border font-mono ${
-                                                createCategory === 'Trefila' ? 'bg-cyan-500/20 text-[#00E5FF] border-cyan-500/40' :
-                                                createCategory === 'Treliça' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
-                                                'bg-purple-500/20 text-purple-400 border-purple-500/40'
-                                            }`}>
+                                            <span className={`text-xs px-2.5 py-0.5 rounded-md border font-mono ${createCategory === 'Trefila' ? 'bg-cyan-500/20 text-[#00E5FF] border-cyan-500/40' :
+                                                    createCategory === 'Treliça' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
+                                                        'bg-purple-500/20 text-purple-400 border-purple-500/40'
+                                                }`}>
                                                 {createMachine}
                                             </span>
                                         )}
@@ -6997,11 +6958,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleChangeCategory('Trefila')}
-                                    className={`py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
-                                        createCategory === 'Trefila'
+                                    className={`py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${createCategory === 'Trefila'
                                             ? 'bg-cyan-500/25 text-[#00E5FF] border border-[#00E5FF]/40 shadow-lg shadow-cyan-500/10'
                                             : 'text-slate-400 hover:text-white'
-                                    }`}
+                                        }`}
                                 >
                                     ⚙️ Trefila (Fio Máquina)
                                 </button>
@@ -7009,11 +6969,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleChangeCategory('Treliça')}
-                                    className={`py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
-                                        createCategory === 'Treliça'
+                                    className={`py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${createCategory === 'Treliça'
                                             ? 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 shadow-lg shadow-emerald-500/10'
                                             : 'text-slate-400 hover:text-white'
-                                    }`}
+                                        }`}
                                 >
                                     🏗️ Treliça (CA-60)
                                 </button>
@@ -7021,11 +6980,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleChangeCategory('Malha')}
-                                    className={`py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${
-                                        createCategory === 'Malha'
+                                    className={`py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider ${createCategory === 'Malha'
                                             ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-lg shadow-purple-500/10'
                                             : 'text-slate-400 hover:text-white'
-                                    }`}
+                                        }`}
                                 >
                                     🕸️ Malha
                                 </button>
@@ -7034,11 +6992,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             <div className="flex items-center justify-between bg-[#08131B] px-4 py-2.5 rounded-xl border border-white/5 text-xs">
                                 <div className="flex items-center gap-2 font-bold">
                                     <span className="text-slate-400 uppercase tracking-wider text-[11px]">Máquina Selecionada no PCP:</span>
-                                    <span className={`font-black uppercase px-2.5 py-0.5 rounded-lg border ${
-                                        createCategory === 'Trefila' ? 'bg-cyan-500/15 text-[#00E5FF] border-cyan-500/30' :
-                                        createCategory === 'Treliça' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                                        'bg-purple-500/15 text-purple-400 border-purple-500/30'
-                                    }`}>
+                                    <span className={`font-black uppercase px-2.5 py-0.5 rounded-lg border ${createCategory === 'Trefila' ? 'bg-cyan-500/15 text-[#00E5FF] border-cyan-500/30' :
+                                            createCategory === 'Treliça' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                                                'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                                        }`}>
                                         {createMachine} • {createCategory === 'Trefila' ? 'Processo Trefilação' : createCategory === 'Treliça' ? 'Processo Treliça' : 'Processo Malha'}
                                     </span>
                                 </div>
@@ -7053,7 +7010,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         {/* ========================================================== */}
                         {createCategory === 'Trefila' && (
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                                
+
                                 {/* Coluna Esquerda: Dados da Ordem & Programação */}
                                 <div className="lg:col-span-5 flex flex-col gap-3.5 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
                                     <h4 className="text-xs font-black uppercase text-[#00E5FF] tracking-wider border-b border-white/5 pb-2">
@@ -7107,7 +7064,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 Ordem Fantasma (Simulação / Sem reserva e sem baixa)
                                             </label>
                                             <span className="text-[10px] text-amber-300/80 leading-tight mt-0.5">
-                                                {isGhostOrder 
+                                                {isGhostOrder
                                                     ? '⚠️ Modo Fantasma Ativo: Os lotes de Fio Máquina devem ser selecionados obrigatoriamente para cálculo de tempo. Não reservará os lotes e não baixará o estoque ao concluir.'
                                                     : 'Ordem regular: os lotes serão reservados para a Trefila e baixados na produção.'}
                                             </span>
@@ -7200,7 +7157,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 ⚡ Parâmetros da Máquina
                                             </span>
                                             <span className="text-[9px] text-slate-400 font-mono">
-                                                {trefilaProductionCalculations.massPerHour > 0 
+                                                {trefilaProductionCalculations.massPerHour > 0
                                                     ? `${trefilaProductionCalculations.massPerHour.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg/h teóricos`
                                                     : 'Informe a velocidade'}
                                             </span>
@@ -7225,8 +7182,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                     </span>
                                                 </div>
                                                 <span className="text-[8px] text-slate-500 font-mono truncate">
-                                                    {trefilaProductionCalculations.speed > 0 
-                                                        ? `~${(trefilaProductionCalculations.speed * 60).toFixed(0)} m/min` 
+                                                    {trefilaProductionCalculations.speed > 0
+                                                        ? `~${(trefilaProductionCalculations.speed * 60).toFixed(0)} m/min`
                                                         : '—'}
                                                 </span>
                                             </div>
@@ -7304,11 +7261,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                 key={num}
                                                                 type="button"
                                                                 onClick={() => handleSelectK7Count(num)}
-                                                                className={`px-2 py-0.5 rounded text-[10px] font-black transition-all ${
-                                                                    k7Count === num
+                                                                className={`px-2 py-0.5 rounded text-[10px] font-black transition-all ${k7Count === num
                                                                         ? 'bg-amber-400 text-slate-950 shadow-sm'
                                                                         : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                                                }`}
+                                                                    }`}
                                                                 title={`Configurar ${num} K-7${num > 1 ? 's' : ''}`}
                                                             >
                                                                 {num} K-7{num > 1 ? 's' : ''}
@@ -7354,9 +7310,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                                         <span className="text-slate-300 font-bold font-mono">
                                                                             {pass.dOutput.toFixed(2)} mm
                                                                         </span>
-                                                                        <span className={`px-1 py-0.2 rounded text-[8px] font-bold ${
-                                                                            pass.reduction > 29 ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-[#00E5FF]'
-                                                                        }`}>
+                                                                        <span className={`px-1 py-0.2 rounded text-[8px] font-bold ${pass.reduction > 29 ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-[#00E5FF]'
+                                                                            }`}>
                                                                             -{pass.reduction.toFixed(1)}%
                                                                         </span>
                                                                     </div>
@@ -7437,8 +7392,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <div className="flex items-center justify-between text-[8px] font-mono text-slate-400 px-0.5">
                                                 <span className="text-[8px] uppercase tracking-wider text-slate-500">Tempo líquido:</span>
                                                 <span className="text-cyan-300 font-bold">
-                                                    {trefilaProductionCalculations.totalHours > 0 
-                                                        ? `~${(trefilaProductionCalculations.totalHours / dailyShiftDetails.totalWorkHours).toFixed(1)}d (${dailyShiftDetails.totalWorkHours.toFixed(1)}h/d)` 
+                                                    {trefilaProductionCalculations.totalHours > 0
+                                                        ? `~${(trefilaProductionCalculations.totalHours / dailyShiftDetails.totalWorkHours).toFixed(1)}d (${dailyShiftDetails.totalWorkHours.toFixed(1)}h/d)`
                                                         : '—'}
                                                 </span>
                                             </div>
@@ -7537,7 +7492,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 2. Lotes Disponíveis de Fio Máquina ({availableTrefilaLots.length})
                                             </h4>
                                             <p className="text-[10px] text-slate-400">
-                                                Marque os lotes que serão consumidos nesta OP 
+                                                Marque os lotes que serão consumidos nesta OP
                                                 <strong className="text-amber-400 font-normal"> (obrigatório inclusive em Ordens Fantasma)</strong>
                                             </p>
                                         </div>
@@ -7569,14 +7524,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 {availableTrefilaLots.map(lot => {
                                                     const isSelected = selectedLotIds.includes(lot.id);
                                                     return (
-                                                        <tr 
+                                                        <tr
                                                             key={lot.id}
                                                             onClick={() => handleSelectTrefilaLot(lot.id, !isSelected)}
-                                                            className={`cursor-pointer transition-colors ${
-                                                                isSelected 
-                                                                    ? 'bg-[#00E5FF]/10 text-white' 
+                                                            className={`cursor-pointer transition-colors ${isSelected
+                                                                    ? 'bg-[#00E5FF]/10 text-white'
                                                                     : 'hover:bg-white/[0.02] text-slate-300'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <td className="p-2.5 text-center">
                                                                 <input
@@ -7628,9 +7582,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             const supCandidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === supBitolaNorm;
                                 const notInOthers = !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
+                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
@@ -7638,9 +7592,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             const inf1Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === infBitolaNorm;
                                 const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
+                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
@@ -7648,9 +7602,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             const inf2Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === infBitolaNorm;
                                 const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
+                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
@@ -7658,9 +7612,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             const sen1Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === senBitolaNorm;
                                 const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
+                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideRightLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
@@ -7668,9 +7622,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             const sen2Candidates = availableCa60Stock.filter(s => {
                                 const matchGauge = trelicaShowAllGauges || normalizeBitola(s.bitola) === senBitolaNorm;
                                 const notInOthers = !isLotSelectedIn(trelicaSuperiorLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
-                                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
-                                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s);
+                                    !isLotSelectedIn(trelicaInferiorLeftLots, s) &&
+                                    !isLotSelectedIn(trelicaInferiorRightLots, s) &&
+                                    !isLotSelectedIn(trelicaSenozoideLeftLots, s);
                                 const matchSearch = !trelicaLotSearch || (s.internalLot || '').toLowerCase().includes(trelicaLotSearch.toLowerCase());
                                 return matchGauge && notInOthers && matchSearch;
                             });
@@ -7752,11 +7706,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             <tr
                                                                 key={lot.id}
                                                                 onClick={() => handleToggleTrelicaLot(posKey, lot.id, !isSelected)}
-                                                                className={`cursor-pointer transition-colors ${
-                                                                    isSelected 
-                                                                        ? 'bg-emerald-500/15 text-white' 
+                                                                className={`cursor-pointer transition-colors ${isSelected
+                                                                        ? 'bg-emerald-500/15 text-white'
                                                                         : 'hover:bg-white/[0.03] text-slate-300'
-                                                                }`}
+                                                                    }`}
                                                             >
                                                                 <td className="p-2 text-center">
                                                                     <input
@@ -7798,7 +7751,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                             return (
                                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                                    
+
                                     {/* Coluna Esquerda: Parâmetros da Treliça e Esquema de Tempos */}
                                     <div className="lg:col-span-5 flex flex-col gap-3 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
                                         <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider border-b border-white/5 pb-2">
@@ -8150,65 +8103,65 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         />
                                     </div>
 
-                                     <div className="flex flex-col gap-1">
-                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                                             <span>Modelo da Malha (Gestão de Lotes)</span>
-                                             {selectedMalhaModelObj?.productCode && (
-                                                 <span className="text-[9px] text-purple-400 font-mono font-bold bg-purple-500/10 px-1.5 py-0.5 rounded">
-                                                     Cód. {selectedMalhaModelObj.productCode}
-                                                 </span>
-                                             )}
-                                         </label>
-                                         <select
-                                             value={malhaModel}
-                                             onChange={(e) => {
-                                                 const val = e.target.value;
-                                                 setMalhaModel(val);
-                                                 const found = availableMalhaModels.find(m => m.description === val || m.productCode === val || m.id === val);
-                                                 if (found && found.gauge) {
-                                                     const rawG = found.gauge.replace('mm', '').replace(',', '.').trim();
-                                                     setMalhaBitola(rawG as Bitola);
-                                                 }
-                                             }}
-                                             className="w-full bg-[#07131B] border border-purple-500/30 rounded-xl py-2 px-3 text-xs text-white font-bold focus:outline-none focus:border-purple-400"
-                                         >
-                                             <option value="">Selecione um modelo de malha cadastrado...</option>
-                                             {availableMalhaModels.map(m => {
-                                                 const parts = [];
-                                                 if (m.productCode) parts.push(`[Cód. ${m.productCode}]`);
-                                                 parts.push(m.description);
-                                                 if (m.gauge) parts.push(`(${m.gauge})`);
-                                                 if (m.meshSpacing) parts.push(`[${m.meshSpacing}]`);
-                                                 if (m.panelDimensions) parts.push(`• ${m.panelDimensions}m`);
-                                                 if (m.peso_peca) parts.push(`• ${m.peso_peca} kg/pç`);
-                                                 return (
-                                                     <option key={m.id || m.productCode || m.description} value={m.description}>
-                                                         {parts.join(' ')}
-                                                     </option>
-                                                 );
-                                             })}
-                                         </select>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                            <span>Modelo da Malha (Gestão de Lotes)</span>
+                                            {selectedMalhaModelObj?.productCode && (
+                                                <span className="text-[9px] text-purple-400 font-mono font-bold bg-purple-500/10 px-1.5 py-0.5 rounded">
+                                                    Cód. {selectedMalhaModelObj.productCode}
+                                                </span>
+                                            )}
+                                        </label>
+                                        <select
+                                            value={malhaModel}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setMalhaModel(val);
+                                                const found = availableMalhaModels.find(m => m.description === val || m.productCode === val || m.id === val);
+                                                if (found && found.gauge) {
+                                                    const rawG = found.gauge.replace('mm', '').replace(',', '.').trim();
+                                                    setMalhaBitola(rawG as Bitola);
+                                                }
+                                            }}
+                                            className="w-full bg-[#07131B] border border-purple-500/30 rounded-xl py-2 px-3 text-xs text-white font-bold focus:outline-none focus:border-purple-400"
+                                        >
+                                            <option value="">Selecione um modelo de malha cadastrado...</option>
+                                            {availableMalhaModels.map(m => {
+                                                const parts = [];
+                                                if (m.productCode) parts.push(`[Cód. ${m.productCode}]`);
+                                                parts.push(m.description);
+                                                if (m.gauge) parts.push(`(${m.gauge})`);
+                                                if (m.meshSpacing) parts.push(`[${m.meshSpacing}]`);
+                                                if (m.panelDimensions) parts.push(`• ${m.panelDimensions}m`);
+                                                if (m.peso_peca) parts.push(`• ${m.peso_peca} kg/pç`);
+                                                return (
+                                                    <option key={m.id || m.productCode || m.description} value={m.description}>
+                                                        {parts.join(' ')}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
 
-                                         {selectedMalhaModelObj && (
-                                             <div className="mt-1 bg-purple-950/30 border border-purple-500/20 rounded-lg p-2 text-[10px] text-slate-300 flex flex-col gap-1">
-                                                 <div className="flex items-center justify-between text-purple-300 font-semibold">
-                                                     <span>{selectedMalhaModelObj.description}</span>
-                                                     {selectedMalhaModelObj.peso_peca && (
-                                                         <span className="font-mono text-white font-bold">{selectedMalhaModelObj.peso_peca} kg/pç</span>
-                                                     )}
-                                                 </div>
-                                                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-400 text-[9px]">
-                                                     {selectedMalhaModelObj.gauge && <span>Bitola: <strong className="text-slate-200">{selectedMalhaModelObj.gauge}</strong></span>}
-                                                     {selectedMalhaModelObj.meshSpacing && <span>Espaçamento: <strong className="text-slate-200">{selectedMalhaModelObj.meshSpacing}</strong></span>}
-                                                     {selectedMalhaModelObj.panelDimensions && <span>Painel: <strong className="text-slate-200">{selectedMalhaModelObj.panelDimensions}m</strong></span>}
-                                                     {selectedMalhaModelObj.peso_peca && (
-                                                         <span>Peso Total Estimado: <strong className="text-purple-300 font-mono">{(malhaPieces * parseFloat(selectedMalhaModelObj.peso_peca.replace(',', '.'))).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg</strong></span>
-                                                     )}
-                                                 </div>
-                                             </div>
-                                         )}
-                                     </div>
-                                 </div>
+                                        {selectedMalhaModelObj && (
+                                            <div className="mt-1 bg-purple-950/30 border border-purple-500/20 rounded-lg p-2 text-[10px] text-slate-300 flex flex-col gap-1">
+                                                <div className="flex items-center justify-between text-purple-300 font-semibold">
+                                                    <span>{selectedMalhaModelObj.description}</span>
+                                                    {selectedMalhaModelObj.peso_peca && (
+                                                        <span className="font-mono text-white font-bold">{selectedMalhaModelObj.peso_peca} kg/pç</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-400 text-[9px]">
+                                                    {selectedMalhaModelObj.gauge && <span>Bitola: <strong className="text-slate-200">{selectedMalhaModelObj.gauge}</strong></span>}
+                                                    {selectedMalhaModelObj.meshSpacing && <span>Espaçamento: <strong className="text-slate-200">{selectedMalhaModelObj.meshSpacing}</strong></span>}
+                                                    {selectedMalhaModelObj.panelDimensions && <span>Painel: <strong className="text-slate-200">{selectedMalhaModelObj.panelDimensions}m</strong></span>}
+                                                    {selectedMalhaModelObj.peso_peca && (
+                                                        <span>Peso Total Estimado: <strong className="text-purple-300 font-mono">{(malhaPieces * parseFloat(selectedMalhaModelObj.peso_peca.replace(',', '.'))).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg</strong></span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
 
                                 <div className="flex flex-col gap-3.5 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
                                     <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider border-b border-white/5 pb-2">
@@ -8402,7 +8355,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {isWorkHoursModalOpen && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fade p-3 sm:p-4">
                     <div className="w-full max-w-xl pcp-glass-card rounded-2xl border border-white/15 p-5 sm:p-6 flex flex-col gap-4 text-slate-100 shadow-2xl max-h-[90vh] overflow-hidden">
-                        
+
                         {/* Cabeçalho */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
                             <div className="flex items-center gap-2.5">
@@ -8418,9 +8371,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     </p>
                                 </div>
                             </div>
-                            <button 
+                            <button
                                 type="button"
-                                onClick={() => setIsWorkHoursModalOpen(false)} 
+                                onClick={() => setIsWorkHoursModalOpen(false)}
                                 className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg"
                             >
                                 <XIcon className="w-5 h-5" />
@@ -8432,11 +8385,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setActiveShiftTab('hours')}
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                                    activeShiftTab === 'hours'
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeShiftTab === 'hours'
                                         ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
                                         : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
-                                }`}
+                                    }`}
                             >
                                 <ClockIcon className="w-4 h-4" />
                                 <span>Horários do Turno</span>
@@ -8445,11 +8397,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setActiveShiftTab('holidays')}
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                                    activeShiftTab === 'holidays'
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${activeShiftTab === 'holidays'
                                         ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
                                         : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
-                                }`}
+                                    }`}
                             >
                                 <CalendarIcon className="w-4 h-4" />
                                 <span>Feriados & Folgas ({holidays.length})</span>
@@ -8464,11 +8415,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setSelectedMachineShiftTab('GLOBAL')}
-                                        className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                                            selectedMachineShiftTab === 'GLOBAL'
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedMachineShiftTab === 'GLOBAL'
                                                 ? 'bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 shadow-sm'
                                                 : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
-                                        }`}
+                                            }`}
                                     >
                                         <span>🏢 Geral (Fábrica)</span>
                                     </button>
@@ -8480,13 +8430,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 key={m.name}
                                                 type="button"
                                                 onClick={() => setSelectedMachineShiftTab(m.name)}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                                                    isSelected
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${isSelected
                                                         ? 'bg-cyan-500/25 text-[#00E5FF] border border-[#00E5FF]/50 shadow-sm'
                                                         : isCustom
                                                             ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30'
                                                             : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
-                                                }`}
+                                                    }`}
                                             >
                                                 <span>{m.name}</span>
                                                 {isCustom && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Jornada personalizada" />}
@@ -8568,7 +8517,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     {/* Toggle: Sem Parada de Almoço */}
                                     <div className="sm:col-span-2 bg-[#08131B] p-2.5 rounded-xl border border-white/5 flex items-center justify-between">
                                         <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                                            <input 
+                                            <input
                                                 type="checkbox"
                                                 checked={Boolean(currentTabConfig.noLunch)}
                                                 onChange={(e) => updateCurrentTabConfig({ noLunch: e.target.checked })}
@@ -8633,10 +8582,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <input
                                                 type="checkbox"
                                                 checked={currentTabConfig.shiftCount === 2}
-                                                onChange={(e) => updateCurrentTabConfig({ 
-                                                    shiftCount: e.target.checked ? 2 : 1, 
-                                                    shift2Start: e.target.checked ? (currentTabConfig.shift2Start || '14:00') : undefined, 
-                                                    shift2End: e.target.checked ? (currentTabConfig.shift2End || '23:59') : undefined 
+                                                onChange={(e) => updateCurrentTabConfig({
+                                                    shiftCount: e.target.checked ? 2 : 1,
+                                                    shift2Start: e.target.checked ? (currentTabConfig.shift2Start || '14:00') : undefined,
+                                                    shift2End: e.target.checked ? (currentTabConfig.shift2End || '23:59') : undefined
                                                 })}
                                                 className="w-4 h-4 rounded text-emerald-400 focus:ring-0 bg-[#0B1D2A] border-white/20 accent-emerald-400"
                                             />
@@ -8678,7 +8627,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <span className="text-[10px] font-black uppercase tracking-wider text-[#00E5FF] block">
                                         ⚙️ Automações e Segurança de Turno
                                     </span>
-                                    
+
                                     <label className="flex items-start gap-2.5 cursor-pointer select-none">
                                         <input
                                             type="checkbox"
@@ -8776,15 +8725,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         ].map(({ day, label }) => {
                                             const isChecked = (tempShiftConfig.workDays || [1, 2, 3, 4, 5]).includes(day);
                                             return (
-                                                <label 
+                                                <label
                                                     key={day}
-                                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center cursor-pointer select-none transition-all ${
-                                                        isChecked 
-                                                            ? 'bg-cyan-500/15 border-[#00E5FF]/40 text-[#00E5FF] font-black' 
+                                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center cursor-pointer select-none transition-all ${isChecked
+                                                            ? 'bg-cyan-500/15 border-[#00E5FF]/40 text-[#00E5FF] font-black'
                                                             : 'bg-white/5 border-white/5 text-slate-500 hover:text-slate-300'
-                                                    }`}
+                                                        }`}
                                                 >
-                                                    <input 
+                                                    <input
                                                         type="checkbox"
                                                         className="hidden"
                                                         checked={isChecked}
@@ -8816,7 +8764,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                                         <div className="sm:col-span-5">
-                                            <input 
+                                            <input
                                                 type="date"
                                                 value={newHolidayDate}
                                                 onChange={(e) => setNewHolidayDate(e.target.value)}
@@ -8826,7 +8774,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             />
                                         </div>
                                         <div className="sm:col-span-7 flex items-center gap-2">
-                                            <input 
+                                            <input
                                                 type="text"
                                                 placeholder="Ex: Feriado Tiradentes, Manutenção"
                                                 value={newHolidayDesc}
@@ -8860,14 +8808,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         holidays.map(h => {
                                             const parts = h.date ? h.date.split('-') : [];
                                             const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : h.date;
-                                            
+
                                             // Dia da semana do feriado
                                             const d = new Date(h.date + 'T00:00:00');
                                             const weekDayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][d.getDay()] || '';
 
                                             return (
-                                                <div 
-                                                    key={h.id} 
+                                                <div
+                                                    key={h.id}
                                                     className="flex items-center justify-between bg-[#08131B] p-2 rounded-xl border border-white/5 hover:border-white/15 transition-all text-xs"
                                                 >
                                                     <div className="flex items-center gap-2.5 min-w-0">
@@ -8981,11 +8929,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setMachineShiftModalTab('op')}
-                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                            machineShiftModalTab === 'op'
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${machineShiftModalTab === 'op'
                                                 ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
                                                 : 'text-slate-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         <span>📋 OP & Ações</span>
                                     </button>
@@ -8994,11 +8941,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => setMachineShiftModalTab('equipment')}
-                                            className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                                machineShiftModalTab === 'equipment'
+                                            className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${machineShiftModalTab === 'equipment'
                                                     ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40 shadow-sm'
                                                     : 'text-slate-400 hover:text-white'
-                                            }`}
+                                                }`}
                                         >
                                             <span>⚡ Rolos & Solda</span>
                                         </button>
@@ -9007,11 +8953,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setMachineShiftModalTab('shifts')}
-                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                            machineShiftModalTab === 'shifts'
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${machineShiftModalTab === 'shifts'
                                                 ? 'bg-cyan-500/25 text-[#00E5FF] border border-cyan-500/40 shadow-sm'
                                                 : 'text-slate-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         <span>☀️ Turnos</span>
                                     </button>
@@ -9019,24 +8964,23 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setMachineShiftModalTab('downtimes')}
-                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                            machineShiftModalTab === 'downtimes'
+                                        className={`py-2 px-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${machineShiftModalTab === 'downtimes'
                                                 ? 'bg-rose-500/25 text-rose-300 border border-rose-500/40 shadow-sm'
                                                 : 'text-slate-400 hover:text-white'
-                                        }`}
+                                            }`}
                                     >
                                         <span>🛑 Paradas</span>
                                         {localDowntimeConfigs.filter(c => {
                                             const mType = machineShiftModalTarget?.split(' ')[0] || '';
                                             return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
                                         }).length > 0 && (
-                                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-rose-200">
-                                                {localDowntimeConfigs.filter(c => {
-                                                    const mType = machineShiftModalTarget?.split(' ')[0] || '';
-                                                    return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
-                                                }).length}
-                                            </span>
-                                        )}
+                                                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-rose-200">
+                                                    {localDowntimeConfigs.filter(c => {
+                                                        const mType = machineShiftModalTarget?.split(' ')[0] || '';
+                                                        return c.isActive && (!c.machineType || c.machineType === 'Geral' || c.machineType === mType);
+                                                    }).length}
+                                                </span>
+                                            )}
                                     </button>
                                 </div>
                             );
@@ -9044,7 +8988,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         {/* ABA: OP & COMANDOS DE PRODUÇÃO */}
                         {machineShiftModalTab === 'op' && (() => {
-                            const machineOrders = productionOrders.filter(o => 
+                            const machineOrders = productionOrders.filter(o =>
                                 (o.scheduledMachine === machineShiftModalTarget || o.machine === machineShiftModalTarget) &&
                                 o.status !== 'completed' && o.status !== 'cancelled'
                             );
@@ -9108,9 +9052,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                             const subtitle = activeOP.productName || (
                                 activeOP.machine?.startsWith('Trefila') ? trefilaSubtitle :
-                                activeOP.machine?.startsWith('Treliça') ? `${activeOP.trelicaModel || 'Treliça'} • ${activeOP.tamanho || ''}m` :
-                                activeOP.machine?.startsWith('Malha') ? `${activeOP.malhaModel || 'Malha'} (${activeOP.tamanho || ''})` :
-                                'Ordem de Produção'
+                                    activeOP.machine?.startsWith('Treliça') ? `${activeOP.trelicaModel || 'Treliça'} • ${activeOP.tamanho || ''}m` :
+                                        activeOP.machine?.startsWith('Malha') ? `${activeOP.malhaModel || 'Malha'} (${activeOP.tamanho || ''})` :
+                                            'Ordem de Produção'
                             );
                             const isLive = prog.isLive;
                             const isPending = prog.isPending;
@@ -9158,7 +9102,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                                         {/* Barra de Progresso */}
                                         <div className="w-full bg-black/40 rounded-full h-2 mt-2.5 overflow-hidden border border-white/10">
-                                            <div 
+                                            <div
                                                 className={`h-full transition-all duration-300 ${isLive ? 'bg-gradient-to-r from-cyan-500 to-emerald-400' : 'bg-amber-400'}`}
                                                 style={{ width: `${Math.min(100, prog.pct)}%` }}
                                             />
@@ -9335,32 +9279,32 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0">
-                                                            <button 
-                                                                type="button" 
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => { setMachineShiftModalTarget(null); setEditingInProgressOP(queuedOp); }}
                                                                 className="p-1 rounded bg-white/5 hover:bg-white/10 text-purple-300 cursor-pointer"
                                                                 title="Editar OP"
                                                             >
                                                                 <PencilIcon className="w-3.5 h-3.5" />
                                                             </button>
-                                                            <button 
-                                                                type="button" 
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => { setMachineShiftModalTarget(null); handleGoToProduction(queuedOp); }}
                                                                 className="p-1 rounded bg-white/5 hover:bg-white/10 text-emerald-300 cursor-pointer"
                                                                 title="Abrir no Painel"
                                                             >
                                                                 <PlayIcon className="w-3.5 h-3.5" />
                                                             </button>
-                                                            <button 
-                                                                type="button" 
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => handlePrintOP(queuedOp)}
                                                                 className="p-1 rounded bg-white/5 hover:bg-white/10 text-cyan-300 cursor-pointer"
                                                                 title="Imprimir Ficha"
                                                             >
                                                                 <PrinterIcon className="w-3.5 h-3.5" />
                                                             </button>
-                                                            <button 
-                                                                type="button" 
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => handleRemoveSchedule(queuedOp.id)}
                                                                 className="p-1 rounded bg-white/5 hover:bg-white/10 text-rose-400 cursor-pointer"
                                                                 title="Desagendar"
@@ -9410,15 +9354,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             1 Superior • 2 Senozóides • 2 Inferiores
                                         </span>
                                     </div>
-                                    <div 
+                                    <div
                                         onClick={() => setViewSpoolStandsMachine(machineShiftModalTarget)}
                                         className="cursor-pointer hover:border-cyan-500/40 transition-all rounded-xl"
                                         title="Clique para gerenciar bobinas e estoque"
                                     >
-                                        <TrelicaSpoolStands 
-                                            machineName={machineShiftModalTarget} 
-                                            isCompact={true} 
-                                            stock={stock} 
+                                        <TrelicaSpoolStands
+                                            machineName={machineShiftModalTarget}
+                                            isCompact={true}
+                                            stock={stock}
                                             productionOrders={productionOrders}
                                         />
                                     </div>
@@ -9505,11 +9449,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shiftCount: 1 }) : null)}
-                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
-                                                machineShiftModalDraft.shiftCount === 1
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${machineShiftModalDraft.shiftCount === 1
                                                     ? 'bg-cyan-500/25 border-[#00E5FF] text-white shadow-[0_0_12px_rgba(0,229,255,0.25)]'
                                                     : 'bg-[#08131B] border-white/10 text-slate-400 hover:border-white/20'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs font-black uppercase text-white flex items-center gap-1.5">
@@ -9527,11 +9470,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => setMachineShiftModalDraft(prev => prev ? ({ ...prev, shiftCount: 2 }) : null)}
-                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
-                                                machineShiftModalDraft.shiftCount === 2
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${machineShiftModalDraft.shiftCount === 2
                                                     ? 'bg-emerald-500/25 border-emerald-400 text-white shadow-[0_0_12px_rgba(16,185,129,0.25)]'
                                                     : 'bg-[#08131B] border-white/10 text-slate-400 hover:border-white/20'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs font-black uppercase text-emerald-300 flex items-center gap-1.5">
@@ -9764,21 +9706,19 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             machineReasons.map(c => (
                                                 <div
                                                     key={c.id}
-                                                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all text-xs ${
-                                                        c.isActive
+                                                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all text-xs ${c.isActive
                                                             ? 'bg-[#08131B] border-white/10 hover:border-white/20'
                                                             : 'bg-[#08131B]/40 border-white/5 opacity-60'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <div className="flex items-center gap-2.5 min-w-0">
                                                         <button
                                                             type="button"
                                                             onClick={() => handleToggleMachineDowntime(c)}
-                                                            className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer ${
-                                                                c.isActive
+                                                            className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer ${c.isActive
                                                                     ? 'bg-rose-500 border-rose-400 text-white'
                                                                     : 'bg-white/5 border-white/20'
-                                                            }`}
+                                                                }`}
                                                             title={c.isActive ? 'Clique para desativar' : 'Clique para ativar'}
                                                         >
                                                             {c.isActive && <span className="text-[10px] leading-none">✓</span>}
@@ -9840,124 +9780,122 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {selectedOP && (() => {
                 const isAlreadyStarted = hasProductionStarted(selectedOP);
                 return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fade p-4">
-                    <div className="w-full max-w-[420px] pcp-glass-card rounded-2xl border border-white/10 p-6 flex flex-col gap-4 text-slate-100">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                            <h3 className="text-sm font-black uppercase tracking-wider text-[#00E5FF] flex items-center gap-2">
-                                <CalendarIcon className="w-5 h-5" />
-                                {isAlreadyStarted ? `Estender Prazo • OP #${selectedOP.orderNumber}` : `Reprogramar OP #${selectedOP.orderNumber}`}
-                            </h3>
-                            <button onClick={() => setSelectedOP(null)} className="text-slate-400 hover:text-white transition-colors">
-                                <XIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {isAlreadyStarted && (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex flex-col gap-1">
-                                <span className="font-bold flex items-center gap-1.5 text-amber-400 uppercase text-[10px] tracking-wider">
-                                    <span>⚠️</span>
-                                    <span>OP com produção em andamento</span>
-                                </span>
-                                <p className="text-[11px] leading-relaxed text-slate-300">
-                                    Esta OP iniciou em <strong className="text-white">{formatFriendlyDate(selectedOP.plannedStartDate)}</strong>. A data de início permanece travada para preservar os apontamentos já realizados. Ajuste a duração abaixo para <strong>estender o prazo</strong> de entrega.
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="space-y-4">
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Máquina</label>
-                                <select
-                                    value={scheduleMachine}
-                                    onChange={(e) => setScheduleMachine(e.target.value)}
-                                    disabled={isAlreadyStarted}
-                                    className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${
-                                        isAlreadyStarted ? 'opacity-60 cursor-not-allowed' : ''
-                                    }`}
-                                >
-                                    {MACHINES.map(m => (
-                                        <option key={m.name} value={m.name}>{m.name} ({m.type})</option>
-                                    ))}
-                                </select>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md animate-fade p-4">
+                        <div className="w-full max-w-[420px] pcp-glass-card rounded-2xl border border-white/10 p-6 flex flex-col gap-4 text-slate-100">
+                            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                                <h3 className="text-sm font-black uppercase tracking-wider text-[#00E5FF] flex items-center gap-2">
+                                    <CalendarIcon className="w-5 h-5" />
+                                    {isAlreadyStarted ? `Estender Prazo • OP #${selectedOP.orderNumber}` : `Reprogramar OP #${selectedOP.orderNumber}`}
+                                </h3>
+                                <button onClick={() => setSelectedOP(null)} className="text-slate-400 hover:text-white transition-colors">
+                                    <XIcon className="w-5 h-5" />
+                                </button>
                             </div>
 
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                                    <span>Data de Início</span>
-                                    {isAlreadyStarted && (
-                                        <span className="text-[9px] font-bold text-amber-400 uppercase">🔒 Início Travado</span>
-                                    )}
-                                </label>
-                                <input
-                                    type="date"
-                                    value={scheduleStartDate}
-                                    onChange={(e) => setScheduleStartDate(e.target.value)}
-                                    disabled={isAlreadyStarted}
-                                    className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${
-                                        isAlreadyStarted ? 'opacity-60 cursor-not-allowed bg-black/40' : ''
-                                    }`}
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
-                                    <span>{isAlreadyStarted ? 'Duração Total (Dias Úteis)' : 'Duração Estimada'}</span>
-                                    <span className="text-[#00E5FF] font-black">{scheduleDuration} {scheduleDuration === 1 ? 'dia' : 'dias'}</span>
-                                </label>
-                                <div className="flex items-center gap-3 bg-[#0A1D2A] border border-white/10 rounded-xl p-1 justify-between">
-                                    <button
-                                        type="button"
-                                        onClick={() => setScheduleDuration(prev => Math.max(1, prev - 1))}
-                                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-                                    >
-                                        -
-                                    </button>
-                                    <span className="text-xs font-bold text-white">{scheduleDuration}d</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setScheduleDuration(prev => prev + 1)}
-                                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
-                                    >
-                                        +
-                                    </button>
+                            {isAlreadyStarted && (
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex flex-col gap-1">
+                                    <span className="font-bold flex items-center gap-1.5 text-amber-400 uppercase text-[10px] tracking-wider">
+                                        <span>⚠️</span>
+                                        <span>OP com produção em andamento</span>
+                                    </span>
+                                    <p className="text-[11px] leading-relaxed text-slate-300">
+                                        Esta OP iniciou em <strong className="text-white">{formatFriendlyDate(selectedOP.plannedStartDate)}</strong>. A data de início permanece travada para preservar os apontamentos já realizados. Ajuste a duração abaixo para <strong>estender o prazo</strong> de entrega.
+                                    </p>
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                    Término previsto: <strong className="text-white">{formatFriendlyDate(calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration))}</strong>
-                                </span>
-                            </div>
-                        </div>
+                            )}
 
-                        <div className="flex items-center gap-3 border-t border-white/10 pt-4 mt-2">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedOP(null)}
-                                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl py-2.5 text-xs font-bold text-slate-400 hover:text-white transition-all text-center"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleSaveSchedule}
-                                className="flex-1 bg-[#00E5FF] hover:bg-[#00B4D8] text-slate-900 rounded-xl py-2.5 text-xs font-black transition-all shadow-md text-center active:scale-95 uppercase tracking-wider"
-                            >
-                                {isAlreadyStarted ? 'Salvar Extensão' : 'Salvar'}
-                            </button>
+                            <div className="space-y-4">
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Máquina</label>
+                                    <select
+                                        value={scheduleMachine}
+                                        onChange={(e) => setScheduleMachine(e.target.value)}
+                                        disabled={isAlreadyStarted}
+                                        className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${isAlreadyStarted ? 'opacity-60 cursor-not-allowed' : ''
+                                            }`}
+                                    >
+                                        {MACHINES.map(m => (
+                                            <option key={m.name} value={m.name}>{m.name} ({m.type})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                        <span>Data de Início</span>
+                                        {isAlreadyStarted && (
+                                            <span className="text-[9px] font-bold text-amber-400 uppercase">🔒 Início Travado</span>
+                                        )}
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={scheduleStartDate}
+                                        onChange={(e) => setScheduleStartDate(e.target.value)}
+                                        disabled={isAlreadyStarted}
+                                        className={`w-full bg-[#0A1D2A] border border-white/10 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-[#00E5FF]/50 text-white font-bold ${isAlreadyStarted ? 'opacity-60 cursor-not-allowed bg-black/40' : ''
+                                            }`}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
+                                        <span>{isAlreadyStarted ? 'Duração Total (Dias Úteis)' : 'Duração Estimada'}</span>
+                                        <span className="text-[#00E5FF] font-black">{scheduleDuration} {scheduleDuration === 1 ? 'dia' : 'dias'}</span>
+                                    </label>
+                                    <div className="flex items-center gap-3 bg-[#0A1D2A] border border-white/10 rounded-xl p-1 justify-between">
+                                        <button
+                                            type="button"
+                                            onClick={() => setScheduleDuration(prev => Math.max(1, prev - 1))}
+                                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                                        >
+                                            -
+                                        </button>
+                                        <span className="text-xs font-bold text-white">{scheduleDuration}d</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setScheduleDuration(prev => prev + 1)}
+                                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 font-black text-sm flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                        Término previsto: <strong className="text-white">{formatFriendlyDate(calculateEndDateByWorkDays(scheduleStartDate, scheduleDuration))}</strong>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 border-t border-white/10 pt-4 mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedOP(null)}
+                                    className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl py-2.5 text-xs font-bold text-slate-400 hover:text-white transition-all text-center"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveSchedule}
+                                    className="flex-1 bg-[#00E5FF] hover:bg-[#00B4D8] text-slate-900 rounded-xl py-2.5 text-xs font-black transition-all shadow-md text-center active:scale-95 uppercase tracking-wider"
+                                >
+                                    {isAlreadyStarted ? 'Salvar Extensão' : 'Salvar'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
                 );
             })()}
 
             {/* DRAWER LATERAL: RAIO-X DA OP */}
             {drawerOP && (
                 <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade">
-                    <div 
+                    <div
                         className="fixed inset-0"
                         onClick={() => setDrawerOP(null)}
                     />
-                    
+
                     <div className="relative w-full max-w-md bg-white border-l border-slate-200 shadow-2xl p-6 flex flex-col gap-5 overflow-y-auto h-full z-10 animate-fade text-slate-800">
-                        
+
                         {/* Topo do Drawer */}
                         <div className="flex items-start justify-between border-b border-slate-200 pb-4">
                             <div>
@@ -10015,7 +9953,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <h2 className="text-xl font-black text-blue-950 mt-1">OP #{drawerOP.orderNumber}</h2>
                                 <p className="text-xs text-slate-500 mt-0.5">{drawerOP.scheduledMachine || (drawerOP.machine as string)}</p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setDrawerOP(null)}
                                 className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer"
                             >
@@ -10087,7 +10025,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     </div>
 
                                     <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden border border-slate-300">
-                                        <div 
+                                        <div
                                             className="h-full bg-gradient-to-r from-orange-500 via-amber-500 to-emerald-500 rounded-full transition-all duration-500"
                                             style={{ width: `${prog.pct}%` }}
                                         />
@@ -10182,7 +10120,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         {/* Ficha Técnica da OP */}
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5 text-xs shadow-sm">
                             <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-2">Especificações</h4>
-                            
+
                             <div className="flex justify-between py-1 border-b border-slate-200">
                                 <span className="text-slate-500">Tipo de Linha:</span>
                                 <strong className="text-slate-900">{drawerOP.machine}</strong>
@@ -10259,8 +10197,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         {/* Apontamentos Recentes de Turno */}
                         {(() => {
-                            const relatedReports = shiftReports.filter(r => 
-                                r.productionOrderId === drawerOP.id || 
+                            const relatedReports = shiftReports.filter(r =>
+                                r.productionOrderId === drawerOP.id ||
                                 (drawerOP.orderNumber && r.orderNumber === drawerOP.orderNumber)
                             );
 
@@ -10330,11 +10268,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => handleCompleteOP(drawerOP)}
-                                        className={`w-full font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all uppercase tracking-wider ${
-                                            isCompleted
+                                        className={`w-full font-black rounded-xl py-3 text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all uppercase tracking-wider ${isCompleted
                                                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
                                                 : 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-rose-600/20'
-                                        }`}
+                                            }`}
                                         title={isCompleted ? "OP Concluída. Clique para reabrir a ordem se necessário." : "Encerrar esta OP, finalizar apontamentos em aberto e liberar a máquina no PCP"}
                                     >
                                         <span>{isCompleted ? '✅' : '🏁'}</span>
@@ -10384,19 +10321,18 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => handleToggleGhostOrder(drawerOP)}
-                                    className={`w-full font-bold rounded-xl py-2.5 text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
-                                        drawerOP.isGhostOrder
+                                    className={`w-full font-bold rounded-xl py-2.5 text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${drawerOP.isGhostOrder
                                             ? 'bg-amber-950/40 text-amber-300 border border-amber-500/40 hover:bg-amber-900/50'
                                             : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-amber-300'
-                                    }`}
-                                    title={drawerOP.isGhostOrder 
-                                        ? "Esta OP é Fantasma (lotes livres no estoque). Clique para reservar os lotes." 
+                                        }`}
+                                    title={drawerOP.isGhostOrder
+                                        ? "Esta OP é Fantasma (lotes livres no estoque). Clique para reservar os lotes."
                                         : "Esta OP está reservando lotes no estoque. Clique para liberar os lotes mantendo a OP ativa."}
                                 >
                                     <span>👻</span>
                                     <span>
-                                        {drawerOP.isGhostOrder 
-                                            ? 'Modo Fantasma Ativo (Lotes Liberados)' 
+                                        {drawerOP.isGhostOrder
+                                            ? 'Modo Fantasma Ativo (Lotes Liberados)'
                                             : 'Converter em Ordem Fantasma (Liberar Lotes)'}
                                     </span>
                                 </button>
@@ -10444,7 +10380,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             {isDowntimeLimitsModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-3 sm:p-5 overflow-y-auto">
                     <div className="w-full max-w-2xl pcp-glass-card rounded-3xl border border-amber-500/30 p-6 flex flex-col gap-5 text-slate-100 shadow-2xl my-auto">
-                        
+
                         {/* Topo do Modal */}
                         <div className="flex items-center justify-between border-b border-white/10 pb-4">
                             <div className="flex items-center gap-3">
@@ -10460,8 +10396,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     </p>
                                 </div>
                             </div>
-                            <button 
-                                onClick={() => setIsDowntimeLimitsModalOpen(false)} 
+                            <button
+                                onClick={() => setIsDowntimeLimitsModalOpen(false)}
                                 className="text-slate-400 hover:text-white transition-colors p-1 rounded-xl hover:bg-white/5"
                             >
                                 <XIcon className="w-6 h-6" />
@@ -10470,7 +10406,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         {/* Corpo com os campos de parametrização */}
                         <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-                            
+
                             {/* Bloco 1: Sequência Padrão do Checklist da Produção */}
                             <div className="bg-[#07131D] p-4 rounded-2xl border border-amber-500/20 space-y-3">
                                 <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wider border-b border-white/5 pb-2">
@@ -10487,7 +10423,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <span className="text-[10px] text-amber-400 font-mono font-bold">Padrão Inicial</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <input 
+                                            <input
                                                 type="number"
                                                 min="5"
                                                 max="360"
@@ -10509,7 +10445,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <span className="text-[10px] text-cyan-400 font-mono font-bold">Por Lote</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <input 
+                                            <input
                                                 type="number"
                                                 min="1"
                                                 max="60"
@@ -10531,7 +10467,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <span className="text-[10px] text-emerald-400 font-mono font-bold">Limite por Ciclo</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <input 
+                                            <input
                                                 type="number"
                                                 min="1"
                                                 max="60"
@@ -10553,7 +10489,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             <span className="text-[10px] text-purple-400 font-mono font-bold">Frequência</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <input 
+                                            <input
                                                 type="number"
                                                 min="30"
                                                 max="480"
@@ -10591,7 +10527,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                 <span className="truncate">{item.label}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                                <input 
+                                                <input
                                                     type="number"
                                                     min="1"
                                                     max="120"
@@ -10666,7 +10602,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     const machineName = op.scheduledMachine || (op.machine as string) || 'Máquina';
                     const targetBitola = op.targetBitola;
                     const modelSubtitle = op.trelicaModel ? `${op.trelicaModel} (${op.tamanho || '6m'})` : op.malhaModel ? op.malhaModel : `Bitola ${targetBitola}mm`;
-                    
+
                     // 1. Início da OP
                     const startRaw = op.startTime || op.creationDate;
                     const startDateObj = startRaw ? new Date(startRaw) : null;
@@ -10684,7 +10620,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                     // 3. Processamento de Eventos de Parada
                     const events = [...(op.downtimeEvents || [])].sort((a, b) => new Date(a.stopTime).getTime() - new Date(b.stopTime).getTime());
-                    
+
                     const normalize = (s: string) => s ? s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : '';
 
                     // Metas estipuladas
@@ -10777,10 +10713,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         // Agrupar motivos
                         const groupKey = itemType === 'setup' ? 'Setup de Máquina' :
-                                         itemType === 'lubrication' ? 'Lubrificação' :
-                                         itemType === 'roll_change' ? 'Troca de Rolo' :
-                                         itemType === 'shift_end' ? 'Final de Turno' : reason;
-                        
+                            itemType === 'lubrication' ? 'Lubrificação' :
+                                itemType === 'roll_change' ? 'Troca de Rolo' :
+                                    itemType === 'shift_end' ? 'Final de Turno' : reason;
+
                         if (!reasonsLostTime[groupKey]) {
                             reasonsLostTime[groupKey] = { count: 0, totalDurationMs: 0, excessMs: 0, expectedSingleMin: expectedMin };
                         }
@@ -10804,8 +10740,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             statusText = `Economizou ${Math.abs(diffMin)}m`;
                         }
 
-                        const timeFormatted = !isNaN(stopDate.getTime()) 
-                            ? stopDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) 
+                        const timeFormatted = !isNaN(stopDate.getTime())
+                            ? stopDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                             : '--:--';
 
                         checklistItems.push({
@@ -10826,12 +10762,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     // Localizar Lote no Estoque
                     const findStockLot = (lotObjOrId: any) => {
                         if (!lotObjOrId) return undefined;
-                        const targetId = typeof lotObjOrId === 'string' 
-                            ? lotObjOrId 
+                        const targetId = typeof lotObjOrId === 'string'
+                            ? lotObjOrId
                             : (lotObjOrId.lotId || lotObjOrId.id || lotObjOrId.internalLot);
                         if (!targetId) return undefined;
-                        return stock.find(s => 
-                            s.id === targetId || 
+                        return stock.find(s =>
+                            s.id === targetId ||
                             s.internalLot === targetId ||
                             (typeof lotObjOrId === 'object' && lotObjOrId.internalLot && s.internalLot === lotObjOrId.internalLot) ||
                             (typeof lotObjOrId === 'object' && lotObjOrId.lotId && s.id === lotObjOrId.lotId)
@@ -10859,8 +10795,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         const lotStart = lot.startTime ? new Date(lot.startTime) : null;
                         const lotEnd = lot.endTime ? new Date(lot.endTime) : null;
-                        const lotTimeStr = lotStart && !isNaN(lotStart.getTime()) 
-                            ? lotStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) 
+                        const lotTimeStr = lotStart && !isNaN(lotStart.getTime())
+                            ? lotStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                             : '--:--';
                         const lotDurationMs = lotStart && lotEnd ? Math.max(0, lotEnd.getTime() - lotStart.getTime()) : undefined;
 
@@ -10871,15 +10807,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
                         // Pesos
                         const inputWeight = Number(stockItem?.initialQuantity || stockItem?.weight || stockItem?.labelWeight || (lot as any).inputWeight || (lot as any).initialWeight || 0);
-                        const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined 
-                            ? Number(lot.finalWeight) 
-                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined 
-                                ? Number((lot as any).producedWeight) 
+                        const outputWeight = lot.finalWeight !== null && lot.finalWeight !== undefined
+                            ? Number(lot.finalWeight)
+                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined
+                                ? Number((lot as any).producedWeight)
                                 : undefined;
 
                         // Descrição de material & bitola
-                        const bitolaDesc = stockItem?.bitola 
-                            ? (stockItem.bitola.toString().includes('mm') ? stockItem.bitola : `${stockItem.bitola}mm`) 
+                        const bitolaDesc = stockItem?.bitola
+                            ? (stockItem.bitola.toString().includes('mm') ? stockItem.bitola : `${stockItem.bitola}mm`)
                             : (op.inputBitola ? `${op.inputBitola}mm` : '');
                         const materialDesc = stockItem?.materialType || 'Fio Máquina';
 
@@ -10910,13 +10846,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             obsParts.push(`Lote Fornec.: ${supplierLot}`);
                         }
 
-                        const displayWeight = outputWeight !== undefined && outputWeight > 0 
-                            ? `${outputWeight.toLocaleString('pt-BR')} kg` 
-                            : inputWeight > 0 
-                                ? `${inputWeight.toLocaleString('pt-BR')} kg` 
+                        const displayWeight = outputWeight !== undefined && outputWeight > 0
+                            ? `${outputWeight.toLocaleString('pt-BR')} kg`
+                            : inputWeight > 0
+                                ? `${inputWeight.toLocaleString('pt-BR')} kg`
                                 : 'Processado';
 
-                        const titleText = corrida 
+                        const titleText = corrida
                             ? `📦 Lote Processado: Lote #${lotNum} • Corrida: ${corrida}`
                             : `📦 Lote Processado: Lote #${lotNum}`;
 
@@ -10975,10 +10911,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     }, 0);
 
                     const totalProducedWeight = processedLots.reduce((acc, lot) => {
-                        const w = lot.finalWeight !== null && lot.finalWeight !== undefined 
-                            ? Number(lot.finalWeight) 
-                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined 
-                                ? Number((lot as any).producedWeight) 
+                        const w = lot.finalWeight !== null && lot.finalWeight !== undefined
+                            ? Number(lot.finalWeight)
+                            : (lot as any).producedWeight !== null && (lot as any).producedWeight !== undefined
+                                ? Number((lot as any).producedWeight)
                                 : 0;
                         return acc + w;
                     }, 0) || Number(op.totalProducedWeight || op.actualProducedWeight || 0);
@@ -10996,7 +10932,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     return (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade p-2 sm:p-4 overflow-y-auto">
                             <div className="w-full max-w-4xl pcp-glass-card rounded-3xl border border-white/15 p-5 sm:p-7 flex flex-col gap-5 text-slate-100 shadow-2xl my-auto">
-                                
+
                                 {/* Cabeçalho do Diagnóstico */}
                                 <div className="flex items-start justify-between border-b border-white/10 pb-4">
                                     <div className="flex items-center gap-3">
@@ -11039,8 +10975,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             </div>
                                         </div>
                                     </div>
-                                    <button 
-                                        onClick={() => setDiagnosticOP(null)} 
+                                    <button
+                                        onClick={() => setDiagnosticOP(null)}
                                         className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-xl hover:bg-white/5"
                                     >
                                         <XIcon className="w-6 h-6" />
@@ -11088,11 +11024,10 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     </div>
 
                                     {/* KPI 4: Saldo de Tempo Perdido (Gargalo) */}
-                                    <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
-                                        totalLostTimeMs > 0 
-                                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' 
-                                             : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
-                                    }`}>
+                                    <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${totalLostTimeMs > 0
+                                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                                            : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200'
+                                        }`}>
                                         <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
                                             <span>{totalLostTimeMs > 0 ? '🔴 Tempo Perdido (Gargalo)' : '🟢 No Padrão Estipulado'}</span>
                                         </div>
@@ -11135,8 +11070,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                                             </span>
                                                         </div>
                                                         <div className="w-full bg-white/10 rounded-full h-1.5 mt-2 overflow-hidden">
-                                                            <div 
-                                                                className="h-full bg-rose-500 rounded-full" 
+                                                            <div
+                                                                className="h-full bg-rose-500 rounded-full"
                                                                 style={{ width: `${Math.min(100, (excessMin / Math.max(1, Math.round(totalLostTimeMs / 60000))) * 100)}%` }}
                                                             />
                                                         </div>
@@ -11184,13 +11119,12 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             if (item.status === 'info') badgeClass = 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300';
 
                                             return (
-                                                <div 
+                                                <div
                                                     key={item.id}
-                                                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-xs ${
-                                                        isLot 
-                                                            ? 'bg-[#0A2234]/85 border-cyan-500/25 hover:border-cyan-500/45 shadow-sm' 
+                                                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-xs ${isLot
+                                                            ? 'bg-[#0A2234]/85 border-cyan-500/25 hover:border-cyan-500/45 shadow-sm'
                                                             : 'bg-[#0B1D2A]/80 border-white/5 hover:border-white/15'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <span className="w-16 font-mono text-[11px] font-bold text-slate-400 flex items-center gap-1">
@@ -11265,18 +11199,16 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
             {/* MODAL / SUB-JANELA: GÊMEO DIGITAL DOS 5 PORTA-ROLOS DA TRELIÇA */}
             {viewSpoolStandsMachine && (
-                <div 
-                    className={`fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center ${
-                        isSpoolStandsFullscreen ? 'p-0' : 'p-2 sm:p-4'
-                    } animate-fade-in`}
+                <div
+                    className={`fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center ${isSpoolStandsFullscreen ? 'p-0' : 'p-2 sm:p-4'
+                        } animate-fade-in`}
                     onClick={() => setViewSpoolStandsMachine(null)}
                 >
-                    <div 
-                        className={`bg-[#0A1620] border border-white/20 shadow-2xl flex flex-col transition-all duration-200 ${
-                            isSpoolStandsFullscreen 
-                                ? 'w-full h-full rounded-none p-3 sm:p-5 overflow-y-auto custom-scrollbar' 
+                    <div
+                        className={`bg-[#0A1620] border border-white/20 shadow-2xl flex flex-col transition-all duration-200 ${isSpoolStandsFullscreen
+                                ? 'w-full h-full rounded-none p-3 sm:p-5 overflow-y-auto custom-scrollbar'
                                 : 'w-full max-w-[98vw] 2xl:max-w-[1720px] max-h-[97vh] rounded-3xl p-3 sm:p-5 overflow-y-auto custom-scrollbar'
-                        }`}
+                            }`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-1">
@@ -11314,8 +11246,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         </div>
 
                         {(() => {
-                            const activeTrelicaOp = productionOrders.find(o => 
-                                ((o.scheduledMachine || o.machine) === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) && 
+                            const activeTrelicaOp = productionOrders.find(o =>
+                                ((o.scheduledMachine || o.machine) === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) &&
                                 (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'pending' || o.status === 'Aberta' || o.status === 'Ativa')
                             ) || productionOrders.find(o => (o.scheduledMachine || o.machine) === viewSpoolStandsMachine) || null;
 
@@ -11326,6 +11258,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         stock={stock}
                                         shiftReports={shiftReports}
                                         machineName={viewSpoolStandsMachine}
+                                        showManagerControls={true}
                                     />
                                 );
                             }
@@ -11633,7 +11566,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             const sDate = new Date(stopTime);
             const rDate = resumeTime ? new Date(resumeTime) : null;
             const isValidStop = !isNaN(sDate.getTime());
-            
+
             let dur = 0;
             const rawDur = e.durationMin ?? e.duration_min;
             if (rawDur !== undefined && !isNaN(Number(rawDur)) && Number(rawDur) > 0) {
@@ -11648,10 +11581,10 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             const fullReason = `${rawReason}${justStr}`;
             const reasonNorm = rawReason.toLowerCase().trim();
             const sHour = isValidStop ? sDate.getHours() : 12;
-            const isTurnoEndReason = reasonNorm.includes('final de turno') || 
-                                     reasonNorm.includes('fim de turno') || 
-                                     reasonNorm.includes('aguardando início') ||
-                                     reasonNorm.includes('encerramento');
+            const isTurnoEndReason = reasonNorm.includes('final de turno') ||
+                reasonNorm.includes('fim de turno') ||
+                reasonNorm.includes('aguardando início') ||
+                reasonNorm.includes('encerramento');
             // Desconsiderar paradas fantasmas de 'Final de Turno' com 0 minutos ou interjornadas noturnas
             if (isTurnoEndReason && (dur > 180 || dur === 0)) {
                 return;
@@ -11702,7 +11635,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         const matchingReports = shiftReports.filter(r => r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber);
         matchingReports.forEach((r, rIdx) => {
             const reportDate = r.date || parseDateOnly(r.shiftStartTime || r.shiftEndTime) || data.dateStr;
-            
+
             (r.downtimeEvents || []).forEach((e: any, eIdx: number) => {
                 const stopTime = e.stopTime || r.shiftStartTime || '';
                 const resumeTime = e.resumeTime || null;
@@ -11720,10 +11653,10 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
 
                 const rNorm = (e.reason || '').toLowerCase().trim();
                 const sHour = isValidStop ? sDate.getHours() : 12;
-                const isTurnoEndReason = rNorm.includes('final de turno') || 
-                                         rNorm.includes('fim de turno') || 
-                                         rNorm.includes('aguardando início') ||
-                                         rNorm.includes('encerramento');
+                const isTurnoEndReason = rNorm.includes('final de turno') ||
+                    rNorm.includes('fim de turno') ||
+                    rNorm.includes('aguardando início') ||
+                    rNorm.includes('encerramento');
                 if (isTurnoEndReason && (dur > 180 || dur === 0)) {
                     return;
                 }
@@ -11732,7 +11665,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                 }
 
                 const dStr = parseDateOnly(stopTime) || reportDate;
-                const timeFormatted = isValidStop 
+                const timeFormatted = isValidStop
                     ? `${sDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${rDate && !isNaN(rDate.getTime()) ? ` às ${rDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}`
                     : 'Horário do turno';
 
@@ -11788,7 +11721,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     // Abas de dias
     const dayTabs = useMemo(() => {
         const tabs: { label: string; dateStr: string; dayName: string; count: number }[] = [];
-        
+
         weekDays.forEach((day, idx) => {
             const dStr = formatDateString(day);
             const dName = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][idx] || '';
@@ -11880,7 +11813,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         let operatorName = '';
 
         // 1. ShiftReports correspondentes a esta OP e data (Deduplicados)
-        const opReportsRaw = (shiftReports || []).filter(r => 
+        const opReportsRaw = (shiftReports || []).filter(r =>
             (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
             (r.date === targetReportDateStr || parseDateOnly(r.shiftStartTime || r.shiftEndTime) === targetReportDateStr)
         );
@@ -11909,8 +11842,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
             const pLots = activeOp.processedLots || (activeOp as any).processed_lots || [];
             let lotWeight = 0;
             pLots.forEach((l: any) => {
-                const fw = l.finalWeight !== null && l.finalWeight !== undefined 
-                    ? Number(l.finalWeight) 
+                const fw = l.finalWeight !== null && l.finalWeight !== undefined
+                    ? Number(l.finalWeight)
                     : (l.final_weight !== null && l.final_weight !== undefined ? Number(l.final_weight) : 0);
                 if (fw <= 0) return;
                 const lIso = l.endTime || l.end_time || l.startTime || l.start_time;
@@ -11935,8 +11868,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                 if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
                     produced += Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
                 } else if (!l.endTime && l.startQuantity !== undefined) {
-                    const currentTotal = isTrefilaMach 
-                        ? Number(activeOp.actualProducedWeight || 0) 
+                    const currentTotal = isTrefilaMach
+                        ? Number(activeOp.actualProducedWeight || 0)
                         : Number(activeOp.actualProducedQuantity || 0);
                     produced += Math.max(0, currentTotal - Number(l.startQuantity));
                 }
@@ -12042,20 +11975,18 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                                 key={tab.dateStr}
                                 type="button"
                                 onClick={() => setSelectedDateStr(tab.dateStr)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-                                    isSelected
+                                className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${isSelected
                                         ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
                                         : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-                                }`}
+                                    }`}
                             >
                                 <span>{tab.label}</span>
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                    isSelected
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected
                                         ? 'bg-slate-950 text-[#00E5FF]'
-                                        : tab.count > 0 
-                                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50' 
+                                        : tab.count > 0
+                                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50'
                                             : 'bg-white/10 text-slate-400'
-                                }`}>
+                                    }`}>
                                     {tab.count}
                                 </span>
                             </button>
@@ -12064,20 +11995,18 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                     <button
                         type="button"
                         onClick={() => setSelectedDateStr('ALL')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-                            selectedDateStr === 'ALL'
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${selectedDateStr === 'ALL'
                                 ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
                                 : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
-                        }`}
+                            }`}
                     >
                         <span>Todas as Paradas</span>
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                            selectedDateStr === 'ALL'
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${selectedDateStr === 'ALL'
                                 ? 'bg-slate-950 text-[#00E5FF]'
                                 : allStops.length > 0
                                     ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
                                     : 'bg-white/10 text-slate-400'
-                        }`}>
+                            }`}>
                             {allStops.length}
                         </span>
                     </button>
@@ -12121,7 +12050,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                         const targetDStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
                         const machName = activeOp.scheduledMachine || activeOp.machine || 'Trefila 1';
                         const machCfg = resolveMachineShiftConfig(machName, shiftConfig);
-                        
+
                         const dayLogs = (activeOp.operatorLogs || []).filter(l => {
                             if (!l.startTime) return false;
                             const s = parseDateOnly(l.startTime);
@@ -12129,7 +12058,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                             return s === targetDStr || e === targetDStr;
                         }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-                        const matchingShiftReport = shiftReports.find(r => 
+                        const matchingShiftReport = shiftReports.find(r =>
                             (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
                             (r.date === targetDStr || parseDateOnly(r.shiftStartTime) === targetDStr)
                         );
@@ -12155,8 +12084,8 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                         const actualStart = fmtHM(firstLog?.startTime) || fmtHM(matchingShiftReport?.shiftStartTime) || (dayLogs.length > 0 ? scheduledStart : (filteredStops.length > 0 ? 'Iniciado' : '--:--'));
                         const scheduledEnd = machCfg.workEnd || '17:33';
                         const isOpen = lastLog && !lastLog.endTime;
-                        const actualEnd = isOpen 
-                            ? 'Em andamento' 
+                        const actualEnd = isOpen
+                            ? 'Em andamento'
                             : (fmtHM(lastLog?.endTime) || fmtHM(matchingShiftReport?.shiftEndTime) || (dayLogs.length > 0 ? scheduledEnd : (filteredStops.length > 0 ? 'Em andamento' : '--:--')));
                         const operatorName = firstLog?.operator || lastLog?.operator || matchingShiftReport?.operator || activeOp.operatorName;
 
@@ -12225,11 +12154,10 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className={`px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
-                                            actualEnd === 'Em andamento' 
+                                        <div className={`px-3 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${actualEnd === 'Em andamento'
                                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
                                                 : 'bg-blue-500/20 text-blue-200 border-blue-500/40'
-                                        }`}>
+                                            }`}>
                                             {actualEnd}
                                         </div>
                                     </div>
@@ -12262,22 +12190,21 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                                     filteredStops.map((stop) => {
                                         const isLong = stop.durationMin >= 30;
                                         const isMedium = stop.durationMin >= 10;
-                                        
+
                                         return (
-                                            <div 
-                                                key={stop.id} 
+                                            <div
+                                                key={stop.id}
                                                 className="p-3 bg-black/40 rounded-xl border border-white/5 hover:border-white/15 flex items-center justify-between gap-3 transition-all"
                                             >
                                                 <div className="flex items-start gap-3 min-w-0">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${
-                                                        stop.isOngoing 
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${stop.isOngoing
                                                             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
-                                                            : isLong 
-                                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
-                                                                : isMedium 
-                                                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                                                            : isLong
+                                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                                                : isMedium
+                                                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                                                     : 'bg-white/5 text-slate-400 border border-white/10'
-                                                    }`}>
+                                                        }`}>
                                                         🛑
                                                     </div>
                                                     <div className="min-w-0">
@@ -12301,7 +12228,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                                                         {(() => {
                                                             const hasBracket = stop.reason.includes('[') && stop.reason.includes(']');
                                                             const isElectrodeStop = stop.reason.toLowerCase().includes('eletrodo') || stop.reason.toLowerCase().includes('solda');
-                                                            
+
                                                             let lotDetail = '';
                                                             if (hasBracket && isElectrodeStop) {
                                                                 lotDetail = stop.reason.substring(stop.reason.indexOf('[') + 1, stop.reason.lastIndexOf(']'));
@@ -12334,13 +12261,12 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                                                     </div>
                                                 </div>
 
-                                                <div className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${
-                                                    isLong 
-                                                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
-                                                        : isMedium 
-                                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                                                <div className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono shrink-0 border ${isLong
+                                                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                                        : isMedium
+                                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                                                             : 'bg-white/5 text-slate-300 border-white/10'
-                                                }`}>
+                                                    }`}>
                                                     {stop.durationMin} min
                                                 </div>
                                             </div>
@@ -12492,8 +12418,8 @@ const AdjustQuantityModal: React.FC<{
     };
     onClose: () => void;
     onSave: (
-        orderId: string, 
-        newTotalQty: number, 
+        orderId: string,
+        newTotalQty: number,
         reason: string,
         details?: {
             mode: 'shift' | 'total';
@@ -12508,12 +12434,12 @@ const AdjustQuantityModal: React.FC<{
     const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
     const unit = isTrefila ? 'kg' : 'pçs';
 
-    const currentTotal = isTrefila 
-        ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0) 
+    const currentTotal = isTrefila
+        ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0)
         : (Number(order.actualProducedQuantity) || 0);
-    
-    const target = isTrefila 
-        ? (order.totalWeight || order.quantityToProduce || 18000) 
+
+    const target = isTrefila
+        ? (order.totalWeight || order.quantityToProduce || 18000)
         : (order.quantityToProduce || (isTrelica ? 3500 : 5000));
 
     // Turno ativo do operador (se houver)
@@ -12543,23 +12469,23 @@ const AdjustQuantityModal: React.FC<{
         return `${cap(parts[0])} ${cap(parts[parts.length - 1])}`;
     };
 
-    const operatorName = formatName(context?.operatorName) 
-        || (activeLog?.operator ? formatName(activeLog.operator) : '') 
+    const operatorName = formatName(context?.operatorName)
+        || (activeLog?.operator ? formatName(activeLog.operator) : '')
         || (context?.dayStats?.operatorName ? formatName(context.dayStats.operatorName) : '')
         || 'Operador';
 
     // Determinar a quantidade de produção base deste turno
     const logStartQty = Number(activeLog?.startQuantity ?? (activeLog as any)?.start_quantity ?? 0) || 0;
     const computedActiveShiftQty = Math.max(0, currentTotal - trailingClosedAfterActive - logStartQty);
-    const shiftBaseQty = context?.shiftProduced !== undefined 
-        ? context.shiftProduced 
+    const shiftBaseQty = context?.shiftProduced !== undefined
+        ? context.shiftProduced
         : computedActiveShiftQty;
 
     const [mode, setMode] = useState<'shift' | 'total'>(initialMode);
     const [qty, setQty] = useState<number | ''>(initialMode === 'shift' ? shiftBaseQty : currentTotal);
     const [reason, setReason] = useState<string>(
-        initialMode === 'shift' 
-            ? 'Ajuste manual de contagem do turno (Gestor)' 
+        initialMode === 'shift'
+            ? 'Ajuste manual de contagem do turno (Gestor)'
             : 'Ajuste manual de contagem geral da OP (Gestor)'
     );
     const [isSaving, setIsSaving] = useState(false);
@@ -12603,7 +12529,7 @@ const AdjustQuantityModal: React.FC<{
     const isBelowMinimum = numericQty < minAllowedQty;
 
     const shiftDelta = isShiftMode ? (numericQty - shiftBaseQty) : (numericQty - currentTotal);
-    const calculatedNewTotal = isShiftMode 
+    const calculatedNewTotal = isShiftMode
         ? Math.max(0, sumLogsTotal + (numericQty - shiftBaseQty))
         : numericQty;
     const calculatedNewShift = isShiftMode
@@ -12649,9 +12575,9 @@ const AdjustQuantityModal: React.FC<{
                             </p>
                         </div>
                     </div>
-                    <button 
-                        type="button" 
-                        onClick={onClose} 
+                    <button
+                        type="button"
+                        onClick={onClose}
                         className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
                     >
                         <XIcon className="w-5 h-5" />
@@ -12663,11 +12589,10 @@ const AdjustQuantityModal: React.FC<{
                     <button
                         type="button"
                         onClick={() => handleSwitchMode('shift')}
-                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                            isShiftMode
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${isShiftMode
                                 ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        }`}
+                            }`}
                     >
                         <span>👤</span>
                         <span className="truncate">Turno de {operatorName} ({shiftBaseQty.toLocaleString('pt-BR')} {unit})</span>
@@ -12675,11 +12600,10 @@ const AdjustQuantityModal: React.FC<{
                     <button
                         type="button"
                         onClick={() => handleSwitchMode('total')}
-                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                            !isShiftMode
+                        className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${!isShiftMode
                                 ? 'bg-[#00E5FF] text-slate-950 shadow-[0_0_15px_rgba(0,229,255,0.4)] font-black'
                                 : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        }`}
+                            }`}
                     >
                         <span>📊</span>
                         <span className="truncate">Total da OP ({currentTotal.toLocaleString('pt-BR')} {unit})</span>
@@ -12738,8 +12662,8 @@ const AdjustQuantityModal: React.FC<{
                     <div className="bg-[#0B1D2A]/90 p-4 rounded-2xl border border-white/10 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                {isShiftMode 
-                                    ? `Definir Quantidade Produzida no Turno (${operatorName}):` 
+                                {isShiftMode
+                                    ? `Definir Quantidade Produzida no Turno (${operatorName}):`
                                     : 'Definir Nova Quantidade Total da OP:'}
                             </label>
                             <button
@@ -12770,16 +12694,15 @@ const AdjustQuantityModal: React.FC<{
                                 type="button"
                                 disabled={numericQty <= minAllowedQty}
                                 onClick={() => setQty(prev => Math.max(minAllowedQty, (Number(prev) || 0) - (isTrefila ? 50 : 1)))}
-                                className={`w-12 h-12 rounded-xl border text-2xl font-black flex items-center justify-center transition-all select-none ${
-                                    numericQty <= minAllowedQty
+                                className={`w-12 h-12 rounded-xl border text-2xl font-black flex items-center justify-center transition-all select-none ${numericQty <= minAllowedQty
                                         ? 'bg-white/5 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
                                         : 'bg-white/5 hover:bg-rose-500/20 text-slate-200 hover:text-rose-300 border-white/10 hover:border-rose-500/40 active:scale-95 cursor-pointer'
-                                }`}
+                                    }`}
                                 title={numericQty <= minAllowedQty ? `Mínimo permitido: ${minAllowedQty} ${unit}` : `Diminuir 1 ${unit}`}
                             >
                                 -
                             </button>
-                            
+
                             <div className="relative flex-1">
                                 <input
                                     type="number"
@@ -12797,11 +12720,10 @@ const AdjustQuantityModal: React.FC<{
                                     onBlur={() => {
                                         if (qty === '') setQty(0);
                                     }}
-                                    className={`w-full h-12 bg-black/50 border rounded-xl text-center text-2xl font-black font-mono tracking-wider outline-none transition-all ${
-                                        isBelowMinimum
+                                    className={`w-full h-12 bg-black/50 border rounded-xl text-center text-2xl font-black font-mono tracking-wider outline-none transition-all ${isBelowMinimum
                                             ? 'border-rose-500 text-rose-300 focus:border-rose-400 ring-2 ring-rose-500/20'
                                             : 'border-white/15 text-white focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF]'
-                                    }`}
+                                        }`}
                                     autoFocus
                                     onFocus={(e) => e.target.select()}
                                 />
@@ -12821,21 +12743,20 @@ const AdjustQuantityModal: React.FC<{
                         </div>
 
                         {/* Indicador em Tempo Real da Diferença e Efeito no Painel */}
-                        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
-                            shiftDelta > 0 
-                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' 
-                                : shiftDelta < 0 
-                                    ? 'bg-amber-950/40 border-amber-500/40 text-amber-200' 
+                        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${shiftDelta > 0
+                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                                : shiftDelta < 0
+                                    ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
                                     : 'bg-black/30 border-white/5 text-slate-400'
-                        }`}>
+                            }`}>
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-base shrink-0">{shiftDelta > 0 ? '📈' : shiftDelta < 0 ? '📉' : '⚖️'}</span>
                                 <div className="flex flex-col min-w-0">
                                     <span className="font-bold">
-                                        {shiftDelta > 0 
-                                            ? `Acréscimo de +${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}` 
-                                            : shiftDelta < 0 
-                                                ? `Redução de ${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}` 
+                                        {shiftDelta > 0
+                                            ? `Acréscimo de +${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}`
+                                            : shiftDelta < 0
+                                                ? `Redução de ${shiftDelta.toLocaleString('pt-BR')} ${unit} ${isShiftMode ? `no turno de ${operatorName}` : 'no total da OP'}`
                                                 : `Nenhuma alteração na quantidade ${isShiftMode ? 'do turno' : 'da OP'}`}
                                     </span>
                                     <span className="text-[11px] opacity-90 truncate mt-0.5">
@@ -12962,15 +12883,15 @@ const ManagerAuthModalForAdjust: React.FC<{
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2 border-t border-white/10">
-                    <button 
-                        type="button" 
-                        onClick={onCancel} 
+                    <button
+                        type="button"
+                        onClick={onCancel}
                         className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
                     >
                         Cancelar
                     </button>
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 cursor-pointer active:scale-98"
                     >
                         Autorizar e Ajustar
@@ -13079,8 +13000,8 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
     const initialShifts = useMemo(() => {
         const list: FinalizedShiftItem[] = [];
         const logs = (order.operatorLogs || []) as any[];
-        const matchingReports = (shiftReports || []).filter(r => 
-            (r.productionOrderId && r.productionOrderId === order.id) || 
+        const matchingReports = (shiftReports || []).filter(r =>
+            (r.productionOrderId && r.productionOrderId === order.id) ||
             (r.orderNumber && r.orderNumber === order.orderNumber)
         );
 
@@ -13118,7 +13039,7 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
         // Se não havia logs fechados em operatorLogs, verificar shiftReports
         if (list.length === 0 && matchingReports.length > 0) {
             matchingReports.forEach((rep, rIdx) => {
-                const qty = isTrefila 
+                const qty = isTrefila
                     ? (Number(rep.totalProducedWeight) || 0)
                     : (Number(rep.totalProducedQuantity) || 0);
                 const dt = rep.date ? new Date(rep.date) : (rep.shiftStartTime ? new Date(rep.shiftStartTime) : new Date());
@@ -13149,7 +13070,7 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
 
     const initialActivePieces = useMemo(() => {
         if (!hasActiveShift) return 0;
-        const currentTotal = isTrefila 
+        const currentTotal = isTrefila
             ? (Number(order.actualProducedWeight) || Number(order.totalProducedWeight) || 0)
             : (Number(order.actualProducedQuantity) || 0);
         const startQty = Number(activeLog?.startQuantity) || 0;
@@ -13184,7 +13105,7 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
     const target = Number(quantityToProduce) || 1;
     const progressPercent = Math.min(100, Math.round((recalculatedTotal / target) * 100));
 
-    const quickMetaDeltas = isTrefila 
+    const quickMetaDeltas = isTrefila
         ? [-1000, -500, -100, 100, 500, 1000]
         : [-500, -100, -50, 50, 100, 500];
 
@@ -13233,9 +13154,9 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
                             </p>
                         </div>
                     </div>
-                    <button 
-                        type="button" 
-                        onClick={onClose} 
+                    <button
+                        type="button"
+                        onClick={onClose}
                         className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
                     >
                         <XIcon className="w-5 h-5" />
@@ -13441,7 +13362,7 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
                             <span className="font-mono font-bold text-[#00E5FF]">{progressPercent}%</span>
                         </div>
                         <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                            <div 
+                            <div
                                 className="h-full bg-gradient-to-r from-purple-500 via-[#00E5FF] to-emerald-400 transition-all duration-300"
                                 style={{ width: `${progressPercent}%` }}
                             />
@@ -13464,16 +13385,16 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
 
                     {/* Botões de Ação */}
                     <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
+                        <button
+                            type="button"
+                            onClick={onClose}
                             disabled={isSaving}
                             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
                         >
                             Cancelar
                         </button>
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isSaving}
                             className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-purple-500/25 flex items-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
                         >
