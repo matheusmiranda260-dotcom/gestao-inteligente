@@ -1008,6 +1008,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
     const [newPkgWeight, setNewPkgWeight] = useState<string>('');
     const [newPkgQty, setNewPkgQty] = useState<string>('200');
     const [newPkgLabelLot, setNewPkgLabelLot] = useState<string>('');
+    const [showAllPackagesHistory, setShowAllPackagesHistory] = useState<boolean>(false);
     const [packageValidationError, setPackageValidationError] = useState<{
         message: string;
         missingPositions: TrelicaWirePositionKey[];
@@ -2179,89 +2180,108 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                         )}
                     </div>
 
-                    {/* CARTÕES SIMPLES DOS PACOTES JÁ FECHADOS */}
+                    {/* CARTÕES SIMPLES DOS PACOTES JÁ FECHADOS (LIMITADOS AOS MAIS RECENTES PARA NÃO EXIGIR ROLAGEM) */}
                     {computed.computedRows.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {computed.computedRows.map(row => (
-                                <div
-                                    key={row.id}
-                                    className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50 space-y-2"
-                                >
-                                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
-                                                {row.packageCode.toUpperCase()}
-                                            </span>
-                                            <div className="flex items-center gap-1.5 bg-white border border-slate-300 px-2 py-1 rounded-lg">
-                                                <span className="text-[10px] font-black uppercase text-slate-500">
-                                                    Qtd. Peças:
+                        <div className="space-y-2.5">
+                            <div className="flex items-center justify-between gap-2 px-1">
+                                <span className="text-[11px] font-black uppercase text-slate-500">
+                                    {showAllPackagesHistory 
+                                        ? `Histórico Completo (${computed.computedRows.length} pacotes fechados)` 
+                                        : `Últimos Pacotes Fechados (Mostrando ${Math.min(2, computed.computedRows.length)} de ${computed.computedRows.length})`}
+                                </span>
+                                {computed.computedRows.length > 2 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAllPackagesHistory(!showAllPackagesHistory)}
+                                        className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition active:scale-95 cursor-pointer"
+                                    >
+                                        {showAllPackagesHistory ? '▲ Ver Menos' : `▼ Ver Todos (${computed.computedRows.length})`}
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {(showAllPackagesHistory ? computed.computedRows : computed.computedRows.slice(-2)).map(row => (
+                                    <div
+                                        key={row.id}
+                                        className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 space-y-1.5"
+                                    >
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="px-2 py-0.5 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
+                                                    {row.packageCode.toUpperCase()}
                                                 </span>
+                                                <div className="flex items-center gap-1 bg-white border border-slate-300 px-1.5 py-0.5 rounded-md">
+                                                    <span className="text-[9px] font-black uppercase text-slate-500">
+                                                        Qtd:
+                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        value={row.quantity}
+                                                        onChange={e =>
+                                                            handleUpdateSavedPkgQty(
+                                                                row.id,
+                                                                parseInt(e.target.value, 10) || 0
+                                                            )
+                                                        }
+                                                        className="w-16 min-w-[56px] !px-1 !py-0.5 rounded !border !border-slate-300 !bg-amber-50 font-mono font-black text-xs text-center !text-slate-900 outline-none"
+                                                    />
+                                                </div>
+                                                {row.finishedLotNumber && (
+                                                    <span className="text-[10px] font-mono font-bold text-slate-500">
+                                                        • #{row.finishedLotNumber}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeletePackage(row.id)}
+                                                className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-bold"
+                                                title="Excluir pacote"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
+                                            <span className="text-[11px] font-black uppercase text-emerald-900">
+                                                ⚖️ Peso:
+                                            </span>
+                                            <div className="flex items-center gap-1">
                                                 <input
                                                     type="number"
-                                                    inputMode="numeric"
-                                                    value={row.quantity}
+                                                    inputMode="decimal"
+                                                    step="0.1"
+                                                    value={row.measuredPackageWeight ?? ''}
                                                     onChange={e =>
-                                                        handleUpdateSavedPkgQty(
+                                                        handleUpdateSavedPkgWeight(
                                                             row.id,
-                                                            parseInt(e.target.value, 10) || 0
+                                                            parseFloat(e.target.value) || null
                                                         )
                                                     }
-                                                    className="w-20 min-w-[72px] !px-1.5 !py-0.5 rounded !border !border-slate-300 !bg-amber-50 font-mono font-black text-sm text-center !text-slate-900 outline-none"
+                                                    className="w-24 min-w-[80px] !px-2 !py-0.5 rounded-lg !border !border-emerald-400 !bg-white font-mono font-black text-xs text-center !text-slate-900 outline-none"
                                                 />
+                                                <span className="text-[11px] font-bold text-emerald-900">kg</span>
                                             </div>
-                                            {row.finishedLotNumber && (
-                                                <span className="text-[11px] font-mono font-bold text-slate-500">
-                                                    • Etiq: {row.finishedLotNumber}
-                                                </span>
-                                            )}
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeletePackage(row.id)}
-                                            className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-bold"
-                                            title="Excluir pacote"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
 
-                                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl">
-                                        <span className="text-xs font-black uppercase text-emerald-900">
-                                            ⚖️ Peso na Balança:
-                                        </span>
-                                        <div className="flex items-center gap-1.5">
-                                            <input
-                                                type="number"
-                                                inputMode="decimal"
-                                                step="0.1"
-                                                value={row.measuredPackageWeight ?? ''}
-                                                onChange={e =>
-                                                    handleUpdateSavedPkgWeight(
-                                                        row.id,
-                                                        parseFloat(e.target.value) || null
-                                                    )
-                                                }
-                                                className="w-28 min-w-[96px] !px-2 !py-1 rounded-lg !border !border-emerald-400 !bg-white font-mono font-black text-sm text-center !text-slate-900 outline-none"
-                                            />
-                                            <span className="text-xs font-bold text-emerald-900">kg</span>
+                                        <div className="flex flex-wrap gap-1 pt-0.5 text-[9px] font-mono">
+                                            {TRELICA_WIRE_POSITIONS.map(pos => {
+                                                const c = row.positions[pos.key];
+                                                return (
+                                                    <span
+                                                        key={pos.key}
+                                                        className="px-1.5 py-0.2 rounded bg-white border border-slate-200 text-slate-700 font-bold"
+                                                    >
+                                                        {pos.shortLabel}: <strong>#{c.lot || '-'}</strong> (-{formatBR(c.kgCons, 0)}kg)
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                     </div>
-
-                                    <div className="flex flex-wrap gap-1.5 pt-1 text-[10px] font-mono">
-                                        {TRELICA_WIRE_POSITIONS.map(pos => {
-                                            const c = row.positions[pos.key];
-                                            return (
-                                                <span
-                                                    key={pos.key}
-                                                    className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-bold"
-                                                >
-                                                    {pos.shortLabel}: <strong>#{c.lot || '-'}</strong> (-{formatBR(c.kgCons, 0)}kg)
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     ) : (
                         <div className="p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400 text-xs">

@@ -2092,6 +2092,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     });
     const [newPkgWeight, setNewPkgWeight] = useState<string>('');
     const [newPkgTag, setNewPkgTag] = useState<string>('');
+    const [showAllPackagesHistory, setShowAllPackagesHistory] = useState<boolean>(false);
     const [validationError, setValidationError] = useState<{
         message: string;
         missingDir?: 'LONGITUDINAL' | 'TRANSVERSAL';
@@ -3002,14 +3003,32 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     </div>
                 </div>
 
-                {/* Lista de Cards dos Pacotes Já Confirmados */}
+                {/* Lista de Cards dos Pacotes Já Confirmados (Mostrando os mais recentes para zero rolagem) */}
                 {computed.computedRows.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {computed.computedRows.map((row) => {
-                            const usedTwoLong = row.longSplits.length > 1;
-                            const usedTwoTrans = row.transSplits.length > 1;
+                    <div className="space-y-2.5">
+                        <div className="flex items-center justify-between gap-2 px-1">
+                            <span className="text-[11px] font-black uppercase text-slate-500">
+                                {showAllPackagesHistory 
+                                    ? `Histórico Completo (${computed.computedRows.length} pacotes fechados)` 
+                                    : `Últimos Pacotes Fechados (Mostrando ${Math.min(2, computed.computedRows.length)} de ${computed.computedRows.length})`}
+                            </span>
+                            {computed.computedRows.length > 2 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllPackagesHistory(!showAllPackagesHistory)}
+                                    className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition active:scale-95 cursor-pointer"
+                                >
+                                    {showAllPackagesHistory ? '▲ Ver Menos' : `▼ Ver Todos (${computed.computedRows.length})`}
+                                </button>
+                            )}
+                        </div>
 
-                            return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {(showAllPackagesHistory ? computed.computedRows : computed.computedRows.slice(-2)).map((row) => {
+                                const usedTwoLong = row.longSplits.length > 1;
+                                const usedTwoTrans = row.transSplits.length > 1;
+
+                                return (
                                 <div
                                     key={row.id}
                                     className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/70 space-y-2.5 flex flex-col justify-between"
@@ -3131,6 +3150,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 </div>
                             );
                         })}
+                        </div>
                     </div>
                 ) : (
                     <div className="p-6 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400 text-xs">
