@@ -25,6 +25,7 @@ import TrelicaSpoolStands from './TrelicaSpoolStands';
 import TrelicaWeldingHead, { getLocalMachineElectrodes, getLocalElectrodeHistory } from './TrelicaWeldingHead';
 import DailyProductionReportSheetModal from './DailyProductionReportSheetModal';
 import MalhaConsumptionReportModal from './MalhaConsumptionReportModal';
+import TrelicaConsumptionReportModal, { TrelicaPackagesOperatorPanel } from './TrelicaConsumptionReportModal';
 import { 
     CalendarIcon, PlusIcon, ChevronRightIcon, XIcon, ArrowLeftIcon, 
     TrashIcon, PlayIcon, CheckCircleIcon, ClockIcon, ChartBarIcon, 
@@ -3348,21 +3349,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 return;
             }
 
-            // Validação OBRIGATÓRIA de lotes de CA-60 (mesmo para Ordens Fantasma para garantir a precisão da produção)
-            const missingParts: string[] = [];
-            if (trelicaSuperiorLots.length === 0) missingParts.push('Banzo Superior');
-            if (trelicaInferiorLeftLots.length === 0) missingParts.push('Inferior (Lado 1)');
-            if (trelicaInferiorRightLots.length === 0) missingParts.push('Inferior (Lado 2)');
-            if (trelicaSenozoideLeftLots.length === 0) missingParts.push('Senozoide (Lado 1)');
-            if (trelicaSenozoideRightLots.length === 0) missingParts.push('Senozoide (Lado 2)');
-
-            if (missingParts.length > 0) {
-                const msg = `Seleção de lotes obrigatória: selecione rolos de CA-60 para ${missingParts.join(', ')} (obrigatório inclusive em Ordens Fantasma para garantir a precisão).`;
-                setCreateOrderError(msg);
-                showNotification?.(msg, 'error');
-                return;
-            }
-
+            // Seleção de lotes agora é feita diretamente pelo operador no painel da máquina (5 lotes ativos + reserva + pacotes de 200 pçs)
             const trelicaLots = {
                 superior: trelicaSuperiorLots[0] || null,
                 inferior1: trelicaInferiorLeftLots[0] || null,
@@ -3386,7 +3373,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             orderData.quantityToProduce = trelicaQuantity;
             orderData.targetBitola = selectedTrelicaModel.superior as Bitola;
             orderData.totalWeight = unitPieceWeight * trelicaQuantity;
-            orderData.isGhostOrder = isTrelicaGhostOrder;
+            orderData.isGhostOrder = true; // Não bloqueia/reserva rolos na abertura da OP; controle feito no painel da máquina
             orderData.selectedLotIds = trelicaLots;
             orderData.trelicaSuperior = selectedTrelicaModel.superior;
             orderData.trelicaInferior = selectedTrelicaModel.inferior;
@@ -7849,25 +7836,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                             />
                                         </div>
 
-                                        {/* Ordem Fantasma Treliça */}
-                                        <div className="flex flex-col gap-1 p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="isTrelicaGhostOrderPCP"
-                                                    checked={isTrelicaGhostOrder}
-                                                    onChange={(e) => setIsTrelicaGhostOrder(e.target.checked)}
-                                                    className="h-4 w-4 rounded border-slate-700 bg-[#07131B] text-amber-500 focus:ring-amber-500 cursor-pointer"
-                                                />
-                                                <label htmlFor="isTrelicaGhostOrderPCP" className="text-xs font-bold text-amber-400 cursor-pointer">
-                                                    Ordem Fantasma (Não reservar rolos de CA-60)
-                                                </label>
-                                            </div>
-                                            <p className="text-[9px] text-amber-300/80 pl-6 leading-tight">
-                                                A seleção dos lotes continua obrigatória para garantir o cálculo preciso de peso, tempos e calibração da OP.
-                                            </p>
-                                        </div>
-
                                         <div className="flex flex-col gap-1">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modelo da Treliça</label>
                                             <select
@@ -8057,268 +8025,95 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                     </div>
 
                                     {/* ========================================================== */}
-                                    {/* Coluna Direita: Seleção Completa de Lotes de CA-60 */}
+                                    {/* Coluna Direita: Resumo Técnico dos 5 Fios & Pacotes (200 pçs) */}
                                     {/* ========================================================== */}
                                     <div className="lg:col-span-7 flex flex-col gap-3 bg-[#0A1822]/90 p-4 rounded-xl border border-white/5">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-2">
-                                            <div>
-                                                <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5">
-                                                    <ClipboardListIcon className="w-4 h-4 text-emerald-400" />
-                                                    2. Seleção de Rolos de CA-60 (Matéria-Prima)
-                                                </h4>
-                                                <p className="text-[10px] text-slate-400">
-                                                    Marque os rolos em estoque para cada arame 
-                                                    <strong className="text-amber-400 font-normal"> (obrigatório inclusive em Ordens Fantasma)</strong>
-                                                </p>
+                                        <div className="border-b border-white/5 pb-2">
+                                            <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5">
+                                                <ClipboardListIcon className="w-4 h-4 text-emerald-400" />
+                                                2. Resumo Técnico dos 5 Fios & Fechamento por Pacotes (200 Pçs)
+                                            </h4>
+                                            <p className="text-[11px] text-slate-300 mt-0.5">
+                                                A seleção dos 5 lotes ativos + lotes reserva e o fechamento dos pacotes padrão de <strong className="text-amber-300">200 peças</strong> são feitos diretamente pelo operador no painel da máquina (igual à Malha).
+                                            </p>
+                                        </div>
+
+                                        {/* Cards das 5 Posições de Arame da Treliça */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                            <div className="p-3 rounded-xl bg-[#07131B] border border-cyan-500/30">
+                                                <span className="text-[10px] font-black uppercase text-cyan-400 block">
+                                                    1. Banzo Superior (1 Fio)
+                                                </span>
+                                                <div className="text-sm font-black text-white mt-0.5">
+                                                    Bitola ⌀ {selectedTrelicaModel?.superior || '--'} mm
+                                                </div>
+                                                <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                                                    <span>Demanda Total OP:</span>
+                                                    <strong className="text-cyan-300">{requiredTrelicaWeights.sup.toFixed(1)} kg</strong>
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                {hasAnyLotsSelected && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleClearAllTrelicaLots}
-                                                        className="text-[10px] text-slate-400 hover:text-red-400 underline font-bold"
-                                                    >
-                                                        Desmarcar todos
-                                                    </button>
-                                                )}
+                                            <div className="p-3 rounded-xl bg-[#07131B] border border-purple-500/30">
+                                                <span className="text-[10px] font-black uppercase text-purple-400 block">
+                                                    2 e 3. Senoides Esq. & Dir. (2 Fios)
+                                                </span>
+                                                <div className="text-sm font-black text-white mt-0.5">
+                                                    Bitola ⌀ {selectedTrelicaModel?.senozoide || '--'} mm
+                                                </div>
+                                                <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                                                    <span>Por lado (2x):</span>
+                                                    <strong className="text-purple-300">{requiredTrelicaWeights.senSide.toFixed(1)} kg cada</strong>
+                                                </div>
+                                            </div>
 
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAutoSelectTrelicaLots}
-                                                    className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
-                                                    title="Seleciona automaticamente rolos compatíveis para todas as posições"
-                                                >
-                                                    ⚡ Auto-Selecionar Lotes
-                                                </button>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={handleLoadSpoolStandsToOrder}
-                                                    className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 text-[10px] font-black px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
-                                                    title={`Carregar as bobinas atualmente montadas nos 5 porta-rolos da ${createMachine}`}
-                                                >
-                                                    📥 Aproveitar Rolos da {createMachine}
-                                                </button>
+                                            <div className="p-3 rounded-xl bg-[#07131B] border border-emerald-500/30">
+                                                <span className="text-[10px] font-black uppercase text-emerald-400 block">
+                                                    4 e 5. Inferiores Esq. & Dir. (2 Fios)
+                                                </span>
+                                                <div className="text-sm font-black text-white mt-0.5">
+                                                    Bitola ⌀ {selectedTrelicaModel?.inferior || '--'} mm
+                                                </div>
+                                                <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                                                    <span>Por lado (2x):</span>
+                                                    <strong className="text-emerald-300">{requiredTrelicaWeights.infSide.toFixed(1)} kg cada</strong>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* BANNER DE DETECÇÃO INTELIGENTE DE BOBINAS MONTADAS NA MÁQUINA */}
-                                        {compatibleStandsForNewOp.length > 0 && (
-                                            <div className="bg-gradient-to-r from-blue-950/80 via-[#0A1D2B] to-emerald-950/60 p-3 rounded-2xl border border-emerald-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-base shadow flex-shrink-0">
-                                                        💡
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
-                                                            <span>SETUP INTELIGENTE: {compatibleStandsForNewOp.length} BOBINA(S) MONTADAS NA {createMachine}!</span>
-                                                            <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold">
-                                                                Bitolas Compatíveis ✓
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-[11px] text-slate-300 mt-0.5">
-                                                            Os porta-rolos já estão abastecidos com {compatibleStandsForNewOp.map(s => `${(s.role_name ? s.role_name.replace('Porta-Rolo ', '') : s.role_type)}: Lote #${s.current_lot_number || s.current_lot_id || '--'} (⌀${s.current_gauge || '--'}mm)`).join(' • ')}. Deseja aproveitar estas bobinas nesta OP para evitar setup de troca de rolo?
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleLoadSpoolStandsToOrder}
-                                                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs transition active:scale-95 shadow-md flex items-center gap-1.5 flex-shrink-0"
-                                                >
-                                                    <span>⚡</span>
-                                                    <span>Aproveitar {compatibleStandsForNewOp.length} Bobinas Montadas</span>
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Cartões de Status / Tabs para Superior, Inferiores e Senozoides */}
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveTrelicaLotTab('superior')}
-                                                className={`p-2.5 rounded-xl border text-left transition-all ${
-                                                    activeTrelicaLotTab === 'superior'
-                                                        ? 'bg-cyan-500/15 border-cyan-500/50 shadow-md shadow-cyan-500/10'
-                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
-                                                }`}
-                                            >
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-black uppercase text-cyan-400">Superior (1x)</span>
-                                                    {isSupDone && <span className="text-[9px]">✅</span>}
-                                                </div>
-                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.superior} mm</div>
-                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
-                                                    <span>{trelicaSuperiorLots.length} rolo(s)</span>
-                                                    <strong className={isSupDone ? 'text-emerald-400' : 'text-amber-400'}>
-                                                        {selectedSupWeight.toFixed(0)}/{requiredTrelicaWeights.sup.toFixed(0)}kg
-                                                    </strong>
-                                                </div>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveTrelicaLotTab('inferior')}
-                                                className={`p-2.5 rounded-xl border text-left transition-all ${
-                                                    activeTrelicaLotTab === 'inferior'
-                                                        ? 'bg-emerald-500/15 border-emerald-500/50 shadow-md shadow-emerald-500/10'
-                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
-                                                }`}
-                                            >
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-black uppercase text-emerald-400">Inferiores (2x)</span>
-                                                    {isInfDone && <span className="text-[9px]">✅</span>}
-                                                </div>
-                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.inferior} mm</div>
-                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
-                                                    <span>{(trelicaInferiorLeftLots.length + trelicaInferiorRightLots.length)} rolo(s)</span>
-                                                    <strong className={isInfDone ? 'text-emerald-400' : 'text-amber-400'}>
-                                                        {(selectedInf1Weight + selectedInf2Weight).toFixed(0)}/{requiredTrelicaWeights.inf.toFixed(0)}kg
-                                                    </strong>
-                                                </div>
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveTrelicaLotTab('senozoide')}
-                                                className={`p-2.5 rounded-xl border text-left transition-all ${
-                                                    activeTrelicaLotTab === 'senozoide'
-                                                        ? 'bg-purple-500/15 border-purple-500/50 shadow-md shadow-purple-500/10'
-                                                        : 'bg-[#07131B] border-white/5 hover:border-white/20'
-                                                }`}
-                                            >
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-black uppercase text-purple-400">Senozoides (2x)</span>
-                                                    {isSenDone && <span className="text-[9px]">✅</span>}
-                                                </div>
-                                                <div className="text-xs font-black text-white mt-0.5">⌀ {selectedTrelicaModel?.senozoide} mm</div>
-                                                <div className="text-[10px] font-mono text-slate-400 mt-1 flex justify-between">
-                                                    <span>{(trelicaSenozoideLeftLots.length + trelicaSenozoideRightLots.length)} rolo(s)</span>
-                                                    <strong className={isSenDone ? 'text-emerald-400' : 'text-amber-400'}>
-                                                        {(selectedSen1Weight + selectedSen2Weight).toFixed(0)}/{requiredTrelicaWeights.sen.toFixed(0)}kg
-                                                    </strong>
-                                                </div>
-                                            </button>
-                                        </div>
-
-                                        {/* Barra de Filtro de Busca de Lotes */}
-                                        <div className="flex items-center justify-between gap-3 bg-[#07131B] p-2 rounded-xl border border-white/5">
-                                            <input
-                                                type="text"
-                                                value={trelicaLotSearch}
-                                                onChange={(e) => setTrelicaLotSearch(e.target.value)}
-                                                placeholder="🔍 Filtrar rolos por lote interno..."
-                                                className="w-full bg-transparent border-none text-xs text-white placeholder-slate-500 focus:outline-none"
-                                            />
-                                            <div className="flex items-center gap-2 whitespace-nowrap pl-2 border-l border-white/10">
-                                                <input
-                                                    type="checkbox"
-                                                    id="trelicaShowAllGauges"
-                                                    checked={trelicaShowAllGauges}
-                                                    onChange={(e) => setTrelicaShowAllGauges(e.target.checked)}
-                                                    className="h-3.5 w-3.5 rounded border-slate-700 bg-[#07131B] text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                                                />
-                                                <label htmlFor="trelicaShowAllGauges" className="text-[10px] text-slate-400 font-bold cursor-pointer">
-                                                    Exibir todas as bitolas
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        {/* Conteúdo da Tab Ativa: BANZO SUPERIOR */}
-                                        {activeTrelicaLotTab === 'superior' && (
-                                            <div className="flex flex-col gap-2">
-                                                {renderLotTable(
-                                                    `Banzo Superior (1x)`,
-                                                    `Bitola nominal: ${selectedTrelicaModel?.superior} mm`,
-                                                    requiredTrelicaWeights.sup,
-                                                    selectedSupWeight,
-                                                    supCandidates,
-                                                    trelicaSuperiorLots,
-                                                    'sup'
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Conteúdo da Tab Ativa: BANZOS INFERIORES (LADO 1 E LADO 2) */}
-                                        {activeTrelicaLotTab === 'inferior' && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {renderLotTable(
-                                                    `Inferior - Lado 1`,
-                                                    `Bitola nominal: ${selectedTrelicaModel?.inferior} mm`,
-                                                    requiredTrelicaWeights.infSide,
-                                                    selectedInf1Weight,
-                                                    inf1Candidates,
-                                                    trelicaInferiorLeftLots,
-                                                    'inf1'
-                                                )}
-                                                {renderLotTable(
-                                                    `Inferior - Lado 2`,
-                                                    `Bitola nominal: ${selectedTrelicaModel?.inferior} mm`,
-                                                    requiredTrelicaWeights.infSide,
-                                                    selectedInf2Weight,
-                                                    inf2Candidates,
-                                                    trelicaInferiorRightLots,
-                                                    'inf2'
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Conteúdo da Tab Ativa: SENOZOIDES (LADO 1 E LADO 2) */}
-                                        {activeTrelicaLotTab === 'senozoide' && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {renderLotTable(
-                                                    `Senozoide - Lado 1`,
-                                                    `Bitola nominal: ${selectedTrelicaModel?.senozoide} mm`,
-                                                    requiredTrelicaWeights.senSide,
-                                                    selectedSen1Weight,
-                                                    sen1Candidates,
-                                                    trelicaSenozoideLeftLots,
-                                                    'sen1'
-                                                )}
-                                                {renderLotTable(
-                                                    `Senozoide - Lado 2`,
-                                                    `Bitola nominal: ${selectedTrelicaModel?.senozoide} mm`,
-                                                    requiredTrelicaWeights.senSide,
-                                                    selectedSen2Weight,
-                                                    sen2Candidates,
-                                                    trelicaSenozoideRightLots,
-                                                    'sen2'
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Resumo Geral de Matéria-Prima Treliça */}
-                                        <div className="bg-[#07131B] p-3 rounded-xl border border-white/5 mt-auto flex flex-col gap-1.5">
-                                            <div className="flex justify-between text-xs text-slate-300">
-                                                <span>Peso Teórico Total da Produção:</span>
-                                                <span className="font-black text-white">
-                                                    {requiredTrelicaWeights.total.toFixed(2)} kg
+                                        {/* Estimativa de Pacotes de 200 Peças */}
+                                        <div className="bg-gradient-to-r from-cyan-950/60 via-[#07131B] to-emerald-950/50 p-3.5 rounded-xl border border-cyan-500/30 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase text-cyan-300">
+                                                    📦 Padrão de Fechamento de Pacotes (200 Peças)
+                                                </span>
+                                                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black">
+                                                    {Math.ceil((trelicaQuantity || 0) / 200)} pacote(s) de 200 pçs
                                                 </span>
                                             </div>
-
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-slate-400">Total Alocado nos Rolos Selecionados:</span>
-                                                <span className={`font-black ${isAllLotsReady ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                                    {totalSelectedTrelicaWeight.toFixed(2)} kg
-                                                </span>
-                                            </div>
-
-                                            <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px]">
-                                                {isAllLotsReady ? (
-                                                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                                        ✓ Todos os 5 arames devidamente abastecidos (+{(totalSelectedTrelicaWeight - requiredTrelicaWeights.total).toFixed(1)} kg extra)
+                                            <div className="grid grid-cols-3 gap-2 text-xs pt-1">
+                                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                                    <span className="text-[10px] text-slate-400 block">Peso Teórico / Peça</span>
+                                                    <span className="font-black text-white">
+                                                        {(parseFloat(String(selectedTrelicaModel?.pesoFinal || selectedTrelicaModel?.peso_final || '0').replace(',', '.')) || 0).toFixed(3)} kg
                                                     </span>
-                                                ) : (
-                                                    <span className="text-amber-400 font-bold flex items-center gap-1">
-                                                        ⚠️ Seleção incompleta ou abaixo da meta (verifique as 3 abas acima)
+                                                </div>
+                                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                                    <span className="text-[10px] text-slate-400 block">Peso Médio / Pacote (200 pçs)</span>
+                                                    <span className="font-black text-emerald-400">
+                                                        {((parseFloat(String(selectedTrelicaModel?.pesoFinal || selectedTrelicaModel?.peso_final || '0').replace(',', '.')) || 0) * 200).toFixed(0)} kg
                                                     </span>
-                                                )}
-
-                                                <span className="text-slate-500 font-mono">
-                                                    {(trelicaSuperiorLots.length + trelicaInferiorLeftLots.length + trelicaInferiorRightLots.length + trelicaSenozoideLeftLots.length + trelicaSenozoideRightLots.length)} rolo(s) marcados
-                                                </span>
+                                                </div>
+                                                <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+                                                    <span className="text-[10px] text-slate-400 block">Peso Total Estimado da OP</span>
+                                                    <span className="font-black text-cyan-300">
+                                                        {requiredTrelicaWeights.total.toFixed(1)} kg
+                                                    </span>
+                                                </div>
                                             </div>
+                                        </div>
+
+                                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-200 mt-auto">
+                                            ✓ <strong>Pronto para Programar:</strong> Ao iniciar a OP na máquina, o operador informa os <strong>5 Lotes Ativos</strong> (Superior, Senoides e Inferiores) + <strong>Lotes Reserva</strong> e registra o peso de cada <strong>Pacote de 200 peças</strong> para gerar o fechamento oficial automaticamente.
                                         </div>
                                     </div>
                                 </div>
@@ -11518,16 +11313,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                             </div>
                         </div>
 
-                        <TrelicaSpoolStands
-                            machineName={viewSpoolStandsMachine}
-                            stock={stock}
-                            currentUser={currentUser}
-                            productionOrders={productionOrders}
-                            activeOrder={productionOrders.find(o => 
-                                (o.machine === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) && 
-                                (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'pending' || o.status === 'Aberta')
-                            ) || null}
-                        />
+                        {(() => {
+                            const activeTrelicaOp = productionOrders.find(o => 
+                                ((o.scheduledMachine || o.machine) === viewSpoolStandsMachine || (viewSpoolStandsMachine.startsWith('Treliça') && o.machine === 'Treliça')) && 
+                                (o.status === 'in_progress' || o.status === 'Em Produção' || o.status === 'pending' || o.status === 'Aberta' || o.status === 'Ativa')
+                            ) || productionOrders.find(o => (o.scheduledMachine || o.machine) === viewSpoolStandsMachine) || null;
+
+                            if (activeTrelicaOp) {
+                                return (
+                                    <TrelicaPackagesOperatorPanel
+                                        op={activeTrelicaOp}
+                                        stock={stock}
+                                        shiftReports={shiftReports}
+                                        machineName={viewSpoolStandsMachine}
+                                    />
+                                );
+                            }
+
+                            return (
+                                <TrelicaSpoolStands
+                                    machineName={viewSpoolStandsMachine}
+                                    stock={stock}
+                                    currentUser={currentUser}
+                                    productionOrders={productionOrders}
+                                    activeOrder={null}
+                                />
+                            );
+                        })()}
                     </div>
                 </div>
             )}
@@ -12051,6 +11863,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
     const targetReportDateStr = selectedDateStr === 'ALL' ? data.dateStr : selectedDateStr;
     const machName = activeOp.scheduledMachine || (activeOp.machine as string) || 'Malha 1';
     const [showMalhaPackagesReport, setShowMalhaPackagesReport] = useState(false);
+    const [showTrelicaPackagesReport, setShowTrelicaPackagesReport] = useState(false);
 
     // Obter estatísticas dinâmicas fiéis do PCP para o dia ativo (Ritmo, Ciclo, Efetivo, Paradas, Produção)
     const activeDayStats = useMemo(() => {
@@ -12176,10 +11989,21 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                                         type="button"
                                         onClick={() => setShowMalhaPackagesReport(true)}
                                         className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.35)] transition-all cursor-pointer active:scale-95 border border-amber-300/60"
-                                        title="Abrir Planilha de Consumo por Lote e Pacotes de 50 Malhas (Conversão Longitudinal / Transversal)"
+                                        title="Abrir Planilha de Consumo por Lote e Pacotes de Malhas (Conversão Longitudinal / Transversal)"
                                     >
                                         <span>📊</span>
-                                        <span>Planilha Lotes & Pacotes (50 pçs)</span>
+                                        <span>Planilha Lotes & Pacotes</span>
+                                    </button>
+                                )}
+                                {(machName.toLowerCase().includes('treli') || Boolean(activeOp.trelicaModel)) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowTrelicaPackagesReport(true)}
+                                        className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.35)] transition-all cursor-pointer active:scale-95 border border-amber-300/60"
+                                        title="Abrir Fechamento de Lotes (5 Fios) e Pacotes de 200 Peças da Treliça"
+                                    >
+                                        <span>📊</span>
+                                        <span>Planilha Lotes & Pacotes (200 pçs)</span>
                                     </button>
                                 )}
                             </div>
@@ -12635,6 +12459,15 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
                 <MalhaConsumptionReportModal
                     isOpen={showMalhaPackagesReport}
                     onClose={() => setShowMalhaPackagesReport(false)}
+                    op={activeOp}
+                    stock={stock}
+                    shiftReports={shiftReports}
+                />
+            )}
+
+            {showTrelicaPackagesReport && (
+                <TrelicaConsumptionReportModal
+                    onClose={() => setShowTrelicaPackagesReport(false)}
                     op={activeOp}
                     stock={stock}
                     shiftReports={shiftReports}

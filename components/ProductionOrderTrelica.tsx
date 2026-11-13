@@ -460,38 +460,13 @@ const ProductionOrderTrelica: React.FC<ProductionOrderTrelicaProps> = ({ setPage
             return;
         }
 
-        // Validations per side
-        if (!isGhostOrder) {
-            if (superiorLots.length === 0) { showNotification('Selecione pelo menos um lote Superior.', 'error'); return; }
-            if (inferiorLeftLots.length === 0) { showNotification('Selecione lotes para Inferior (Lado 1).', 'error'); return; }
-            if (inferiorRightLots.length === 0) { showNotification('Selecione lotes para Inferior (Lado 2).', 'error'); return; }
-            if (senozoideLeftLots.length === 0) { showNotification('Selecione lotes para Senozoide (Lado 1).', 'error'); return; }
-            if (senozoideRightLots.length === 0) { showNotification('Selecione lotes para Senozoide (Lado 2).', 'error'); return; }
-
-            if (selectedSuperiorWeight < requiredSuperiorWeight) {
-                showNotification('Peso Superior insuficiente.', 'error'); return;
-            }
-            if (selectedInferiorLeftWeight < requiredInferiorSideWeight) {
-                showNotification('Peso Inferior (Lado 1) insuficiente.', 'error'); return;
-            }
-            if (selectedInferiorRightWeight < requiredInferiorSideWeight) {
-                showNotification('Peso Inferior (Lado 2) insuficiente.', 'error'); return;
-            }
-            if (selectedSenozoideLeftWeight < requiredSenozoideSideWeight) {
-                showNotification('Peso Senozoide (Lado 1) insuficiente.', 'error'); return;
-            }
-            if (selectedSenozoideRightWeight < requiredSenozoideSideWeight) {
-                showNotification('Peso Senozoide (Lado 2) insuficiente.', 'error'); return;
-            }
-        }
-
-        // Criar estrutura compatível com o back-end e report
-        const trelicaLots = isGhostOrder ? {} : {
-            superior: superiorLots[0],
-            inferior1: inferiorLeftLots[0],
-            inferior2: inferiorRightLots[0],
-            senozoide1: senozoideLeftLots[0],
-            senozoide2: senozoideRightLots[0],
+        // A seleção de lotes agora é feita diretamente pelo operador no painel da máquina (5 lotes ativos + reserva + pacotes de 200 pçs)
+        const trelicaLots = {
+            superior: superiorLots[0] || null,
+            inferior1: inferiorLeftLots[0] || null,
+            inferior2: inferiorRightLots[0] || null,
+            senozoide1: senozoideLeftLots[0] || null,
+            senozoide2: senozoideRightLots[0] || null,
 
             allSuperior: superiorLots,
             allInferiorLeft: inferiorLeftLots,

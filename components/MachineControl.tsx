@@ -19,6 +19,7 @@ import TrelicaWeldingHead, {
     getLocalElectrodeHistory
 } from './TrelicaWeldingHead';
 import { MalhaPackagesOperatorPanel } from './MalhaConsumptionReportModal';
+import { TrelicaPackagesOperatorPanel } from './TrelicaConsumptionReportModal';
 
 
 const IdleActivityLogger: React.FC<{
@@ -3641,25 +3642,25 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
                                     )}
 
-                                    {/* Gêmeo Digital dos Porta-Rolos Interativo e Liberado */}
+                                    {/* Painel Simplificado dos 5 Lotes (Superior, Senoides e Inferiores) + Pacotes de 200 pçs */}
                                     <div className="bg-[#07131B] p-3 sm:p-5 rounded-3xl border border-white/10 shadow-2xl">
-                                        <TrelicaSpoolStands
-                                            machineName={activeMachine}
-                                            stock={stock}
-                                            activeOrder={activeOrder}
-                                            productionOrders={productionOrders}
-                                            currentUser={currentUser}
-                                            readOnly={false}
-                                            onSpoolChange={(stand, newLot) => {
-                                                if (addLotToOrder && activeOrder) {
-                                                    try {
-                                                        addLotToOrder(activeOrder.id, newLot.id);
-                                                    } catch (e) {
-                                                        console.warn('Auto addLotToOrder:', e);
-                                                    }
-                                                }
-                                            }}
-                                        />
+                                        {activeOrder ? (
+                                            <TrelicaPackagesOperatorPanel
+                                                op={activeOrder}
+                                                stock={stock}
+                                                shiftReports={shiftReports}
+                                                machineName={activeMachine}
+                                            />
+                                        ) : (
+                                            <TrelicaSpoolStands
+                                                machineName={activeMachine}
+                                                stock={stock}
+                                                activeOrder={activeOrder}
+                                                productionOrders={productionOrders}
+                                                currentUser={currentUser}
+                                                readOnly={false}
+                                            />
+                                        )}
                                     </div>
 
                                     {/* Rodapé de Confirmação */}
@@ -4591,14 +4592,23 @@ const MachineControl: React.FC<MachineControlProps> = ({
                             </div>
                         </div>
 
-                        <TrelicaSpoolStands
-                            machineName={activeMachine}
-                            stock={stock}
-                            activeOrder={activeOrder}
-                            productionOrders={productionOrders}
-                            currentUser={currentUser}
-                            readOnly={true}
-                        />
+                        {activeOrder ? (
+                            <TrelicaPackagesOperatorPanel
+                                op={activeOrder}
+                                stock={stock}
+                                shiftReports={shiftReports}
+                                machineName={activeMachine}
+                            />
+                        ) : (
+                            <TrelicaSpoolStands
+                                machineName={activeMachine}
+                                stock={stock}
+                                activeOrder={activeOrder}
+                                productionOrders={productionOrders}
+                                currentUser={currentUser}
+                                readOnly={true}
+                            />
+                        )}
                     </div>
                 </div>
             )}
@@ -5992,6 +6002,13 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </>
                                     ) : activeMachine.startsWith('Malha') && activeOrder ? (
                                         <MalhaPackagesOperatorPanel
+                                            op={activeOrder}
+                                            stock={stock}
+                                            shiftReports={shiftReports}
+                                            machineName={activeMachine}
+                                        />
+                                    ) : activeMachine.startsWith('Treliça') && activeOrder ? (
+                                        <TrelicaPackagesOperatorPanel
                                             op={activeOrder}
                                             stock={stock}
                                             shiftReports={shiftReports}
