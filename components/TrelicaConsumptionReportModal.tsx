@@ -160,6 +160,42 @@ export const getEmptyTrelicaQueues = (): Record<TrelicaWirePositionKey, TrelicaL
     inferior_dir: []
 });
 
+/** Helper à prova de falhas para extrair a fila de lotes de qualquer posição, 
+ * aceitando tanto snake_case ('senoide_esq') quanto camelCase ('senoideEsq' gerado pelo Supabase) */
+export const getQueueForPosition = (
+    rawQueues: Record<string, any> | undefined | null,
+    key: TrelicaWirePositionKey
+): any[] => {
+    if (!rawQueues || typeof rawQueues !== 'object') return [];
+
+    // 1. Chave exata (ex: 'senoide_esq')
+    if (Array.isArray(rawQueues[key])) return rawQueues[key];
+
+    // 2. Chave camelCase (ex: 'senoideEsq')
+    const camelKey = key.replace(/_([a-z])/g, (_, g) => g.toUpperCase());
+    if (Array.isArray(rawQueues[camelKey])) return rawQueues[camelKey];
+
+    // 3. Chave snake_case explícita
+    const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+    if (Array.isArray(rawQueues[snakeKey])) return rawQueues[snakeKey];
+
+    // 4. Mapeamentos legados e alternativos (ex: 'inferior1', 'senozoide1')
+    const altKeysMap: Record<TrelicaWirePositionKey, string[]> = {
+        superior: ['sup', 'allSuperior', 'banzo_superior', 'banzoSuperior'],
+        senoide_esq: ['senoide1', 'senozoide1', 'allSenozoideLeft', 'senoideLeft', 'senozoideLeft', 'senozoide_esq', 'senozoideEsq'],
+        senoide_dir: ['senoide2', 'senozoide2', 'allSenozoideRight', 'senoideRight', 'senozoideRight', 'senozoide_dir', 'senozoideDir'],
+        inferior_esq: ['inferior1', 'allInferiorLeft', 'inferiorLeft'],
+        inferior_dir: ['inferior2', 'allInferiorRight', 'inferiorRight']
+    };
+
+    const alternatives = altKeysMap[key] || [];
+    for (const alt of alternatives) {
+        if (Array.isArray(rawQueues[alt])) return rawQueues[alt];
+    }
+
+    return [];
+};
+
 export const getSavedTrelicaPackagesData = (
     op?: ProductionOrderData | null,
     stock?: StockItem[]
@@ -225,7 +261,7 @@ export const getSavedTrelicaPackagesData = (
 
         const rawQueues = source.queues || {};
         TRELICA_WIRE_POSITIONS.forEach(({ key }) => {
-            const arr = Array.isArray(rawQueues[key]) ? rawQueues[key] : [];
+            const arr = getQueueForPosition(rawQueues, key);
             queues[key] = arr
                 .map((item: any, idx: number) => {
                     const lot = cleanLotCode(item?.lot);
@@ -242,17 +278,65 @@ export const getSavedTrelicaPackagesData = (
         });
 
         const rawPackages = Array.isArray(source.packages) ? source.packages : [];
-        const packages: TrelicaPackageRow[] = rawPackages.map((p: any, idx: number) => ({
-            id: p.id || `tpkg-${idx + 1}`,
-            packageCode: `p${idx + 1}`,
-            finishedLotNumber: String(p.finishedLotNumber ?? p.finished_lot_number ?? ''),
-            quantity: Number(p.quantity ?? 200) || 200,
-            measuredPackageWeight: p.measuredPackageWeight ?? p.measured_package_weight ?? null,
-            lotsByPosition: p.lotsByPosition || {},
-            confirmed: true,
-            recordedAt: p.recordedAt || p.recorded_at,
-            operator: p.operator
-        }));
+        const packages: TrelicaPackageRow[] = rawPackages.map((p: any, idx: number) => {
+            const rawLotsByPos = p.lotsByPosition || p.lots_by_position || {};
+            const normalizedLotsByPos: any = {};
+            TRELICA_WIRE_POSITIONS.forEach(({ key }) => {
+                const camelKey = key.replace(/_([a-z])/g, (_, g) => g.toUpperCase());
+                const found = rawLotsByPos[key] || rawLotsByPos[camelKey];
+                if (found) {
+                    normalizedLotsByPos[key] = found;
+                }
+            });
+
+            return {
+                id: p.id || `tpkg-${idx + 1}`,
+                packageCode: `p${idx + 1}`,
+                finishedLotNumber: String(p.finishedLotNumber ?? p.finished_lot_number ?? ''),
+                quantity: Number(p.quantity ?? 200) || 200,
+                measuredPackageWeight: p.measuredPackageWeight ?? p.measured_package_weight ?? null,
+                lotsByPosition: normalizedLotsByPos,
+                confirmed: true,
+                recordedAt: p.recordedAt || p.recorded_at,
+                operator: p.operator
+            };
+        });
+
+        // Fallback inteligente para OP que possui lotes pré-selecionados na criação (selectedLotIds)
+        const selLots: any = (op as any).selectedLotIds || (op as any).selected_lot_ids;
+        if (selLots && typeof selLots === 'object') {
+            const getPreselectedLotId = (k: TrelicaWirePositionKey): string | null => {
+                if (k === 'superior') return selLots.superior || selLots.allSuperior?.[0] || null;
+                if (k === 'senoide_esq') return selLots.senozoide1 || selLots.senoide1 || selLots.allSenozoideLeft?.[0] || null;
+                if (k === 'senoide_dir') return selLots.senozoide2 || selLots.senoide2 || selLots.allSenozoideRight?.[0] || null;
+                if (k === 'inferior_esq') return selLots.inferior1 || selLots.allInferiorLeft?.[0] || null;
+                if (k === 'inferior_dir') return selLots.inferior2 || selLots.allInferiorRight?.[0] || null;
+                return null;
+            };
+
+            TRELICA_WIRE_POSITIONS.forEach(({ key }) => {
+                if (queues[key].length === 0) {
+                    const rawLotIdOrCode = getPreselectedLotId(key);
+                    if (rawLotIdOrCode) {
+                        const cleanCode = cleanLotCode(rawLotIdOrCode);
+                        const stockItem = (stock || []).find(
+                            s => s.id === rawLotIdOrCode || cleanLotCode(s.internalLot).toLowerCase() === cleanCode.toLowerCase()
+                        );
+                        const finalLot = stockItem ? cleanLotCode(stockItem.internalLot) : cleanCode;
+                        const finalWeight = Number(stockItem?.initialQuantity || stockItem?.remainingQuantity || stockItem?.labelWeight || 0);
+                        if (finalLot) {
+                            queues[key].push({
+                                id: `${key}-init-${Date.now()}`,
+                                lot: finalLot,
+                                weight: finalWeight,
+                                bitola: String(stockItem?.bitola || ''),
+                                addedAt: new Date().toISOString()
+                            });
+                        }
+                    }
+                }
+            });
+        }
 
         return {
             version: 1,
@@ -287,14 +371,29 @@ export const getSavedTrelicaPackagesData = (
 };
 
 export const saveTrelicaPackagesData = async (op: ProductionOrderData, data: TrelicaPackagesReportData) => {
+    // Sanitiza queues para manter as chaves tanto em snake_case quanto em camelCase
+    // para sobrevivência total à serialização/desserialização do Supabase
+    const sanitizedQueues: Record<string, TrelicaLotSupplyItem[]> = {};
+    TRELICA_WIRE_POSITIONS.forEach(({ key }) => {
+        const q = data.queues[key] || [];
+        const camelKey = key.replace(/_([a-z])/g, (_, g) => g.toUpperCase());
+        sanitizedQueues[key] = q;
+        sanitizedQueues[camelKey] = q;
+    });
+
     const payload: TrelicaPackagesReportData = {
         ...data,
+        queues: sanitizedQueues as any,
         version: 1,
         updatedAt: new Date().toISOString()
     };
 
     try {
         localStorage.setItem(`trelica_packages_data_${op.id || op.orderNumber}`, JSON.stringify(payload));
+        if (op.id && op.orderNumber) {
+            localStorage.setItem(`trelica_packages_data_${op.orderNumber}`, JSON.stringify(payload));
+            localStorage.setItem(`trelica_packages_data_${op.id}`, JSON.stringify(payload));
+        }
     } catch (e) {}
 
     // Sincroniza também com weighedPackages na OP para manter 100% compatível com os cards e gráficos existentes
@@ -315,7 +414,8 @@ export const saveTrelicaPackagesData = async (op: ProductionOrderData, data: Tre
             const currentSummary = op.summary && typeof op.summary === 'object' ? op.summary : {};
             const updatedSummary = {
                 ...currentSummary,
-                trelicaPackagesData: payload
+                trelicaPackagesData: payload,
+                trelica_packages_data: payload
             };
             op.summary = updatedSummary;
             op.weighedPackages = syncedWeighedPackages;
@@ -1024,9 +1124,18 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
     const [showAllGaugesInPicker, setShowAllGaugesInPicker] = useState<boolean>(false);
     const [slotError, setSlotError] = useState<string | null>(null);
 
+    const opSummary = (op?.summary || {}) as any;
+    const opUpdatedAt =
+        opSummary?.trelicaPackagesData?.updatedAt ||
+        opSummary?.trelicaPackagesData?.updated_at ||
+        opSummary?.trelica_packages_data?.updatedAt ||
+        opSummary?.trelica_packages_data?.updated_at ||
+        (op as any)?.updatedAt ||
+        (op as any)?.updated_at;
+
     useEffect(() => {
         setReportData(getSavedTrelicaPackagesData(op, stock));
-    }, [op?.id, op?.orderNumber, (op?.summary as any)?.trelicaPackagesData?.updatedAt]);
+    }, [op?.id, op?.orderNumber, opUpdatedAt]);
 
     useEffect(() => {
         let cancelled = false;
