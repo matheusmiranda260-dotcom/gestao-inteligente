@@ -2004,6 +2004,46 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
     );
 };
 
+export interface MalhaActiveLotsValidationResult {
+    isAllConfigured: boolean;
+    configuredCount: number;
+    missingDirections: Array<'LONGITUDINAL' | 'TRANSVERSAL'>;
+    activeLongLot: string;
+    activeTransLot: string;
+    longSobraKg: number;
+    transSobraKg: number;
+}
+
+export const getMalhaActiveLotsValidation = (
+    op?: ProductionOrderData | null,
+    stock?: StockItem[]
+): MalhaActiveLotsValidationResult => {
+    const data = getSavedMalhaPackagesData(op as ProductionOrderData, stock || []);
+    const computed = computeMalhaPackagesAndLots(
+        data.packages,
+        data.techConfig,
+        data.longLotsQueue,
+        data.transLotsQueue
+    );
+
+    const hasLong = Boolean(computed.activeLongLot && computed.activeLongLot.lot && computed.activeLongLot.kgEntra > 0);
+    const hasTrans = Boolean(computed.activeTransLot && computed.activeTransLot.lot && computed.activeTransLot.kgEntra > 0);
+
+    const missingDirections: Array<'LONGITUDINAL' | 'TRANSVERSAL'> = [];
+    if (!hasLong) missingDirections.push('LONGITUDINAL');
+    if (!hasTrans) missingDirections.push('TRANSVERSAL');
+
+    return {
+        isAllConfigured: missingDirections.length === 0,
+        configuredCount: 2 - missingDirections.length,
+        missingDirections,
+        activeLongLot: computed.activeLongLot?.lot || '',
+        activeTransLot: computed.activeTransLot?.lot || '',
+        longSobraKg: Number(computed.activeLongLot?.sobra || 0),
+        transSobraKg: Number(computed.activeTransLot?.sobra || 0)
+    };
+};
+
 // ============================================================================
 // PAINEL DO OPERADOR NO APP:
 // 1. Lote Ativo + Lote Reserva (Longitudinal & Transversal) com Peso e Saldo
@@ -2015,10 +2055,33 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     shiftReports?: ShiftReport[];
     machineName?: string;
     showManagerControls?: boolean;
-}> = ({ op, stock, shiftReports = [], machineName = 'Malha 1', showManagerControls = false }) => {
+    activeSection?: 'all' | 'lots' | 'weigh';
+    onRequestSwitchSection?: (section: 'lots' | 'weigh') => void;
+}> = ({
+    op,
+    stock,
+    shiftReports = [],
+    machineName = 'Malha 1',
+    showManagerControls = false,
+    activeSection = 'all',
+    onRequestSwitchSection
+}) => {
     const [reportData, setReportData] = useState<MalhaPackagesReportData>(() => getSavedMalhaPackagesData(op, stock));
     const [showFullModal, setShowFullModal] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
+
+    const [internalSection, setInternalSection] = useState<'lots' | 'weigh'>('lots');
+    const effectiveSection: 'lots' | 'weigh' =
+        activeSection === 'lots' || activeSection === 'weigh' ? activeSection : internalSection;
+
+    const switchSection = (sec: 'lots' | 'weigh') => {
+        setInternalSection(sec);
+        if (onRequestSwitchSection) {
+            onRequestSwitchSection(sec);
+        }
+    };
+
+    const [expandedDir, setExpandedDir] = useState<'LONGITUDINAL' | 'TRANSVERSAL' | null>(null);
 
     // Estado para Fechar Novo Pacote + Peso do Pacote
     const [newPkgQty, setNewPkgQty] = useState<number>(() => {
@@ -2591,39 +2654,81 @@ export const MalhaPackagesOperatorPanel: React.FC<{
 
     return (
         <div className="space-y-4 w-full max-w-full overflow-hidden text-left">
-            {/* BLOCO 1: ABASTECIMENTO DE LOTES (ATIVO + RESERVA) */}
-            <div className="bg-slate-100/80 p-3.5 sm:p-5 rounded-2xl border border-slate-200 space-y-3.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                        <h3 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
-                            <span>🔄 1. Lotes na Máquina (Ativo & Reserva)</span>
-                        </h3>
-                        <p className="text-[11px] text-slate-500">
-                            Aponte apenas o Lote Ativo e o Reserva com seus pesos. O sistema abate automaticamente conforme você pesa os pacotes!
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-                            {saveStatus === 'saved' ? '✓ Sincronizado' : 'Salvando...'}
+            {/* BARRA INTERNA DE SEPARAÇÃO (LOTES vs PESAGEM) QUANDO EM MODO 'all' (DESKTOP) */}
+            {activeSection === 'all' && (
+                <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-300">
+                    <button
+                        type="button"
+                        onClick={() => switchSection('lots')}
+                        className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
+                            effectiveSection === 'lots'
+                                ? 'bg-slate-900 text-white shadow-md'
+                                : 'text-slate-600 hover:bg-white/60'
+                        }`}
+                    >
+                        <span>🔄 Lotes na Máquina</span>
+                        <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                computed.activeLongLot && computed.activeTransLot
+                                    ? 'bg-emerald-500 text-slate-950'
+                                    : 'bg-amber-400 text-slate-950'
+                            }`}
+                        >
+                            {(computed.activeLongLot ? 1 : 0) + (computed.activeTransLot ? 1 : 0)}/2 OK
                         </span>
-                        {showManagerControls && (
-                            <button
-                                type="button"
-                                onClick={() => setShowFullModal(true)}
-                                className="px-3 py-1.5 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
-                            >
-                                <span>📊</span>
-                                <span>Relatório Completo</span>
-                            </button>
-                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => switchSection('weigh')}
+                        className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer ${
+                            effectiveSection === 'weigh'
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'text-slate-600 hover:bg-white/60'
+                        }`}
+                    >
+                        <span>⚖️ Pesagem de Pacotes</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-black bg-indigo-100 text-indigo-900">
+                            {reportData.packages.length} pct
+                        </span>
+                    </button>
+                </div>
+            )}
+
+            {/* BLOCO 1: ABASTECIMENTO DE LOTES (ATIVO + RESERVA) */}
+            {effectiveSection === 'lots' && (
+                <div className="bg-slate-100/80 p-3.5 sm:p-5 rounded-2xl border border-slate-200 space-y-3.5 animate-fade-in">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <h3 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
+                                <span>🔄 1. Lotes na Máquina (Ativo & Reserva)</span>
+                            </h3>
+                            <p className="text-[11px] text-slate-500">
+                                Aponte apenas o Lote Ativo e o Reserva com seus pesos. O sistema abate automaticamente conforme você pesa os pacotes!
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                {saveStatus === 'saved' ? '✓ Sincronizado' : 'Salvando...'}
+                            </span>
+                            {showManagerControls && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowFullModal(true)}
+                                    className="px-3 py-1.5 rounded-xl bg-[#1F3864] hover:bg-[#2F5597] text-white font-black text-[11px] uppercase tracking-wider transition active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
+                                >
+                                    <span>📊</span>
+                                    <span>Relatório Completo</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {renderDirectionSupplyCard('LONGITUDINAL')}
+                        {renderDirectionSupplyCard('TRANSVERSAL')}
                     </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {renderDirectionSupplyCard('LONGITUDINAL')}
-                    {renderDirectionSupplyCard('TRANSVERSAL')}
-                </div>
-            </div>
+            )}
 
             {/* MODAL/PAINEL DE SELEÇÃO DE LOTE (ATIVO OU RESERVA) */}
             {pickerTarget && (
@@ -2747,7 +2852,8 @@ export const MalhaPackagesOperatorPanel: React.FC<{
             )}
 
             {/* BLOCO 2: FECHAR PACOTE DE 50 MALHAS + PESO DO PACOTE -> CALCULA BITOLA E PESOS LONG/TRANS AUTOMATICAMENTE */}
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4">
+            {effectiveSection === 'weigh' && (
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-4 animate-fade-in">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -3032,6 +3138,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     </div>
                 )}
             </div>
+            )}
 
             {/* BLOCO 3: MARCAÇÕES DIÁRIAS DE PRODUÇÃO (VISÍVEL SOMENTE PARA GESTOR) */}
             {showManagerControls && (

@@ -18,8 +18,8 @@ import TrelicaWeldingHead, {
     ELECTRODE_POSITIONS_CONFIG,
     getLocalElectrodeHistory
 } from './TrelicaWeldingHead';
-import { MalhaPackagesOperatorPanel } from './MalhaConsumptionReportModal';
-import { TrelicaPackagesOperatorPanel } from './TrelicaConsumptionReportModal';
+import { MalhaPackagesOperatorPanel, getMalhaActiveLotsValidation } from './MalhaConsumptionReportModal';
+import { TrelicaPackagesOperatorPanel, getTrelicaActiveLotsValidation } from './TrelicaConsumptionReportModal';
 
 
 const IdleActivityLogger: React.FC<{
@@ -1555,7 +1555,9 @@ const QuantityPromptModal: React.FC<{
     machineName?: string;
     order?: ProductionOrderData | null;
     shiftStartQuantity?: number;
-}> = ({ onClose, onSubmit, currentQuantity, machineName, order, shiftStartQuantity = 0 }) => {
+    stock?: StockItem[];
+    onNavigateToLots?: () => void;
+}> = ({ onClose, onSubmit, currentQuantity, machineName, order, shiftStartQuantity = 0, stock = [], onNavigateToLots }) => {
     // Modo: 'shift' (peças deste turno) ou 'total' (contador total acumulado da máquina/OP)
     const [mode, setMode] = useState<'shift' | 'total'>('shift');
     
@@ -1569,11 +1571,29 @@ const QuantityPromptModal: React.FC<{
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const isTrelica = machineName?.startsWith('Treliça');
+    const isMalha = machineName?.startsWith('Malha');
 
     // Cálculos dinâmicos baseados no modo selecionado
     const effectiveShiftQty = mode === 'shift' ? shiftQty : Math.max(0, totalQty - shiftStartQuantity);
     const effectiveTotalQty = mode === 'shift' ? (shiftStartQuantity + shiftQty) : totalQty;
     const pieceDelta = Math.max(0, effectiveShiftQty - currentQuantity);
+
+    // Validação Inteligente dos Lotes Ativos
+    const trelicaLotsValidation = useMemo(() => {
+        if (!isTrelica || !order) return null;
+        return getTrelicaActiveLotsValidation(order, stock, effectiveTotalQty);
+    }, [isTrelica, order, stock, effectiveTotalQty]);
+
+    const malhaLotsValidation = useMemo(() => {
+        if (!isMalha || !order) return null;
+        return getMalhaActiveLotsValidation(order, stock);
+    }, [isMalha, order, stock]);
+
+    const hasMissingLots = isTrelica
+        ? (trelicaLotsValidation ? !trelicaLotsValidation.isAllConfigured : false)
+        : isMalha
+        ? (malhaLotsValidation ? !malhaLotsValidation.isAllConfigured : false)
+        : false;
 
     const trelicaUnitWeight = order?.totalWeight && order?.quantityToProduce 
         ? (order.totalWeight / order.quantityToProduce) 
@@ -1583,6 +1603,8 @@ const QuantityPromptModal: React.FC<{
     const isBelowMinimum = mode === 'shift' 
         ? shiftQty < currentQuantity 
         : totalQty < totalOrderQty;
+
+    const isSubmitBlocked = isBelowMinimum || (pieceDelta > 0 && hasMissingLots);
 
     const handleShiftChange = (valStr: string) => {
         const val = parseInt(valStr, 10);
@@ -1680,6 +1702,57 @@ const QuantityPromptModal: React.FC<{
                         <span>Contador Geral / Painel</span>
                     </button>
                 </div>
+
+                {/* Alerta Inteligente de Lotes Faltantes ou Bloqueio */}
+                {hasMissingLots && (
+                    <div className="bg-rose-950/80 border-2 border-rose-500 p-3.5 rounded-2xl flex flex-col gap-2.5 text-xs text-rose-100 animate-fade-in shadow-lg">
+                        <div className="flex items-start gap-2.5">
+                            <span className="text-xl">⚠️</span>
+                            <div>
+                                <h4 className="font-black text-rose-200 text-sm">
+                                    {isTrelica ? 'Lotes da Treliça Pendentes na Máquina!' : 'Lotes da Malha Pendentes!'}
+                                </h4>
+                                <p className="text-[11px] text-rose-300 mt-0.5 leading-snug">
+                                    Para garantir a rastreabilidade e dedução automática de matéria-prima, é obrigatório selecionar os lotes com peso antes de lançar novas peças.
+                                </p>
+                            </div>
+                        </div>
+
+                        {isTrelica && trelicaLotsValidation && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                {trelicaLotsValidation.missingPositions.map(mp => (
+                                    <span key={mp.key} className="px-2 py-0.5 rounded-md bg-rose-900 border border-rose-600 text-rose-200 font-bold text-[10px] font-mono">
+                                        Falta: {mp.label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {isMalha && malhaLotsValidation && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                {malhaLotsValidation.missingDirections.map(dir => (
+                                    <span key={dir} className="px-2 py-0.5 rounded-md bg-rose-900 border border-rose-600 text-rose-200 font-bold text-[10px] font-mono">
+                                        Falta: Fio {dir}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {onNavigateToLots && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClose();
+                                    onNavigateToLots();
+                                }}
+                                className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer mt-1"
+                            >
+                                <span>🔄</span>
+                                <span>Ir para Aba LOTES e Abastecer Agora</span>
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* Banner Informativo contextual */}
                 <div className="bg-blue-950/40 border border-blue-500/30 p-3 rounded-xl flex items-start gap-2.5 text-xs text-blue-200">
@@ -1800,11 +1873,11 @@ const QuantityPromptModal: React.FC<{
                     </button>
                     <button
                         type="submit"
-                        disabled={isBelowMinimum}
+                        disabled={isSubmitBlocked}
                         className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-6 rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer"
                     >
                         <span>✓</span>
-                        <span>Confirmar Produção</span>
+                        <span>{hasMissingLots && pieceDelta > 0 ? 'Abasteça os Lotes Primeiro' : 'Confirmar Produção'}</span>
                     </button>
                 </div>
             </form>
@@ -2263,7 +2336,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     const [pendingGauges, setPendingGauges] = useState<Map<string, string>>(new Map()); // Novo estado para bitolas
     const [pendingPackageWeights, setPendingPackageWeights] = useState<Map<number, string>>(new Map());
     const [justCompletedOrderId, setJustCompletedOrderId] = useState<string | null>(null);
-    const [mobileTab, setMobileTab] = useState<'monitor' | 'work' | 'process' | 'weigh' | 'performance'>((activeMachine && typeof activeMachine === 'string' && activeMachine.startsWith('Treliça')) ? 'work' : 'monitor');
+    const [mobileTab, setMobileTab] = useState<'monitor' | 'lots' | 'work' | 'process' | 'weigh' | 'performance'>((activeMachine && typeof activeMachine === 'string' && activeMachine.startsWith('Treliça')) ? 'lots' : 'monitor');
     const [managerOverrideData, setManagerOverrideData] = useState<{
         packageNumber: number;
         quantity: number;
@@ -4115,6 +4188,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         shiftStartQuantity={effectiveStart}
                         machineName={activeMachine}
                         order={promptOrder}
+                        stock={stock}
+                        onNavigateToLots={() => setMobileTab('lots')}
                     />
                 );
             })()}
@@ -4851,6 +4926,39 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         Pesagem
                                     </button>
                                 </>
+                            ) : activeMachine.startsWith('Treliça') || activeMachine.startsWith('Malha') ? (
+                                <>
+                                    <button
+                                        onClick={() => setMobileTab('lots')}
+                                        className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'lots' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                    >
+                                        <ArrowPathIcon className={`h-3.5 w-3.5 ${mobileTab === 'lots' ? 'text-amber-500' : 'text-slate-400'}`} />
+                                        <span>LOTES</span>
+                                        {activeMachine.startsWith('Treliça') && (() => {
+                                            const v = getTrelicaActiveLotsValidation(activeOrder, stock);
+                                            return (
+                                                <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full ${v.isAllConfigured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>
+                                                    {v.configuredCount}/5
+                                                </span>
+                                            );
+                                        })()}
+                                        {activeMachine.startsWith('Malha') && (() => {
+                                            const v = getMalhaActiveLotsValidation(activeOrder, stock);
+                                            return (
+                                                <span className={`text-[8px] font-black px-1.5 py-0.2 rounded-full ${v.isAllConfigured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>
+                                                    {v.configuredCount}/2
+                                                </span>
+                                            );
+                                        })()}
+                                    </button>
+                                    <button
+                                        onClick={() => setMobileTab('work')}
+                                        className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'work' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
+                                    >
+                                        <ScaleIcon className={`h-3.5 w-3.5 ${mobileTab === 'work' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                                        PESAGEM
+                                    </button>
+                                </>
                             ) : (
                                 <button
                                     onClick={() => setMobileTab('work')}
@@ -5168,7 +5276,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
-                                    <div className={`lg:col-span-2 min-w-0 max-w-full space-y-4 md:space-y-6 ${(mobileTab !== 'monitor' && mobileTab !== 'performance') ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                    <div className={`lg:col-span-2 min-w-0 max-w-full space-y-4 md:space-y-6 ${(mobileTab !== 'monitor' && mobileTab !== 'performance' && mobileTab !== 'work') ? 'hidden lg:block' : 'animate-fade-in'}`}>
                                         <div className={`grid grid-cols-1 gap-6 ${activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? 'hidden md:grid' : 'grid'}`}>
                                                 {/* Header Info - Simplified for Mobile */}
                                                 <div className="col-span-2">
@@ -5461,7 +5569,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                     </div>
                                 {/* Coluna Direita: Área de Trabalho (Lotes/Pacotes) */}
-                                <div className={`lg:col-span-2 min-w-0 max-w-full space-y-6 relative ${mobileTab === 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                <div className={`lg:col-span-2 min-w-0 max-w-full space-y-6 relative ${mobileTab === 'monitor' || mobileTab === 'performance' ? 'hidden lg:block' : 'animate-fade-in'}`}>
 
                                     {activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? (
                                         <>
@@ -6006,6 +6114,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             stock={stock}
                                             shiftReports={shiftReports}
                                             machineName={activeMachine}
+                                            activeSection={mobileTab === 'lots' ? 'lots' : mobileTab === 'work' ? 'weigh' : 'all'}
+                                            onRequestSwitchSection={(sec) => setMobileTab(sec === 'lots' ? 'lots' : 'work')}
                                         />
                                     ) : activeMachine.startsWith('Treliça') && activeOrder ? (
                                         <TrelicaPackagesOperatorPanel
@@ -6013,6 +6123,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             stock={stock}
                                             shiftReports={shiftReports}
                                             machineName={activeMachine}
+                                            activeSection={mobileTab === 'lots' ? 'lots' : mobileTab === 'work' ? 'weigh' : 'all'}
+                                            onRequestSwitchSection={(sec) => setMobileTab(sec === 'lots' ? 'lots' : 'work')}
                                         />
                                     ) : (
                                         <>
