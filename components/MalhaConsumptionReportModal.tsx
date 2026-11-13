@@ -1413,9 +1413,40 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             </thead>
                             <tbody>
                                 {computed.computedRows.length > 0 ? (
-                                    computed.computedRows.map((row) => {
-                                        const hasLongEntry = Boolean(row.longLot || row.longLotWeight > 0);
-                                        const hasTransEntry = Boolean(row.transLot || row.transLotWeight > 0);
+                                    computed.computedRows.map((row, idx, rows) => {
+                                        const cleanLongLot = (row.longLot || '').trim();
+                                        const prevLongLot = idx > 0 ? (rows[idx - 1].longLot || '').trim() : '';
+                                        let longSpan = 1;
+                                        if (cleanLongLot && cleanLongLot === prevLongLot) {
+                                            longSpan = 0;
+                                        } else if (cleanLongLot) {
+                                            while (
+                                                idx + longSpan < rows.length &&
+                                                (rows[idx + longSpan].longLot || '').trim() === cleanLongLot
+                                            ) {
+                                                longSpan++;
+                                            }
+                                        }
+                                        const longGroupRows = longSpan > 0 ? rows.slice(idx, idx + longSpan) : [row];
+                                        const longWeightRow = longGroupRows.find(r => r.longLotWeight > 0) || row;
+                                        const hasLongEntry = Boolean(cleanLongLot || longWeightRow.longLotWeight > 0);
+
+                                        const cleanTransLot = (row.transLot || '').trim();
+                                        const prevTransLot = idx > 0 ? (rows[idx - 1].transLot || '').trim() : '';
+                                        let transSpan = 1;
+                                        if (cleanTransLot && cleanTransLot === prevTransLot) {
+                                            transSpan = 0;
+                                        } else if (cleanTransLot) {
+                                            while (
+                                                idx + transSpan < rows.length &&
+                                                (rows[idx + transSpan].transLot || '').trim() === cleanTransLot
+                                            ) {
+                                                transSpan++;
+                                            }
+                                        }
+                                        const transGroupRows = transSpan > 0 ? rows.slice(idx, idx + transSpan) : [row];
+                                        const transWeightRow = transGroupRows.find(r => r.transLotWeight > 0) || row;
+                                        const hasTransEntry = Boolean(cleanTransLot || transWeightRow.transLotWeight > 0);
 
                                         return (
                                             <tr key={row.id} className="hover:bg-slate-50">
@@ -1455,31 +1486,43 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                     {row.calculatedBitola.toFixed(2).replace('.', ',')} mm
                                                 </td>
 
-                                                {/* LONGITUDINAL */}
-                                                <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                    <input
-                                                        type="text"
-                                                        list="malha-stock-lots-datalist"
-                                                        value={row.longLot}
-                                                        onChange={e => updatePackageRow(row.id, 'longLot', e.target.value)}
-                                                        placeholder="Nº Lote"
-                                                        className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
-                                                    />
-                                                    {row.longSplits.length > 1 && (
-                                                        <div className="text-[9px] font-bold text-amber-900 leading-tight">
-                                                            {row.longSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className={`p-1 border border-slate-400 text-center ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                    <input
-                                                        type="number"
-                                                        value={row.longLotWeight || ''}
-                                                        onChange={e => updatePackageRow(row.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
-                                                        placeholder="Kg Lote"
-                                                        className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
-                                                    />
-                                                </td>
+                                                {/* LONGITUDINAL (Mesclado quando mesmo lote em pacotes seguidos) */}
+                                                {longSpan > 0 && (
+                                                    <>
+                                                        <td
+                                                            rowSpan={longSpan}
+                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                        >
+                                                            <input
+                                                                type="text"
+                                                                list="malha-stock-lots-datalist"
+                                                                value={row.longLot}
+                                                                onChange={e => updatePackageRow(row.id, 'longLot', e.target.value)}
+                                                                placeholder="Nº Lote"
+                                                                className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
+                                                            />
+                                                            {longGroupRows
+                                                                .filter(r => r.longSplits.length > 1)
+                                                                .map(r => (
+                                                                    <div key={r.id} className="text-[9px] font-bold text-amber-900 leading-tight">
+                                                                        {r.longSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
+                                                                    </div>
+                                                                ))}
+                                                        </td>
+                                                        <td
+                                                            rowSpan={longSpan}
+                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                        >
+                                                            <input
+                                                                type="number"
+                                                                value={longWeightRow.longLotWeight || ''}
+                                                                onChange={e => updatePackageRow(longWeightRow.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
+                                                                placeholder="Kg Lote"
+                                                                className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
+                                                            />
+                                                        </td>
+                                                    </>
+                                                )}
                                                 <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
                                                     row.longPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
                                                 }`}>
@@ -1489,31 +1532,43 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                     {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
 
-                                                {/* TRANSVERSAL */}
-                                                <td className={`p-1 border border-slate-400 text-center ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                    <input
-                                                        type="text"
-                                                        list="malha-stock-lots-datalist"
-                                                        value={row.transLot}
-                                                        onChange={e => updatePackageRow(row.id, 'transLot', e.target.value)}
-                                                        placeholder="Nº Lote"
-                                                        className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
-                                                    />
-                                                    {row.transSplits.length > 1 && (
-                                                        <div className="text-[9px] font-bold text-blue-900 leading-tight">
-                                                            {row.transSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className={`p-1 border border-slate-400 text-center ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}>
-                                                    <input
-                                                        type="number"
-                                                        value={row.transLotWeight || ''}
-                                                        onChange={e => updatePackageRow(row.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
-                                                        placeholder="Kg Lote"
-                                                        className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
-                                                    />
-                                                </td>
+                                                {/* TRANSVERSAL (Mesclado quando mesmo lote em pacotes seguidos) */}
+                                                {transSpan > 0 && (
+                                                    <>
+                                                        <td
+                                                            rowSpan={transSpan}
+                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                        >
+                                                            <input
+                                                                type="text"
+                                                                list="malha-stock-lots-datalist"
+                                                                value={row.transLot}
+                                                                onChange={e => updatePackageRow(row.id, 'transLot', e.target.value)}
+                                                                placeholder="Nº Lote"
+                                                                className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
+                                                            />
+                                                            {transGroupRows
+                                                                .filter(r => r.transSplits.length > 1)
+                                                                .map(r => (
+                                                                    <div key={r.id} className="text-[9px] font-bold text-blue-900 leading-tight">
+                                                                        {r.transSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
+                                                                    </div>
+                                                                ))}
+                                                        </td>
+                                                        <td
+                                                            rowSpan={transSpan}
+                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                        >
+                                                            <input
+                                                                type="number"
+                                                                value={transWeightRow.transLotWeight || ''}
+                                                                onChange={e => updatePackageRow(transWeightRow.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
+                                                                placeholder="Kg Lote"
+                                                                className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
+                                                            />
+                                                        </td>
+                                                    </>
+                                                )}
                                                 <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
                                                     row.transPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
                                                 }`}>
