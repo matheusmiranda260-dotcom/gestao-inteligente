@@ -1384,15 +1384,15 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                         <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                             <thead>
                                 <tr>
-                                    <th colSpan={14} className="bg-[#1F3864] text-white font-black uppercase py-2 px-3 text-center tracking-wider border border-[#1F3864]">
+                                    <th colSpan={14} className="!bg-[#1F3864] !text-white font-black uppercase py-2 px-3 text-center tracking-wider border border-[#1F3864]">
                                         CONSUMÍVEIS POR LOTE (PACOTES DE 50 MALHAS • CONVERSÃO AUTOMÁTICA PELO PESO DO PACOTE)
                                     </th>
                                 </tr>
                                 <tr className="bg-[#2F5597] text-white font-black uppercase text-[11px]">
-                                    <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center">PACOTE DE 50 MALHAS & BITOLA REAL</th>
-                                    <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center bg-[#1F4E79]">LONGITUDINAL</th>
-                                    <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center bg-[#2E75B6]">TRANSVERSAL</th>
-                                    <th className="py-1 px-1 border border-slate-400 text-center print:hidden w-8"></th>
+                                    <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">PACOTE DE 50 MALHAS & BITOLA REAL</th>
+                                    <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#1F4E79] !text-white">LONGITUDINAL</th>
+                                    <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#2E75B6] !text-white">TRANSVERSAL</th>
+                                    <th className="py-1 px-1 border border-slate-400 text-center print:hidden w-8 !bg-[#1F3864] !text-white"></th>
                                 </tr>
                                 <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[10px]">
                                     <th className="py-1.5 px-2 border border-slate-400 text-center w-20">LOTE (Etiq.)</th>
@@ -1600,30 +1600,30 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                 )}
 
                                 <tr className="bg-[#2F5597] text-white font-black">
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center">TOTAL</td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 text-center !text-white">TOTAL</td>
+                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-white">
                                         {computed.totalQuantity}
                                     </td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-white">
                                         {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
                                     </td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-white">
                                         Ø {computed.effectiveBitola.toFixed(2).replace('.', ',')}
                                     </td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-white">
                                         {computed.totalLongCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
+                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-white">
                                         {computed.totalTransCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
-                                    <td className="py-1.5 px-1 border border-slate-400 print:hidden"></td>
+                                    <td className="py-1.5 px-1 border border-slate-400 print:hidden !text-white"></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1645,16 +1645,16 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
                                     <tr>
-                                        <th colSpan={5} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
+                                        <th colSpan={5} className="!bg-[#1F3864] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
                                             LOTES CONSUMIDOS (CONVERSÃO E SOBRA)
                                         </th>
                                     </tr>
-                                    <tr className="bg-[#2F5597] text-white font-bold uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Posição</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Lote</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right">kg. entra.</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right">cons.</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right">sobra</th>
+                                    <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[11px]">
+                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Posição</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Lote</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">kg. entra.</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">cons.</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">sobra</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1686,14 +1686,14 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                         </tr>
                                     )}
                                     <tr className="bg-[#D9E1F2] font-black text-slate-900">
-                                        <td colSpan={2} className="py-1.5 px-2 border border-slate-400 text-center">Total</td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                        <td colSpan={2} className="py-1.5 px-2 border border-slate-400 text-center !text-slate-950">Total</td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
                                             {computed.totalLotEntraKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                                         </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
                                             {computed.totalLotConsKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                                         </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono text-emerald-800">
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-emerald-800">
                                             {computed.totalLotSobraKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                                         </td>
                                     </tr>
@@ -1705,7 +1705,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
                                     <tr>
-                                        <th colSpan={4} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
+                                        <th colSpan={4} className="!bg-[#1F3864] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
                                             <div className="flex items-center justify-between gap-2">
                                                 <span>ATUALIZAÇÃO DA PRODUÇÃO (MARCAÇÕES DIÁRIAS)</span>
                                                 <button
@@ -1719,27 +1719,27 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             </div>
                                         </th>
                                     </tr>
-                                    <tr className="bg-[#2F5597] text-white font-bold uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Qnt.</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right">Peso (kg)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Média (kg/peça)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Data</th>
+                                    <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[11px]">
+                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Qnt.</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">Peso (kg)</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Média (kg/peça)</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Data</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {dailyUpdates.length > 0 ? (
                                         dailyUpdates.map((u, idx) => (
                                             <tr key={u.isoDate || idx} className="hover:bg-slate-50">
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-black text-[#002060]">
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-black !text-[#002060]">
                                                     {u.qty}
                                                 </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold text-[#002060]">
+                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold !text-[#002060]">
                                                     {u.weightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono text-slate-600">
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono !text-slate-700 font-semibold">
                                                     {u.avgKgPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold text-[#002060]">
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold !text-[#002060]">
                                                     {u.date}
                                                 </td>
                                             </tr>
@@ -1751,17 +1751,17 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             </td>
                                         </tr>
                                     )}
-                                    <tr className="bg-[#002060] text-white font-black">
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                    <tr className="bg-[#D9E1F2] font-black text-slate-950">
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-950 text-sm">
                                             {totalDailyQty || op.actualProducedQuantity || 0}
                                         </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950 text-sm">
                                             {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-900">
                                             {avgDailyWeightPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center uppercase text-[10px]">
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center uppercase text-[10px] !text-slate-950">
                                             Total / Média
                                         </td>
                                     </tr>
@@ -2822,26 +2822,26 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     <table className="w-full border-collapse text-xs">
                         <thead>
                             <tr className="bg-[#002060] text-white text-[10px] font-black uppercase">
-                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4">Qnt.</th>
-                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4">Peso (kg)</th>
-                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4">Média (kg/peça)</th>
-                                <th className="py-2 px-3 text-center w-1/4">Data</th>
+                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4 !bg-[#002060] !text-white">Qnt.</th>
+                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4 !bg-[#002060] !text-white">Peso (kg)</th>
+                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4 !bg-[#002060] !text-white">Média (kg/peça)</th>
+                                <th className="py-2 px-3 text-center w-1/4 !bg-[#002060] !text-white">Data</th>
                             </tr>
                         </thead>
                         <tbody>
                             {dailyUpdates.length > 0 ? (
                                 dailyUpdates.map((u, idx) => (
                                     <tr key={u.isoDate || idx} className="border-b border-slate-200 hover:bg-slate-50 font-bold text-[#002060]">
-                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-black">
+                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-black !text-[#002060]">
                                             {u.qty}
                                         </td>
-                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-mono">
+                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-mono !text-[#002060]">
                                             {u.weightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-mono text-slate-600">
+                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-mono !text-slate-700">
                                             {u.avgKgPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-2 px-3 text-center font-mono font-black">
+                                        <td className="py-2 px-3 text-center font-mono font-black !text-[#002060]">
                                             {u.date}
                                         </td>
                                     </tr>
@@ -2853,17 +2853,17 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                     </td>
                                 </tr>
                             )}
-                            <tr className="bg-[#002060] text-white font-black">
-                                <td className="py-2 px-3 border-r border-slate-700 text-center font-mono">
+                            <tr className="bg-[#D9E1F2] font-black text-slate-950 border-t-2 border-[#002060]">
+                                <td className="py-2 px-3 border-r border-slate-400 text-center font-mono !text-slate-950 text-sm">
                                     {totalDailyQty || op.actualProducedQuantity || 0}
                                 </td>
-                                <td className="py-2 px-3 border-r border-slate-700 text-center font-mono">
+                                <td className="py-2 px-3 border-r border-slate-400 text-center font-mono !text-slate-950 text-sm">
                                     {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="py-2 px-3 border-r border-slate-700 text-center font-mono">
+                                <td className="py-2 px-3 border-r border-slate-400 text-center font-mono !text-slate-900">
                                     {avgDailyWeightPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="py-2 px-3 text-center uppercase text-[10px]">
+                                <td className="py-2 px-3 text-center uppercase text-[10px] !text-slate-950">
                                     Total / Média
                                 </td>
                             </tr>

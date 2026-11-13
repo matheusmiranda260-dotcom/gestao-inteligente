@@ -227,8 +227,17 @@ td {
   color: var(--text-primary);
 }
 
+tr.text-white > th,
+tr.text-white > td {
+  color: #FFFFFF;
+}
+
 tr:hover td {
   background: rgba(0, 0, 0, 0.02);
+}
+
+tr.text-white:hover > td {
+  background: transparent;
 }
 
 .tactical-card tr:hover td {
