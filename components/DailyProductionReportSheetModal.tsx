@@ -995,23 +995,30 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         });
 
-        // 2. Dos Operator Logs (Ground truth fiel de medidores de máquina)
+        // 2. Dos Operator Logs (Ground truth fiel de medidores de máquina, somando múltiplos turnos do mesmo dia)
+        const logsDayMap = new Map<string, number>();
         (targetOp.operatorLogs || []).forEach((l: any) => {
-            const s = getLocalDateString(l.startTime);
-            const e = getLocalDateString(l.endTime);
+            if (!l || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG') return;
+            const s = getLocalDateString(l.startTime || l.start_time);
+            const e = getLocalDateString(l.endTime || l.end_time);
             const d = s || e;
             if (!d) return;
 
             let diff = 0;
-            if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
-                diff = Math.max(0, Number(l.endQuantity) - Number(l.startQuantity));
-            } else if (!l.endTime && l.startQuantity !== undefined) {
-                diff = Math.max(0, (Number(targetOp.actualProducedQuantity) || 0) - Number(l.startQuantity));
+            const sQ = l.startQuantity ?? l.start_quantity;
+            const eQ = l.endQuantity ?? l.end_quantity;
+            if (eQ !== undefined && sQ !== undefined) {
+                diff = Math.max(0, Number(eQ) - Number(sQ));
+            } else if (!l.endTime && !l.end_time && sQ !== undefined) {
+                diff = Math.max(0, (Number(targetOp.actualProducedQuantity) || 0) - Number(sQ));
             }
 
             if (diff > 0) {
-                dayMap.set(d, diff);
+                logsDayMap.set(d, (logsDayMap.get(d) || 0) + diff);
             }
+        });
+        logsDayMap.forEach((qty, d) => {
+            dayMap.set(d, Math.max(dayMap.get(d) || 0, qty));
         });
 
         // 3. De pacotes pesados
@@ -2215,12 +2222,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             ? generateTrefilaProductionUpdates(op, stock, selectedDate)
             : generateProductionUpdatesHistory(op, cleanShiftReports, getTheoreticalWeightPerPiece(prodDesc, defaultSize), selectedDate);
 
-        // Se for Trefila e piecesA for 0, somar do updates do dia selecionado
-        if (isTrefila && piecesA === 0) {
+        // Se piecesA for 0, sincronizar com a produção registrada em updates para o dia selecionado
+        if (piecesA === 0) {
             const dayUpdates = updates.filter(u => matchesDate(u.data, selectedDate) || (selectedDate && formatDateBr(selectedDate).startsWith(u.data)));
-            const sumOut = (dayUpdates.length > 0 ? dayUpdates : updates).reduce((acc, u) => acc + (Number(u.saida ?? u.peso) || 0), 0);
-            if (sumOut > 0) {
-                piecesA = sumOut;
+            if (isTrefila) {
+                const sumOut = (dayUpdates.length > 0 ? dayUpdates : updates).reduce((acc, u) => acc + (Number(u.saida ?? u.peso) || 0), 0);
+                if (sumOut > 0) {
+                    piecesA = sumOut;
+                }
+            } else if (dayUpdates.length > 0) {
+                const sumQty = dayUpdates.reduce((acc, u) => acc + (Number(u.qnt) || 0), 0);
+                if (sumQty > 0) {
+                    piecesA = sumQty;
+                }
             }
         }
 
@@ -2503,8 +2517,21 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     (!isTrefila || dbReport.production_updates.some((u: any) => Boolean(u.lote) || Number(u.kgEntrada) > 0 || Number(u.saida) > 0 || Number(u.peso) > 0));
 
                 let finalUpdates = hasValidDbUpdates
-                    ? dbReport.production_updates
+                    ? [...dbReport.production_updates]
                     : (autoHistory.length > 0 ? autoHistory : (auto.productionUpdates.length > 0 ? auto.productionUpdates : (dbReport.production_updates || [])));
+
+                // Para Malha e Treliça, mesclar novas marcações diárias de autoHistory que ainda não estavam salvas no dbReport
+                if (!isTrefila && hasValidDbUpdates && autoHistory.length > 0) {
+                    autoHistory.forEach(autoRow => {
+                        const alreadyHasDate = finalUpdates.some((u: any) =>
+                            matchesDate(u.data, autoRow.data) || String(u.data || '').trim() === String(autoRow.data || '').trim()
+                        );
+                        if (!alreadyHasDate && Number(autoRow.qnt) > 0) {
+                            finalUpdates.push(autoRow);
+                        }
+                    });
+                    finalUpdates.sort((a: any, b: any) => parseDateSortKey(a.data) - parseDateSortKey(b.data));
+                }
 
                 if (!isTrefila && finalUpdates && finalUpdates.length > 0) {
                     finalUpdates = finalUpdates.map((u: any) => {
@@ -2539,8 +2566,16 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         piecesAFromDb = auto.statsShiftA.pecasProduzidas;
                     }
                 } else {
+                    const dayUpdates = (finalUpdates || []).filter((u: any) =>
+                        matchesDate(u.data, targetDate) || (targetDate && formatDateBr(targetDate).startsWith(u.data))
+                    );
+                    const sumDayQty = dayUpdates.reduce((acc: number, u: any) => acc + (Number(u.qnt) || 0), 0);
                     if (initialProduced !== undefined && initialProduced > 0) {
                         piecesAFromDb = initialProduced;
+                    } else if (piecesAFromDb === 0 && sumDayQty > 0) {
+                        piecesAFromDb = sumDayQty;
+                    } else if (piecesAFromDb === 0 && auto.statsShiftA.pecasProduzidas > 0) {
+                        piecesAFromDb = auto.statsShiftA.pecasProduzidas;
                     }
                 }
 

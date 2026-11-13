@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { ProductionOrderData, StockItem, ShiftReport } from '../types';
 import { DefaultMalhaGauges } from '../types';
 import { updateItem } from '../services/supabaseService';
+import { supabase } from '../supabaseClient';
 
 export interface MalhaLotSupplyItem {
     id: string;
@@ -687,6 +688,277 @@ export const computeMalhaPackagesAndLots = (
     };
 };
 
+// Extrai YYYY-MM-DD em horário local sem deslocar strings YYYY-MM-DD em -3h (UTC-3)
+const extractLocalIsoDateStr = (raw: any): string => {
+    if (!raw) return '';
+    const str = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str;
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+        const [dd, mm, yyyy] = str.split('/');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    if (/^\d{2}\/\d{2}\/\d{2}$/.test(str)) {
+        const [dd, mm, yy] = str.split('/');
+        return `20${yy}-${mm}-${dd}`;
+    }
+    if (/^\d{2}\/\d{2}$/.test(str)) {
+        const [dd, mm] = str.split('/');
+        const yyyy = new Date().getFullYear();
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatIsoToBrDate = (isoStr: string): string => {
+    if (!isoStr) return '';
+    const parts = isoStr.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return isoStr;
+};
+
+export interface UnifiedDailyUpdateRow {
+    isoDate: string;
+    date: string; // DD/MM/YYYY
+    qty: number;
+    weightKg: number;
+    avgKgPerPiece: number;
+}
+
+export const useUnifiedMalhaDailyUpdates = (
+    op: ProductionOrderData,
+    shiftReports: ShiftReport[] = [],
+    unitWeightKg: number = 65.8841,
+    activeTrigger: boolean = true
+) => {
+    const [remoteShiftReports, setRemoteShiftReports] = useState<any[]>([]);
+    const [remoteDailyReports, setRemoteDailyReports] = useState<any[]>([]);
+    const [freshOperatorLogs, setFreshOperatorLogs] = useState<any[] | null>(null);
+    const [isSyncingDaily, setIsSyncingDaily] = useState<boolean>(false);
+    const [syncTick, setSyncTick] = useState<number>(0);
+
+    const reloadDailyUpdates = () => setSyncTick(t => t + 1);
+
+    useEffect(() => {
+        if (!activeTrigger || !op) return;
+        let isMounted = true;
+        const cleanOpNum = String(op.orderNumber || (op as any).order_number || '').trim();
+
+        const fetchAllDailySources = async () => {
+            setIsSyncingDaily(true);
+            try {
+                const promises: Promise<any>[] = [];
+
+                // 1. Buscar shift_reports atualizados da OP no Supabase
+                if (op.id || cleanOpNum) {
+                    const query = supabase.from('shift_reports').select('*');
+                    if (op.id && cleanOpNum) {
+                        promises.push(query.or(`production_order_id.eq.${op.id},order_number.eq.${cleanOpNum}`) as any);
+                    } else if (op.id) {
+                        promises.push(query.eq('production_order_id', op.id) as any);
+                    } else {
+                        promises.push(query.eq('order_number', cleanOpNum) as any);
+                    }
+                } else {
+                    promises.push(Promise.resolve({ data: [] }));
+                }
+
+                // 2. Buscar trelica_daily_reports (Relatório Diário) desta OP no Supabase
+                if (cleanOpNum) {
+                    promises.push(
+                        supabase
+                            .from('trelica_daily_reports')
+                            .select('date, production_order, stats_shift_a, stats_shift_b, production_updates')
+                            .eq('production_order', cleanOpNum) as any
+                    );
+                } else {
+                    promises.push(Promise.resolve({ data: [] }));
+                }
+
+                // 3. Buscar operator_logs mais recentes da OP em production_orders
+                if (op.id) {
+                    promises.push(
+                        supabase
+                            .from('production_orders')
+                            .select('operator_logs, actual_produced_quantity')
+                            .eq('id', op.id)
+                            .single() as any
+                    );
+                } else {
+                    promises.push(Promise.resolve({ data: null }));
+                }
+
+                const [srRes, drRes, opRes] = await Promise.all(promises);
+                if (!isMounted) return;
+
+                if (Array.isArray(srRes?.data)) {
+                    setRemoteShiftReports(srRes.data);
+                }
+                if (Array.isArray(drRes?.data)) {
+                    setRemoteDailyReports(drRes.data);
+                }
+                if (opRes?.data && Array.isArray(opRes.data.operator_logs)) {
+                    setFreshOperatorLogs(opRes.data.operator_logs);
+                }
+            } catch (err) {
+                console.warn('Erro ao sincronizar marcações diárias da OP:', err);
+            } finally {
+                if (isMounted) setIsSyncingDaily(false);
+            }
+        };
+
+        fetchAllDailySources();
+        return () => {
+            isMounted = false;
+        };
+    }, [activeTrigger, op?.id, op?.orderNumber, syncTick]);
+
+    const dailyUpdates = useMemo<UnifiedDailyUpdateRow[]>(() => {
+        const dayQtyMap = new Map<string, number>();
+        const daySavedWeightMap = new Map<string, number>();
+        const cleanOpNum = String(op?.orderNumber || (op as any)?.order_number || '').trim();
+
+        // 1. Consolidar Shift Reports (props + banco) deduplicados por data + turno + operador
+        const allShiftReps = [...(shiftReports || []), ...(remoteShiftReports || [])];
+        const dedupedRepMap = new Map<string, any>();
+
+        allShiftReps.forEach(r => {
+            if (!r) return;
+            const rOpId = r.productionOrderId || r.production_order_id;
+            const rOpNum = String(r.orderNumber || r.order_number || '').trim();
+            const isThisOp = (op?.id && rOpId === op.id) || (cleanOpNum && rOpNum === cleanOpNum);
+            if (!isThisOp) return;
+
+            const isoD = extractLocalIsoDateStr(r.date || r.shiftStartTime || r.shift_start_time || r.shiftEndTime || r.shift_end_time);
+            if (!isoD) return;
+            const shiftKey = String(r.shift || '').toLowerCase().trim();
+            const opKey = String(r.operator || '').toLowerCase().trim();
+            const key = `${isoD}_${shiftKey}_${opKey}`;
+            const qty = Number(r.totalProducedQuantity ?? r.total_produced_quantity ?? 0) || 0;
+
+            if (!dedupedRepMap.has(key) || qty > (Number(dedupedRepMap.get(key)?.qty) || 0)) {
+                dedupedRepMap.set(key, { isoD, qty });
+            }
+        });
+
+        dedupedRepMap.forEach(({ isoD, qty }) => {
+            if (qty > 0) {
+                dayQtyMap.set(isoD, (dayQtyMap.get(isoD) || 0) + qty);
+            }
+        });
+
+        // 2. Consolidar Operator Logs (somando múltiplos turnos do mesmo dia sem descartar dias que estão em shift_reports!)
+        const logsSource: any[] = freshOperatorLogs || op?.operatorLogs || (op as any)?.operator_logs || [];
+        const logsByDay = new Map<string, number>();
+        logsSource.forEach(l => {
+            if (!l || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG') return;
+            const rawStart = l.startTime || l.start_time;
+            const rawEnd = l.endTime || l.end_time;
+            const isoD = extractLocalIsoDateStr(rawStart || rawEnd);
+            if (!isoD) return;
+
+            const startQ = Number(l.startQuantity ?? l.start_quantity ?? 0) || 0;
+            const endQ = rawEnd
+                ? (Number(l.endQuantity ?? l.end_quantity ?? startQ) || 0)
+                : (Number(op?.actualProducedQuantity ?? (op as any)?.actual_produced_quantity ?? 0) || 0);
+            const diff = Math.max(0, endQ - startQ);
+            if (diff > 0) {
+                logsByDay.set(isoD, (logsByDay.get(isoD) || 0) + diff);
+            }
+        });
+
+        logsByDay.forEach((logQty, isoD) => {
+            dayQtyMap.set(isoD, Math.max(dayQtyMap.get(isoD) || 0, logQty));
+        });
+
+        // 3. Consolidar Relatórios Diários salvos (trelica_daily_reports: production_updates e stats_shift_a/b)
+        (remoteDailyReports || []).forEach(dr => {
+            if (!dr) return;
+            const repIsoDate = extractLocalIsoDateStr(dr.date);
+            const piecesA = Number(dr.stats_shift_a?.pecasProduzidas || 0) || 0;
+            const piecesB = Number(dr.stats_shift_b?.pecasProduzidas || 0) || 0;
+            const sumShiftStats = piecesA + piecesB;
+            if (repIsoDate && sumShiftStats > 0) {
+                dayQtyMap.set(repIsoDate, Math.max(dayQtyMap.get(repIsoDate) || 0, sumShiftStats));
+            }
+
+            if (Array.isArray(dr.production_updates)) {
+                dr.production_updates.forEach((u: any) => {
+                    if (!u) return;
+                    const uIso = extractLocalIsoDateStr(u.data);
+                    const uQty = Number(u.qnt ?? u.quantity ?? 0) || 0;
+                    const uPeso = Number(u.peso ?? u.weight ?? 0) || 0;
+                    if (uIso && uQty > 0) {
+                        dayQtyMap.set(uIso, Math.max(dayQtyMap.get(uIso) || 0, uQty));
+                        if (uPeso > 0) {
+                            daySavedWeightMap.set(uIso, uPeso);
+                        }
+                    }
+                });
+            }
+        });
+
+        // 4. Pacotes pesados (weighedPackages) caso alguma data ainda não conste no mapa
+        (op?.weighedPackages || []).forEach((p: any) => {
+            if (!p?.timestamp) return;
+            const isoD = extractLocalIsoDateStr(p.timestamp);
+            const q = Number(p.quantity) || 50;
+            if (isoD && q > 0 && !dayQtyMap.has(isoD)) {
+                dayQtyMap.set(isoD, q);
+            }
+        });
+
+        const effectiveUnitW = unitWeightKg > 0 ? unitWeightKg : 65.8841;
+        const sortedIsoDates = Array.from(dayQtyMap.keys()).sort();
+
+        return sortedIsoDates.map(isoDate => {
+            const qty = dayQtyMap.get(isoDate) || 0;
+            const savedW = daySavedWeightMap.get(isoDate);
+            const weightKg = (savedW && savedW > 0 && Math.abs(savedW / qty - effectiveUnitW) < 5)
+                ? savedW
+                : Math.round(qty * effectiveUnitW * 100) / 100;
+            const avgKgPerPiece = qty > 0 ? weightKg / qty : effectiveUnitW;
+            return {
+                isoDate,
+                date: formatIsoToBrDate(isoDate),
+                qty,
+                weightKg,
+                avgKgPerPiece
+            };
+        });
+    }, [op, shiftReports, remoteShiftReports, remoteDailyReports, freshOperatorLogs, unitWeightKg]);
+
+    const totalDailyQty = useMemo(
+        () => dailyUpdates.reduce((acc, u) => acc + u.qty, 0),
+        [dailyUpdates]
+    );
+    const totalDailyWeightKg = useMemo(
+        () => dailyUpdates.reduce((acc, u) => acc + u.weightKg, 0),
+        [dailyUpdates]
+    );
+    const avgDailyWeightPerPiece = useMemo(
+        () => (totalDailyQty > 0 ? totalDailyWeightKg / totalDailyQty : (unitWeightKg > 0 ? unitWeightKg : 65.8841)),
+        [totalDailyQty, totalDailyWeightKg, unitWeightKg]
+    );
+
+    return {
+        dailyUpdates,
+        totalDailyQty,
+        totalDailyWeightKg,
+        avgDailyWeightPerPiece,
+        reloadDailyUpdates,
+        isSyncingDaily
+    };
+};
+
 interface MalhaConsumptionReportModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -840,44 +1112,26 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
         [reportData.techConfig, computed.effectiveBitola]
     );
 
-    const dailyUpdates = useMemo(() => {
-        const byDate = new Map<string, number>();
-        const logs: any[] = op.operatorLogs || (op as any).operator_logs || [];
-        logs.forEach(l => {
-            const rawStart = l.startTime || l.start_time;
-            if (!rawStart || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG') return;
-            const d = new Date(rawStart);
-            if (isNaN(d.getTime())) return;
-            const dateBr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-            const startQ = Number(l.startQuantity ?? l.start_quantity ?? 0) || 0;
-            const endQ = (l.endTime || l.end_time)
-                ? (Number(l.endQuantity ?? l.end_quantity ?? startQ) || 0)
-                : (Number(op.actualProducedQuantity) || 0);
-            const diff = Math.max(0, endQ - startQ);
-            if (diff > 0) {
-                byDate.set(dateBr, (byDate.get(dateBr) || 0) + diff);
-            }
-        });
+    const {
+        dailyUpdates,
+        totalDailyQty,
+        totalDailyWeightKg,
+        avgDailyWeightPerPiece,
+        reloadDailyUpdates,
+        isSyncingDaily
+    } = useUnifiedMalhaDailyUpdates(op, shiftReports, physics.totalPesoUnit, isOpen);
 
-        if (byDate.size === 0) {
-            (shiftReports || [])
-                .filter(r => r.productionOrderId === op.id || r.orderNumber === op.orderNumber)
-                .forEach(r => {
-                    const rawD = r.date || r.shiftStartTime;
-                    if (!rawD) return;
-                    const d = new Date(rawD);
-                    const dateBr = !isNaN(d.getTime())
-                        ? d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-                        : String(rawD);
-                    const qty = Number(r.totalProducedQuantity || 0);
-                    if (qty > 0) {
-                        byDate.set(dateBr, (byDate.get(dateBr) || 0) + qty);
-                    }
-                });
+    const displayPackageQty = useMemo(() => {
+        if (reportData.packages.length > 0) {
+            const firstQty = Number(reportData.packages[0].quantity) || 0;
+            const allSame = reportData.packages.every(p => (Number(p.quantity) || 0) === firstQty);
+            if (allSame && firstQty > 0) return firstQty;
+            return Math.round(computed.totalQuantity / reportData.packages.length);
         }
+        return reportData.techConfig.defaultQtyPerPackage || 50;
+    }, [reportData.packages, reportData.techConfig.defaultQtyPerPackage, computed.totalQuantity]);
 
-        return Array.from(byDate.entries()).map(([date, qty]) => ({ date, qty }));
-    }, [op, shiftReports]);
+    const pendingPiecesToPackage = Math.max(0, totalDailyQty - computed.totalQuantity);
 
     if (!isOpen) return null;
 
@@ -1078,17 +1332,17 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             {reportData.packages.length}
                                         </td>
                                         <td className="py-1.5 px-2 border border-slate-400 text-center font-bold">
-                                            {reportData.techConfig.defaultQtyPerPackage || 50}
+                                            {displayPackageQty}
                                         </td>
                                         <td className="py-1.5 px-2 border border-slate-400 text-center font-bold">
                                             {computed.totalQuantity}
                                         </td>
                                         <td className="py-1.5 px-2 border border-slate-400 text-right font-mono font-bold">
-                                            {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                                            {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                     </tr>
                                     <tr className="bg-[#D9E1F2] font-black text-slate-900">
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center">Total:</td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center">Total Pesado:</td>
                                         <td className="py-1.5 px-2 border border-slate-400"></td>
                                         <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
                                             {computed.totalQuantity}
@@ -1097,6 +1351,29 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                     </tr>
+                                    {totalDailyQty > 0 && (
+                                        <tr className="bg-emerald-50 font-black text-emerald-950">
+                                            <td colSpan={2} className="py-1.5 px-2 border border-slate-400 text-center text-[11px]">
+                                                Produzido (Marcações Diárias):
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-center font-mono text-emerald-800">
+                                                {totalDailyQty}
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-right font-mono text-emerald-800">
+                                                {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {pendingPiecesToPackage > 0 && (
+                                        <tr className="bg-amber-50 font-black text-amber-900">
+                                            <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center text-[10px]">
+                                                Saldo p/ Fechar Pacote:
+                                            </td>
+                                            <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center font-mono text-[11px]">
+                                                {pendingPiecesToPackage} malhas em máquina
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -1373,39 +1650,65 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                             <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
                                 <thead>
                                     <tr>
-                                        <th colSpan={2} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
-                                            ATUALIZAÇÃO PRODUÇÃO
+                                        <th colSpan={4} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span>ATUALIZAÇÃO DA PRODUÇÃO (MARCAÇÕES DIÁRIAS)</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={reloadDailyUpdates}
+                                                    className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase print:hidden cursor-pointer"
+                                                    title="Sincronizar marcações com o Relatório Diário"
+                                                >
+                                                    {isSyncingDaily ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
+                                                </button>
+                                            </div>
                                         </th>
                                     </tr>
                                     <tr className="bg-[#2F5597] text-white font-bold uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Peças Produzidas</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-center">Qnt.</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-right">Peso (kg)</th>
+                                        <th className="py-1 px-2 border border-slate-400 text-center">Média (kg/peça)</th>
                                         <th className="py-1 px-2 border border-slate-400 text-center">Data</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {dailyUpdates.length > 0 ? (
                                         dailyUpdates.map((u, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50">
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-black text-slate-900">
+                                            <tr key={u.isoDate || idx} className="hover:bg-slate-50">
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-black text-[#002060]">
                                                     {u.qty}
                                                 </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono text-slate-700">
+                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold text-[#002060]">
+                                                    {u.weightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono text-slate-600">
+                                                    {u.avgKgPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold text-[#002060]">
                                                     {u.date}
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={2} className="py-4 text-center text-slate-400 italic">
+                                            <td colSpan={4} className="py-4 text-center text-slate-400 italic">
                                                 Sem apontamentos diários registrados.
                                             </td>
                                         </tr>
                                     )}
-                                    <tr className="bg-[#D9E1F2] font-black text-slate-900">
+                                    <tr className="bg-[#002060] text-white font-black">
                                         <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
-                                            {dailyUpdates.reduce((acc, u) => acc + u.qty, 0) || op.actualProducedQuantity || 0}
+                                            {totalDailyQty || op.actualProducedQuantity || 0}
                                         </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center">Total Produzido</td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
+                                            {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
+                                            {avgDailyWeightPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center uppercase text-[10px]">
+                                            Total / Média
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1474,6 +1777,19 @@ export const MalhaPackagesOperatorPanel: React.FC<{
         () => computeMalhaPackagesAndLots(reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue),
         [reportData.packages, reportData.techConfig, reportData.longLotsQueue, reportData.transLotsQueue]
     );
+    const panelPhysics = useMemo(
+        () => calculateMalhaPhysics(reportData.techConfig, computed.effectiveBitola),
+        [reportData.techConfig, computed.effectiveBitola]
+    );
+    const {
+        dailyUpdates,
+        totalDailyQty,
+        totalDailyWeightKg,
+        avgDailyWeightPerPiece,
+        reloadDailyUpdates,
+        isSyncingDaily
+    } = useUnifiedMalhaDailyUpdates(op, shiftReports, panelPhysics.totalPesoUnit, true);
+    const pendingPiecesToPackage = Math.max(0, totalDailyQty - computed.totalQuantity);
 
     // Conjunto de todos os lotes já cadastrados/utilizados nesta OP (Ativos, Reservas ou já Finalizados com Sobra 0)
     const usedLotCodesMap = useMemo(() => {
@@ -2413,6 +2729,92 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         Nenhum pacote de 50 malhas fechado ainda. Digite o <strong>Peso do Pacote (kg)</strong> acima e confirme o <strong>Pacote P1</strong>!
                     </div>
                 )}
+            </div>
+
+            {/* BLOCO 3: MARCAÇÕES DIÁRIAS DE PRODUÇÃO (SINCRONIZADO COM RELATÓRIO DIÁRIO) */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-slate-200 shadow-sm space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                    <div>
+                        <h3 className="text-sm sm:text-base font-black uppercase text-[#002060] flex items-center gap-2">
+                            <span>📅 3. Atualização da Produção (Marcações Diárias)</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                            Todas as marcações diárias da OP sincronizadas com o Relatório Diário e comparadas com os pacotes pesados.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {totalDailyQty > 0 && (
+                            <span className="px-2.5 py-1 rounded-full bg-blue-50 text-[#002060] border border-blue-200 text-[11px] font-mono font-black">
+                                Produzido: {totalDailyQty} pçs • Em Pacotes: {computed.totalQuantity} pçs
+                            </span>
+                        )}
+                        {pendingPiecesToPackage > 0 && (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-mono font-black">
+                                Saldo p/ Pacote: {pendingPiecesToPackage} pçs
+                            </span>
+                        )}
+                        <button
+                            type="button"
+                            onClick={reloadDailyUpdates}
+                            className="px-3 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-black text-[10px] uppercase tracking-wider shadow-sm transition active:scale-95 cursor-pointer"
+                        >
+                            {isSyncingDaily ? '⏳ Sincronizando...' : '🔄 Sincronizar OP'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto border border-[#002060] rounded-xl">
+                    <table className="w-full border-collapse text-xs">
+                        <thead>
+                            <tr className="bg-[#002060] text-white text-[10px] font-black uppercase">
+                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4">Qnt.</th>
+                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4">Peso (kg)</th>
+                                <th className="py-2 px-3 border-r border-slate-700 text-center w-1/4">Média (kg/peça)</th>
+                                <th className="py-2 px-3 text-center w-1/4">Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dailyUpdates.length > 0 ? (
+                                dailyUpdates.map((u, idx) => (
+                                    <tr key={u.isoDate || idx} className="border-b border-slate-200 hover:bg-slate-50 font-bold text-[#002060]">
+                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-black">
+                                            {u.qty}
+                                        </td>
+                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-mono">
+                                            {u.weightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-2 px-3 border-r border-slate-200 text-center font-mono text-slate-600">
+                                            {u.avgKgPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-2 px-3 text-center font-mono font-black">
+                                            {u.date}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="py-4 text-center text-slate-400 italic">
+                                        Nenhuma marcação diária registrada para esta OP ainda.
+                                    </td>
+                                </tr>
+                            )}
+                            <tr className="bg-[#002060] text-white font-black">
+                                <td className="py-2 px-3 border-r border-slate-700 text-center font-mono">
+                                    {totalDailyQty || op.actualProducedQuantity || 0}
+                                </td>
+                                <td className="py-2 px-3 border-r border-slate-700 text-center font-mono">
+                                    {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2 px-3 border-r border-slate-700 text-center font-mono">
+                                    {avgDailyWeightPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2 px-3 text-center uppercase text-[10px]">
+                                    Total / Média
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {showFullModal && (
