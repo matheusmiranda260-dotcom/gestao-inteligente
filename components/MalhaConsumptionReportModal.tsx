@@ -1154,7 +1154,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                 #malha-closing-report-sheet .malha-sheet-input {
                     border: none !important;
                     background: transparent !important;
-                    padding: 2px 4px !important;
+                    padding: 2px 3px !important;
                     margin: 0 !important;
                     min-height: 0 !important;
                     height: auto !important;
@@ -1162,6 +1162,13 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                     outline: none !important;
                     border-radius: 4px !important;
                     line-height: 1.25 !important;
+                    -moz-appearance: textfield !important;
+                    appearance: textfield !important;
+                }
+                #malha-closing-report-sheet .malha-sheet-input::-webkit-outer-spin-button,
+                #malha-closing-report-sheet .malha-sheet-input::-webkit-inner-spin-button {
+                    -webkit-appearance: none !important;
+                    margin: 0 !important;
                 }
                 #malha-closing-report-sheet .malha-sheet-input:focus {
                     background: rgba(251, 191, 36, 0.18) !important;
@@ -1425,9 +1432,10 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
                                                 <input
                                                     type="number"
+                                                    inputMode="numeric"
                                                     value={reportData.techConfig.longQnt}
                                                     onChange={e => updateTechField('longQnt', parseFloat(e.target.value) || 0)}
-                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                    className="malha-sheet-input print:hidden min-w-[64px] w-20 text-center font-black !text-slate-950"
                                                 />
                                                 <span className="hidden print-only-value font-mono font-black text-slate-950">
                                                     {reportData.techConfig.longQnt}
@@ -1436,10 +1444,11 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
                                                 <input
                                                     type="number"
+                                                    inputMode="decimal"
                                                     step="0.05"
                                                     value={reportData.techConfig.longTam}
                                                     onChange={e => updateTechField('longTam', parseFloat(e.target.value) || 0)}
-                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                    className="malha-sheet-input print:hidden min-w-[64px] w-20 text-center font-black !text-slate-950"
                                                 />
                                                 <span className="hidden print-only-value font-mono font-black text-slate-950">
                                                     {reportData.techConfig.longTam.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
@@ -1457,9 +1466,10 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
                                                 <input
                                                     type="number"
+                                                    inputMode="numeric"
                                                     value={reportData.techConfig.transQnt}
                                                     onChange={e => updateTechField('transQnt', parseFloat(e.target.value) || 0)}
-                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                    className="malha-sheet-input print:hidden min-w-[64px] w-20 text-center font-black !text-slate-950"
                                                 />
                                                 <span className="hidden print-only-value font-mono font-black text-slate-950">
                                                     {reportData.techConfig.transQnt}
@@ -1468,10 +1478,11 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                             <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
                                                 <input
                                                     type="number"
+                                                    inputMode="decimal"
                                                     step="0.05"
                                                     value={reportData.techConfig.transTam}
                                                     onChange={e => updateTechField('transTam', parseFloat(e.target.value) || 0)}
-                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                    className="malha-sheet-input print:hidden min-w-[64px] w-20 text-center font-black !text-slate-950"
                                                 />
                                                 <span className="hidden print-only-value font-mono font-black text-slate-950">
                                                     {reportData.techConfig.transTam.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
@@ -1585,8 +1596,8 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                     <tr className="bg-[#D9E1F2] text-slate-950 font-black uppercase text-[10px]">
                                         <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-[#D9E1F2] !text-slate-950">LOTE (Etiq.)</th>
                                         <th className="py-1 px-1.5 border border-slate-400 text-center w-10 !bg-[#D9E1F2] !text-slate-950">PCT</th>
-                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-14 !bg-[#D9E1F2] !text-slate-950">QUNT.</th>
-                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-24 !bg-emerald-200 !text-emerald-950">PESO PCT (kg)</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center min-w-[68px] w-20 !bg-[#D9E1F2] !text-slate-950">QUNT.</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center min-w-[80px] w-24 !bg-emerald-200 !text-emerald-950">PESO PCT (kg)</th>
                                         <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-emerald-100 !text-emerald-950">BITOLA CALC.</th>
                                         <th className="py-1 px-1.5 border border-slate-400 text-center w-24 !bg-yellow-200 !text-slate-950">LOTE</th>
                                         <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-yellow-200 !text-slate-950">PESO LOTE</th>
@@ -1656,9 +1667,10 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                     <td className="p-1 border border-slate-400 text-center bg-amber-50/30">
                                                         <input
                                                             type="number"
+                                                            inputMode="numeric"
                                                             value={row.quantity}
                                                             onChange={e => updatePackageRow(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
-                                                            className="malha-sheet-input print:hidden w-full text-center font-black !text-slate-950"
+                                                            className="malha-sheet-input print:hidden min-w-[60px] w-full text-center font-black !text-slate-950 text-xs sm:text-sm"
                                                         />
                                                         <span className="hidden print-only-value font-mono font-black text-slate-950">
                                                             {row.quantity}
@@ -1668,11 +1680,12 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                                     <td className="p-1 border border-slate-400 text-center bg-emerald-100/70">
                                                         <input
                                                             type="number"
+                                                            inputMode="decimal"
                                                             step="0.1"
                                                             value={row.measuredPackageWeight ?? ''}
                                                             onChange={e => updatePackageRow(row.id, 'measuredPackageWeight', parseFloat(e.target.value) || null)}
                                                             placeholder={row.packageWeightKg.toFixed(0)}
-                                                            className="malha-sheet-input print:hidden w-full text-center font-black !text-emerald-950"
+                                                            className="malha-sheet-input print:hidden min-w-[72px] w-full text-center font-black !text-emerald-950 text-xs sm:text-sm"
                                                         />
                                                         <span className="hidden print-only-value font-mono font-black text-emerald-950">
                                                             {(row.measuredPackageWeight ?? row.packageWeightKg).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
@@ -2764,9 +2777,9 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
-                        <div>
-                            <label className="text-[9px] font-black uppercase text-emerald-300 block mb-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                        <div className="sm:col-span-1 lg:col-span-4">
+                            <label className="text-[11px] font-black uppercase text-emerald-300 block mb-1">
                                 ⚖️ Peso do Pacote (kg) *
                             </label>
                             <input
@@ -2776,22 +2789,23 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 value={newPkgWeight}
                                 onChange={e => setNewPkgWeight(e.target.value)}
                                 placeholder={`Ex: ${livePreview.packageWeightKg.toFixed(0)}`}
-                                className="w-full px-3 py-2.5 rounded-xl bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 font-mono font-black text-base text-center outline-none focus:border-emerald-300"
+                                className="w-full min-w-[110px] !px-3 !py-2.5 rounded-xl !bg-emerald-950/90 !border-2 !border-emerald-400 !text-emerald-200 font-mono font-black text-lg text-center outline-none focus:!border-emerald-300"
                             />
                         </div>
-                        <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
-                                Qtd. Malhas
+                        <div className="sm:col-span-1 lg:col-span-3">
+                            <label className="text-[11px] font-black uppercase text-amber-300 block mb-1">
+                                Qtd. de Peças (Malhas)
                             </label>
                             <input
                                 type="number"
+                                inputMode="numeric"
                                 value={newPkgQty}
                                 onChange={e => setNewPkgQty(parseInt(e.target.value, 10) || 0)}
-                                className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-black text-sm text-center outline-none focus:border-amber-400"
+                                className="w-full min-w-[100px] !px-2 !py-2.5 rounded-xl !bg-slate-800 !border-2 !border-amber-400/70 !text-white font-mono font-black text-lg text-center outline-none focus:!border-amber-300"
                             />
                         </div>
-                        <div>
-                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">
+                        <div className="sm:col-span-1 lg:col-span-2">
+                            <label className="text-[11px] font-black uppercase text-slate-300 block mb-1">
                                 Nº Etiqueta (Opcional)
                             </label>
                             <input
@@ -2799,13 +2813,13 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                 value={newPkgTag}
                                 onChange={e => setNewPkgTag(e.target.value)}
                                 placeholder="Ex: 88846"
-                                className="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-bold text-sm text-center outline-none focus:border-amber-400"
+                                className="w-full min-w-[90px] !px-2 !py-2.5 rounded-xl !bg-slate-800 !border !border-white/25 !text-white font-mono font-bold text-base text-center outline-none focus:!border-amber-400"
                             />
                         </div>
                         <button
                             type="button"
                             onClick={handleConfirmNewPackage}
-                            className="col-span-2 sm:col-span-1 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
+                            className="sm:col-span-1 lg:col-span-3 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
                         >
                             <span>✅</span>
                             <span>Confirmar P{nextPackageNumber}</span>
@@ -2899,9 +2913,18 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                                             <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
                                                 {row.packageCode.toUpperCase()}
                                             </span>
-                                            <span className="text-xs font-black text-slate-800">
-                                                {row.quantity} pçs
-                                            </span>
+                                            <div className="flex items-center gap-1 bg-white border border-slate-300 px-2 py-0.5 rounded-lg">
+                                                <span className="text-[10px] font-black uppercase text-slate-500">
+                                                    Qtd:
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    value={row.quantity}
+                                                    onChange={e => handleUpdatePackageField(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
+                                                    className="w-20 min-w-[72px] !px-1.5 !py-0.5 rounded !border !border-slate-300 !bg-amber-50 font-mono font-black text-sm text-center !text-slate-900 outline-none"
+                                                />
+                                            </div>
                                             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-mono font-black">
                                                 📏 Bitola: {row.calculatedBitola.toFixed(2).replace('.', ',')} mm
                                             </span>

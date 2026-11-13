@@ -1153,6 +1153,13 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
         await persistData({ ...reportData, packages: nextPackages });
     };
 
+    const handleUpdateSavedPkgQty = async (pkgId: string, newQty: number) => {
+        const nextPackages = reportData.packages.map(p =>
+            p.id === pkgId ? { ...p, quantity: Math.max(0, newQty) } : p
+        );
+        await persistData({ ...reportData, packages: nextPackages });
+    };
+
     const handleDeletePackage = async (pkgId: string) => {
         const nextPackages = reportData.packages
             .filter(p => p.id !== pkgId)
@@ -1457,7 +1464,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                                             )
                                                         }
                                                         placeholder="Ex: 2075"
-                                                        className="w-full px-2.5 py-1.5 rounded-lg border-2 border-emerald-400 bg-white font-mono font-black text-sm text-slate-900 text-center outline-none"
+                                                        className="w-full min-w-[88px] !px-2 !py-1.5 rounded-lg !border-2 !border-emerald-400 !bg-white font-mono font-black text-sm !text-slate-900 text-center outline-none"
                                                     />
                                                 </div>
                                             </div>
@@ -1603,9 +1610,9 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                         </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 items-end">
-                        <div className="col-span-2 sm:col-span-1">
-                            <label className="text-[10px] font-black uppercase text-emerald-300 block mb-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                        <div className="sm:col-span-1 lg:col-span-4">
+                            <label className="text-[11px] font-black uppercase text-emerald-300 block mb-1">
                                 ⚖️ Peso do Pacote (kg) *
                             </label>
                             <input
@@ -1618,25 +1625,25 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                     setPackageValidationError(null);
                                 }}
                                 placeholder={`Ex: ${Math.round(reportData.techConfig.pesoFinalUnit * 200)}`}
-                                className="w-full px-3 py-3 rounded-xl bg-emerald-500/20 border-2 border-emerald-400 text-emerald-200 font-mono font-black text-lg text-center outline-none focus:border-emerald-300"
+                                className="w-full min-w-[110px] !px-3 !py-3 rounded-xl !bg-emerald-950/90 !border-2 !border-emerald-400 !text-emerald-200 font-mono font-black text-lg text-center outline-none focus:!border-emerald-300"
                             />
                         </div>
 
-                        <div>
-                            <label className="text-[10px] font-black uppercase text-slate-300 block mb-1">
-                                Qtd. Peças
+                        <div className="sm:col-span-1 lg:col-span-3">
+                            <label className="text-[11px] font-black uppercase text-amber-300 block mb-1">
+                                Qtd. de Peças
                             </label>
                             <input
                                 type="number"
                                 inputMode="numeric"
                                 value={newPkgQty}
                                 onChange={e => setNewPkgQty(e.target.value)}
-                                className="w-full px-3 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-black text-base text-center outline-none"
+                                className="w-full min-w-[100px] !px-2 !py-3 rounded-xl !bg-slate-800 !border-2 !border-amber-400/70 !text-white font-mono font-black text-lg text-center outline-none focus:!border-amber-300"
                             />
                         </div>
 
-                        <div>
-                            <label className="text-[10px] font-black uppercase text-slate-300 block mb-1">
+                        <div className="sm:col-span-1 lg:col-span-2">
+                            <label className="text-[11px] font-black uppercase text-slate-300 block mb-1">
                                 Etiqueta (Opcional)
                             </label>
                             <input
@@ -1644,14 +1651,14 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                 value={newPkgLabelLot}
                                 onChange={e => setNewPkgLabelLot(e.target.value)}
                                 placeholder="Ex: 88910"
-                                className="w-full px-3 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-mono font-bold text-sm text-center outline-none"
+                                className="w-full min-w-[90px] !px-2 !py-3 rounded-xl !bg-slate-800 !border !border-white/25 !text-white font-mono font-bold text-base text-center outline-none focus:!border-cyan-400"
                             />
                         </div>
 
                         <button
                             type="button"
                             onClick={handleConfirmNewPackage}
-                            className="col-span-2 sm:col-span-1 py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
+                            className="sm:col-span-1 lg:col-span-3 py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5"
                         >
                             <span>✅</span>
                             <span>Confirmar P{nextPkgNumber}</span>
@@ -1699,14 +1706,28 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                 key={row.id}
                                 className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50 space-y-2"
                             >
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <span className="px-2.5 py-1 rounded-lg bg-[#1F3864] text-white font-black font-mono text-xs uppercase">
                                             {row.packageCode.toUpperCase()}
                                         </span>
-                                        <span className="text-xs font-black text-slate-800">
-                                            {row.quantity} peças
-                                        </span>
+                                        <div className="flex items-center gap-1.5 bg-white border border-slate-300 px-2 py-1 rounded-lg">
+                                            <span className="text-[10px] font-black uppercase text-slate-500">
+                                                Qtd. Peças:
+                                            </span>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                value={row.quantity}
+                                                onChange={e =>
+                                                    handleUpdateSavedPkgQty(
+                                                        row.id,
+                                                        parseInt(e.target.value, 10) || 0
+                                                    )
+                                                }
+                                                className="w-20 min-w-[72px] !px-1.5 !py-0.5 rounded !border !border-slate-300 !bg-amber-50 font-mono font-black text-sm text-center !text-slate-900 outline-none"
+                                            />
+                                        </div>
                                         {row.finishedLotNumber && (
                                             <span className="text-[11px] font-mono font-bold text-slate-500">
                                                 • Etiq: {row.finishedLotNumber}
@@ -1739,7 +1760,7 @@ export const TrelicaPackagesOperatorPanel: React.FC<TrelicaPackagesOperatorPanel
                                                     parseFloat(e.target.value) || null
                                                 )
                                             }
-                                            className="w-24 px-2 py-1 rounded-lg border border-emerald-400 bg-white font-mono font-black text-sm text-center text-slate-900"
+                                            className="w-28 min-w-[96px] !px-2 !py-1 rounded-lg !border !border-emerald-400 !bg-white font-mono font-black text-sm text-center !text-slate-900 outline-none"
                                         />
                                         <span className="text-xs font-bold text-emerald-900">kg</span>
                                     </div>
@@ -1977,6 +1998,28 @@ export const TrelicaConsumptionReportModal: React.FC<TrelicaConsumptionReportMod
     return (
         <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 overflow-y-auto">
             <style>{`
+                #trelica-closing-sheet-print .trelica-sheet-input {
+                    border: none !important;
+                    background: transparent !important;
+                    padding: 2px 3px !important;
+                    margin: 0 !important;
+                    min-height: 0 !important;
+                    height: auto !important;
+                    box-shadow: none !important;
+                    outline: none !important;
+                    border-radius: 4px !important;
+                    line-height: 1.25 !important;
+                    -moz-appearance: textfield !important;
+                    appearance: textfield !important;
+                }
+                #trelica-closing-sheet-print .trelica-sheet-input::-webkit-outer-spin-button,
+                #trelica-closing-sheet-print .trelica-sheet-input::-webkit-inner-spin-button {
+                    -webkit-appearance: none !important;
+                    margin: 0 !important;
+                }
+                #trelica-closing-sheet-print .trelica-sheet-input:focus {
+                    background: rgba(251, 191, 36, 0.2) !important;
+                }
                 @media print {
                     @page {
                         size: A4 landscape;
@@ -2245,11 +2288,11 @@ export const TrelicaConsumptionReportModal: React.FC<TrelicaConsumptionReportMod
                                             <th className="p-1 border border-slate-400 no-print"></th>
                                         </tr>
                                         <tr className="bg-slate-200 text-slate-900 font-black uppercase text-[9px]">
-                                            <th className="p-1 border border-slate-300">LOTE ETIQ.</th>
-                                            <th className="p-1 border border-slate-300">PCT</th>
-                                            <th className="p-1 border border-slate-300">QUNT.</th>
-                                            <th className="p-1 border border-slate-300 bg-emerald-100">PESO PCT</th>
-                                            <th className="p-1 border border-slate-300">KG/PEÇA</th>
+                                            <th className="p-1 border border-slate-300 min-w-[64px]">LOTE ETIQ.</th>
+                                            <th className="p-1 border border-slate-300 min-w-[36px]">PCT</th>
+                                            <th className="p-1 border border-slate-300 min-w-[60px]">QUNT.</th>
+                                            <th className="p-1 border border-slate-300 bg-emerald-100 min-w-[72px]">PESO PCT</th>
+                                            <th className="p-1 border border-slate-300 min-w-[56px]">KG/PEÇA</th>
                                             {TRELICA_WIRE_POSITIONS.map(pos => (
                                                 <React.Fragment key={`${pos.key}-sub`}>
                                                     <th className="p-1 border border-slate-300 bg-amber-100">LOTE</th>
@@ -2276,25 +2319,27 @@ export const TrelicaConsumptionReportModal: React.FC<TrelicaConsumptionReportMod
                                                             )
                                                         }
                                                         placeholder="Etiqueta"
-                                                        className="w-14 text-center font-bold text-slate-900 bg-transparent border-b border-transparent focus:border-slate-500 outline-none"
+                                                        className="trelica-sheet-input w-full min-w-[60px] text-center font-bold !text-slate-900 text-xs"
                                                     />
                                                 </td>
                                                 <td className="p-1 border border-slate-300 text-center font-black">
                                                     {row.packageCode}
                                                 </td>
-                                                <td className="p-1 border border-slate-300 text-center">
+                                                <td className="p-1 border border-slate-300 text-center bg-amber-50/40">
                                                     <input
                                                         type="number"
+                                                        inputMode="numeric"
                                                         value={row.quantity}
                                                         onChange={e =>
                                                             handleUpdatePackageField(row.id, 'quantity', e.target.value)
                                                         }
-                                                        className="w-10 text-center font-black text-slate-900 bg-transparent"
+                                                        className="trelica-sheet-input w-full min-w-[56px] text-center font-black !text-slate-950 text-xs"
                                                     />
                                                 </td>
                                                 <td className="p-1 border border-slate-300 text-center bg-emerald-50 font-black">
                                                     <input
                                                         type="number"
+                                                        inputMode="decimal"
                                                         value={Math.round(row.packageWeightKg)}
                                                         onChange={e =>
                                                             handleUpdatePackageField(
@@ -2303,7 +2348,7 @@ export const TrelicaConsumptionReportModal: React.FC<TrelicaConsumptionReportMod
                                                                 e.target.value
                                                             )
                                                         }
-                                                        className="w-12 text-center font-black text-emerald-900 bg-transparent"
+                                                        className="trelica-sheet-input w-full min-w-[68px] text-center font-black !text-emerald-950 text-xs"
                                                     />
                                                 </td>
                                                 <td className="p-1 border border-slate-300 text-center font-bold">

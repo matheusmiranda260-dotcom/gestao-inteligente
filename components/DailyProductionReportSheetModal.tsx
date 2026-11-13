@@ -4138,7 +4138,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     type="number"
                                                     value={statsShiftA.pecasProduzidas || ''}
                                                     onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                                    className="modern-editable-input text-center w-12 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    className="modern-editable-input text-center w-20 min-w-[76px] text-slate-950 border-b border-slate-200 font-black text-sm"
                                                     placeholder="0"
                                                 />
                                                 <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
@@ -4146,7 +4146,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     type="number"
                                                     value={statsShiftA.tamanhoPeca || ''}
                                                     onChange={e => setStatsShiftA({ ...statsShiftA, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                                    className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    className="modern-editable-input text-center w-14 min-w-[52px] text-slate-950 border-b border-slate-200 font-black text-sm"
                                                     placeholder="0"
                                                 />
                                                 <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
@@ -4329,7 +4329,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     type="number"
                                                     value={statsShiftB.pecasProduzidas || ''}
                                                     onChange={e => setStatsShiftB({ ...statsShiftB, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
-                                                    className="modern-editable-input text-center w-12 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    className="modern-editable-input text-center w-20 min-w-[76px] text-slate-950 border-b border-slate-200 font-black text-sm"
                                                     placeholder="0"
                                                 />
                                                 <span className="text-slate-500 font-bold text-xs px-0.5">peças de</span>
@@ -4337,7 +4337,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                     type="number"
                                                     value={statsShiftB.tamanhoPeca || ''}
                                                     onChange={e => setStatsShiftB({ ...statsShiftB, tamanhoPeca: parseFloat(e.target.value) || 0 })}
-                                                    className="modern-editable-input text-center w-8 text-slate-950 border-b border-slate-200 font-black text-sm"
+                                                    className="modern-editable-input text-center w-14 min-w-[52px] text-slate-950 border-b border-slate-200 font-black text-sm"
                                                     placeholder="0"
                                                 />
                                                 <span className="text-slate-500 font-bold text-xs pl-0.5">metros</span>
@@ -4406,7 +4406,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             type="number"
                                             value={piecesToProduce}
                                             onChange={e => setPiecesToProduce(parseInt(e.target.value, 10) || 0)}
-                                            className="modern-editable-input text-center w-24 text-[#002060] font-black text-xs"
+                                            className="modern-editable-input text-center w-28 min-w-[100px] text-[#002060] font-black text-xs"
                                         />
                                         <span className="text-slate-500 font-medium">{isTrefila ? 'kg' : 'treliças'}</span>
                                     </div>
