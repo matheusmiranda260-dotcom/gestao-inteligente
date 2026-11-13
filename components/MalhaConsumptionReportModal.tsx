@@ -1136,637 +1136,850 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
     if (!isOpen) return null;
 
     const modelName = (op.malhaModel || (op as any).malha_model || op.productDescription || 'MALHA SOLDADA PAINEL SOB MEDIDA').toUpperCase();
+    const machineLabel = (op.machine || 'MALHA 1').toUpperCase();
+    const nowDate = new Date();
+    const formattedClosingDate = nowDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const formattedDayOfWeek = nowDate.toLocaleDateString('pt-BR', { weekday: 'long' }).toUpperCase();
 
     return (
         <div
-            className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[160] p-2 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-black/85 backdrop-blur-md flex flex-col z-[160] overflow-y-auto print:bg-white print:p-0 print:overflow-visible"
             onClick={onClose}
         >
+            {/* CSS de Impressão A4 e Inputs Limpos */}
+            <style dangerouslySetInnerHTML={{ __html: `
+                #malha-closing-report-sheet .malha-sheet-input {
+                    border: none !important;
+                    background: transparent !important;
+                    padding: 2px 4px !important;
+                    margin: 0 !important;
+                    min-height: 0 !important;
+                    height: auto !important;
+                    box-shadow: none !important;
+                    outline: none !important;
+                    border-radius: 4px !important;
+                    line-height: 1.25 !important;
+                }
+                #malha-closing-report-sheet .malha-sheet-input:focus {
+                    background: rgba(251, 191, 36, 0.18) !important;
+                }
+                #malha-closing-report-sheet th,
+                #malha-closing-report-sheet td {
+                    padding: 4px 6px !important;
+                }
+                @media print {
+                    @page {
+                        size: A4 portrait;
+                        margin: 6mm 5mm 6mm 5mm;
+                    }
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                        overflow: visible !important;
+                        height: auto !important;
+                    }
+                    body * {
+                        visibility: hidden !important;
+                    }
+                    #malha-closing-report-sheet,
+                    #malha-closing-report-sheet * {
+                        visibility: visible !important;
+                    }
+                    #malha-closing-report-sheet {
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin: 0 !important;
+                        box-shadow: none !important;
+                        border: 2px solid #002060 !important;
+                        border-radius: 6px !important;
+                        overflow: visible !important;
+                        background: #ffffff !important;
+                    }
+                    #malha-closing-report-sheet .no-print,
+                    #malha-closing-report-sheet .print\\:hidden {
+                        display: none !important;
+                        visibility: hidden !important;
+                    }
+                    #malha-closing-report-sheet .print-only-value {
+                        display: block !important;
+                        visibility: visible !important;
+                    }
+                    #malha-closing-report-sheet table {
+                        min-width: 0 !important;
+                        width: 100% !important;
+                        font-size: 9.5pt !important;
+                    }
+                    #malha-closing-report-sheet th,
+                    #malha-closing-report-sheet td {
+                        padding: 3px 5px !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    #malha-closing-report-sheet .print-two-cols {
+                        display: grid !important;
+                        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+                        gap: 10px !important;
+                    }
+                    #malha-closing-report-sheet .print-col-7 {
+                        grid-column: span 7 / span 7 !important;
+                    }
+                    #malha-closing-report-sheet .print-col-5 {
+                        grid-column: span 5 / span 5 !important;
+                    }
+                    #malha-closing-report-sheet .print-col-6 {
+                        grid-column: span 6 / span 6 !important;
+                    }
+                    #malha-closing-report-sheet .print-col-3 {
+                        grid-column: span 3 / span 3 !important;
+                    }
+                }
+            `}} />
+
+            {/* Barra de Ações Superior (Oculta na Impressão) */}
             <div
-                className="bg-white text-slate-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden border-2 border-slate-300 my-auto"
+                className="sticky top-0 z-50 bg-[#08131B]/95 backdrop-blur-md border-b border-white/10 px-4 py-2.5 shadow-2xl flex flex-wrap items-center justify-between gap-3 no-print print:hidden"
                 onClick={e => e.stopPropagation()}
             >
-                <div className="bg-[#0A1B27] text-white px-4 py-3 flex items-center justify-between gap-3 flex-wrap print:hidden">
-                    <div className="flex items-center gap-2.5">
-                        <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 text-lg">📊</span>
-                        <div>
-                            <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
-                                Relatório de Consumo por Lote & Pacotes (50 Malhas) • OP #{op.orderNumber}
+                <div className="flex items-center gap-2.5">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition cursor-pointer"
+                        title="Voltar"
+                    >
+                        ✕
+                    </button>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white">
+                                Fechamento Ordem de Produção Malha
                             </h2>
-                            <p className="text-[11px] text-slate-400">
-                                Pelo peso do pacote, o sistema calcula a bitola exata do fio e divide o peso Longitudinal e Transversal automaticamente
-                            </p>
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/40 font-mono">
+                                {machineLabel}
+                            </span>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold ${
-                            saveStatus === 'saved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'
-                        }`}>
-                            {saveStatus === 'saved' ? '✓ Salvo Automaticamente' : 'Salvando...'}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={handleAddPackage}
-                            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer"
-                        >
-                            + Pacote (50 pçs)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => window.print()}
-                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer"
-                        >
-                            🖨️ Imprimir
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition cursor-pointer"
-                        >
-                            ✕ Fechar
-                        </button>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                            OP #{op.orderNumber} • Pelo peso do pacote, o sistema calcula a bitola exata do fio e divide Longitudinal e Transversal
+                        </p>
                     </div>
                 </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold ${
+                        saveStatus === 'saved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'
+                    }`}>
+                        {saveStatus === 'saved' ? '✓ Salvo Automaticamente' : 'Salvando...'}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={handleAddPackage}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer"
+                    >
+                        + Pacote (50 pçs)
+                    </button>
+                    <button
+                        type="button"
+                        onClick={reloadDailyUpdates}
+                        className="px-3 py-1.5 rounded-xl bg-[#00E5FF]/15 hover:bg-[#00E5FF]/25 text-[#00E5FF] border border-[#00E5FF]/40 font-black text-xs uppercase tracking-wider transition cursor-pointer"
+                    >
+                        {isSyncingDaily ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#002060] hover:bg-blue-800 text-white font-black text-xs uppercase tracking-wider border border-blue-400/30 shadow-lg transition cursor-pointer"
+                    >
+                        🖨️ Imprimir A4
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition cursor-pointer"
+                    >
+                        ✕ Fechar
+                    </button>
+                </div>
+            </div>
 
-                <div className="p-4 sm:p-6 overflow-y-auto space-y-6 bg-slate-50 flex-1">
-                    {/* 1. CABEÇALHO DO MODELO / BITOLA / MASSA / ORDEM */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full max-w-4xl mx-auto border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
-                            <tbody>
-                                <tr>
-                                    <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center w-28 border border-[#1F3864]">
-                                        MODELO
-                                    </td>
-                                    <td colSpan={5} className="font-bold text-slate-800 px-3 py-1.5 text-center border border-slate-400">
-                                        {modelName}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center border border-[#1F3864]">
-                                        BITOLA (mm)
-                                    </td>
-                                    <td className="px-2 py-1.5 text-center border border-slate-400 bg-emerald-50/70 w-32 font-mono font-black text-emerald-900">
-                                        {computed.effectiveBitola.toFixed(2).replace('.', ',')} mm
-                                    </td>
-                                    <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center w-28 border border-[#1F3864]">
-                                        MASSA (kg/m)
-                                    </td>
-                                    <td className="px-3 py-1.5 text-center font-mono font-bold text-slate-800 border border-slate-400 w-36 bg-slate-100">
-                                        {physics.massaLinear.toFixed(8).replace('.', ',')}
-                                    </td>
-                                    <td className="bg-[#1F3864] text-white font-black uppercase px-3 py-1.5 text-center w-28 border border-[#1F3864]">
-                                        ORDEM
-                                    </td>
-                                    <td className="px-3 py-1.5 text-center font-black text-slate-900 border border-slate-400 w-32">
-                                        {op.orderNumber}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* 2. DESCRIÇÃO TÉCNICA & RESUMO DA ORDEM */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                        <div className="lg:col-span-7 overflow-x-auto">
-                            <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={5} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
-                                            DESCRIÇÃO TÉCNICA (POR 1 PAINEL DE MALHA)
-                                        </th>
-                                    </tr>
-                                    <tr className="bg-[#2F5597] text-white font-bold uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-left">DIREÇÃO</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">QNT. (Fios)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">TAM (m)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">LINEAR (m)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right">PESO (kg)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td className="py-1.5 px-2 font-bold border border-slate-400">LONGITUDINAL</td>
-                                        <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
-                                            <input
-                                                type="number"
-                                                value={reportData.techConfig.longQnt}
-                                                onChange={e => updateTechField('longQnt', parseFloat(e.target.value) || 0)}
-                                                className="w-16 text-center font-bold bg-transparent outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
-                                            <input
-                                                type="number"
-                                                step="0.05"
-                                                value={reportData.techConfig.longTam}
-                                                onChange={e => updateTechField('longTam', parseFloat(e.target.value) || 0)}
-                                                className="w-16 text-center font-bold bg-transparent outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono font-semibold bg-slate-50">
-                                            {physics.longLinear.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono font-bold bg-slate-50">
-                                            {physics.longPesoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 5, maximumFractionDigits: 5 })}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-1.5 px-2 font-bold border border-slate-400">TRANSVERSAL</td>
-                                        <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
-                                            <input
-                                                type="number"
-                                                value={reportData.techConfig.transQnt}
-                                                onChange={e => updateTechField('transQnt', parseFloat(e.target.value) || 0)}
-                                                className="w-16 text-center font-bold bg-transparent outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
-                                            <input
-                                                type="number"
-                                                step="0.05"
-                                                value={reportData.techConfig.transTam}
-                                                onChange={e => updateTechField('transTam', parseFloat(e.target.value) || 0)}
-                                                className="w-16 text-center font-bold bg-transparent outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono font-semibold bg-slate-50">
-                                            {physics.transLinear.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono font-bold bg-slate-50">
-                                            {physics.transPesoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 5, maximumFractionDigits: 5 })}
-                                        </td>
-                                    </tr>
-                                    <tr className="bg-[#D9E1F2] font-black text-slate-900">
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center">TOTAL</td>
-                                        <td className="py-1.5 px-2 border border-slate-400"></td>
-                                        <td className="py-1.5 px-2 border border-slate-400"></td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
-                                            {physics.totalLinear.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
-                                            {physics.totalPesoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 5, maximumFractionDigits: 8 })}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+            {/* Folha Oficial A4 - Fechamento Ordem de Produção Malha */}
+            <div
+                className="flex-1 p-2 sm:p-5 md:p-6 flex justify-center items-start print:p-0"
+                onClick={e => e.stopPropagation()}
+            >
+                <div
+                    id="malha-closing-report-sheet"
+                    className="bg-white text-slate-900 w-full max-w-5xl border-2 border-[#002060] rounded-xl overflow-hidden shadow-2xl my-auto"
+                >
+                    {/* 1. CABEÇALHO OFICIAL GRUPO ITA AÇOS (IDÊNTICO AO PADRÃO DO CONTROLE DE PRODUÇÃO) */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 print-two-cols border-b-2 border-[#002060]">
+                        {/* Bloco 1: Logo Ita Aços */}
+                        <div className="col-span-1 md:col-span-3 print-col-3 bg-white p-2.5 flex items-center justify-center md:border-r-2 border-[#002060]">
+                            <img
+                                src="/ita-acos-logo.png"
+                                alt="Logo Grupo Ita Aços"
+                                className="h-14 md:h-16 object-contain"
+                                style={{ maxHeight: '70px' }}
+                            />
                         </div>
 
-                        <div className="lg:col-span-5 overflow-x-auto">
-                            <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={4} className="bg-[#1F3864] text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
-                                            RESUMO DA ORDEM
-                                        </th>
-                                    </tr>
-                                    <tr className="bg-[#2F5597] text-white font-bold uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Pacotes</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Quantidade</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center">Total (Malhas)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right">Peso (kg)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-bold">
-                                            {reportData.packages.length}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-bold">
-                                            {displayPackageQty}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-bold">
-                                            {computed.totalQuantity}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono font-bold">
-                                            {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                    </tr>
-                                    <tr className="bg-[#D9E1F2] font-black text-slate-900">
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center">Total Pesado:</td>
-                                        <td className="py-1.5 px-2 border border-slate-400"></td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono">
-                                            {computed.totalQuantity}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono">
-                                            {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                    </tr>
-                                    {totalDailyQty > 0 && (
-                                        <tr className="bg-emerald-50 font-black text-emerald-950">
-                                            <td colSpan={2} className="py-1.5 px-2 border border-slate-400 text-center text-[11px]">
-                                                Produzido (Marcações Diárias):
-                                            </td>
-                                            <td className="py-1.5 px-2 border border-slate-400 text-center font-mono text-emerald-800">
-                                                {totalDailyQty}
-                                            </td>
-                                            <td className="py-1.5 px-2 border border-slate-400 text-right font-mono text-emerald-800">
-                                                {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {pendingPiecesToPackage > 0 && (
-                                        <tr className="bg-amber-50 font-black text-amber-900">
-                                            <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center text-[10px]">
-                                                Saldo p/ Fechar Pacote:
-                                            </td>
-                                            <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center font-mono text-[11px]">
-                                                {pendingPiecesToPackage} malhas em máquina
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                        {/* Bloco 2: Título Oficial */}
+                        <div className="col-span-1 md:col-span-6 print-col-6 bg-[#002060] text-white p-3.5 flex flex-col justify-center text-center md:text-left md:pl-6">
+                            <h1 className="text-lg md:text-xl font-black uppercase tracking-wider leading-tight !text-white">
+                                Fechamento Ordem de Produção Malha
+                            </h1>
+                            <p className="text-[11px] md:text-xs font-extrabold uppercase tracking-widest !text-slate-300 mt-0.5">
+                                Setor Laminação – {machineLabel}
+                            </p>
+                        </div>
+
+                        {/* Bloco 3: Data de Emissão / Fechamento */}
+                        <div className="col-span-1 md:col-span-3 print-col-3 bg-[#002060] text-white p-3 flex items-center justify-center border-t-2 md:border-t-0 md:border-l-2 border-white">
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-lg">📅</span>
+                                <div>
+                                    <div className="text-[9px] font-black !text-slate-300 tracking-wider uppercase">
+                                        Data de Emissão
+                                    </div>
+                                    <div className="text-sm md:text-base font-black !text-white leading-tight font-mono">
+                                        {formattedClosingDate}
+                                    </div>
+                                    <div className="text-[9px] font-extrabold !text-slate-300 uppercase">
+                                        {formattedDayOfWeek}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* 3. CONSUMÍVEIS POR LOTE */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
-                            <thead>
-                                <tr>
-                                    <th colSpan={14} className="!bg-[#1F3864] !text-white font-black uppercase py-2 px-3 text-center tracking-wider border border-[#1F3864]">
-                                        CONSUMÍVEIS POR LOTE (PACOTES DE 50 MALHAS • CONVERSÃO AUTOMÁTICA PELO PESO DO PACOTE)
-                                    </th>
-                                </tr>
-                                <tr className="bg-[#2F5597] text-white font-black uppercase text-[11px]">
-                                    <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">PACOTE DE 50 MALHAS & BITOLA REAL</th>
-                                    <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#1F4E79] !text-white">LONGITUDINAL</th>
-                                    <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#2E75B6] !text-white">TRANSVERSAL</th>
-                                    <th className="py-1 px-1 border border-slate-400 text-center print:hidden w-8 !bg-[#1F3864] !text-white"></th>
-                                </tr>
-                                <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[10px]">
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20">LOTE (Etiq.)</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-12">PCT</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-14">QUNT.</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-emerald-200/80">PESO PCT (kg)</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20 bg-emerald-100">BITOLA CALC.</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20 bg-yellow-200/80">PESO LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">PESO INICIAL</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">KG CONS.</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-24 bg-yellow-200/80">LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-center w-20 bg-yellow-200/80">PESO LOTE</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">PESO INICIAL</th>
-                                    <th className="py-1.5 px-2 border border-slate-400 text-right w-24">KG CONS.</th>
-                                    <th className="py-1.5 px-1 border border-slate-400 text-center print:hidden"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {computed.computedRows.length > 0 ? (
-                                    computed.computedRows.map((row, idx, rows) => {
-                                        const cleanLongLot = (row.longLot || '').trim();
-                                        const prevLongLot = idx > 0 ? (rows[idx - 1].longLot || '').trim() : '';
-                                        let longSpan = 1;
-                                        if (cleanLongLot && cleanLongLot === prevLongLot) {
-                                            longSpan = 0;
-                                        } else if (cleanLongLot) {
-                                            while (
-                                                idx + longSpan < rows.length &&
-                                                (rows[idx + longSpan].longLot || '').trim() === cleanLongLot
-                                            ) {
-                                                longSpan++;
+                    {/* FAIXA DE IDENTIFICAÇÃO DA ORDEM E PRODUTO */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 print-two-cols border-b-2 border-[#002060] bg-[#fbfcfd]">
+                        <div className="col-span-1 md:col-span-3 print-col-3 p-2.5 border-b md:border-b-0 md:border-r border-slate-300 flex flex-col justify-center">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                                Ordem de Produção
+                            </span>
+                            <span className="text-lg font-black text-[#002060] font-mono leading-tight">
+                                OP #{op.orderNumber}
+                            </span>
+                        </div>
+                        <div className="col-span-1 md:col-span-6 print-col-6 p-2.5 border-b md:border-b-0 md:border-r border-slate-300 flex flex-col justify-center">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                                Descrição do Produto (Modelo)
+                            </span>
+                            <span className="text-xs sm:text-sm font-black text-[#002060] leading-snug">
+                                {modelName}
+                            </span>
+                        </div>
+                        <div className="col-span-1 md:col-span-3 print-col-3 p-2.5 bg-emerald-50/60 flex items-center justify-between gap-2">
+                            <div>
+                                <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider block">
+                                    Bitola Média Real
+                                </span>
+                                <span className="text-sm font-black font-mono text-emerald-900">
+                                    Ø {computed.effectiveBitola.toFixed(2).replace('.', ',')} mm
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">
+                                    Massa (kg/m)
+                                </span>
+                                <span className="text-xs font-bold font-mono text-slate-800">
+                                    {physics.massaLinear.toFixed(6).replace('.', ',')}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* CORPO DO RELATÓRIO */}
+                    <div className="p-3 sm:p-4 space-y-3.5 bg-white">
+                        {/* 2. DESCRIÇÃO TÉCNICA & RESUMO DA ORDEM */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 print-two-cols gap-3.5 items-start">
+                            <div className="md:col-span-7 print-col-7 overflow-x-auto">
+                                <table className="w-full border-collapse border-2 border-[#002060] text-xs bg-white">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={5} className="!bg-[#002060] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#002060]">
+                                                DESCRIÇÃO TÉCNICA (POR 1 PAINEL DE MALHA)
+                                            </th>
+                                        </tr>
+                                        <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[10px]">
+                                            <th className="py-1 px-2 border border-slate-400 text-left !bg-[#D9E1F2] !text-slate-950">DIREÇÃO</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">QNT. (Fios)</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">TAM (m)</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">LINEAR (m)</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-950">PESO (kg)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td className="py-1 px-2 font-black border border-slate-400 !text-[#002060]">LONGITUDINAL</td>
+                                            <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
+                                                <input
+                                                    type="number"
+                                                    value={reportData.techConfig.longQnt}
+                                                    onChange={e => updateTechField('longQnt', parseFloat(e.target.value) || 0)}
+                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                />
+                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                    {reportData.techConfig.longQnt}
+                                                </span>
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
+                                                <input
+                                                    type="number"
+                                                    step="0.05"
+                                                    value={reportData.techConfig.longTam}
+                                                    onChange={e => updateTechField('longTam', parseFloat(e.target.value) || 0)}
+                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                />
+                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                    {reportData.techConfig.longTam.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                                                </span>
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold bg-slate-50 !text-slate-900">
+                                                {physics.longLinear.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold bg-slate-50 !text-slate-900">
+                                                {physics.longPesoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 5, maximumFractionDigits: 5 })}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td className="py-1 px-2 font-black border border-slate-400 !text-[#002060]">TRANSVERSAL</td>
+                                            <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
+                                                <input
+                                                    type="number"
+                                                    value={reportData.techConfig.transQnt}
+                                                    onChange={e => updateTechField('transQnt', parseFloat(e.target.value) || 0)}
+                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                />
+                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                    {reportData.techConfig.transQnt}
+                                                </span>
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 bg-amber-50/50 text-center">
+                                                <input
+                                                    type="number"
+                                                    step="0.05"
+                                                    value={reportData.techConfig.transTam}
+                                                    onChange={e => updateTechField('transTam', parseFloat(e.target.value) || 0)}
+                                                    className="malha-sheet-input print:hidden w-16 text-center font-black !text-slate-950"
+                                                />
+                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                    {reportData.techConfig.transTam.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                                                </span>
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold bg-slate-50 !text-slate-900">
+                                                {physics.transLinear.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold bg-slate-50 !text-slate-900">
+                                                {physics.transPesoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 5, maximumFractionDigits: 5 })}
+                                            </td>
+                                        </tr>
+                                        <tr className="bg-[#D9E1F2] font-black text-slate-950">
+                                            <td className="py-1 px-2 border border-slate-400 text-center !text-slate-950">TOTAL</td>
+                                            <td className="py-1 px-2 border border-slate-400 !text-slate-950"></td>
+                                            <td className="py-1 px-2 border border-slate-400 !text-slate-950"></td>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-mono !text-slate-950">
+                                                {physics.totalLinear.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-right font-mono !text-slate-950">
+                                                {physics.totalPesoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 5, maximumFractionDigits: 8 })}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="md:col-span-5 print-col-5 overflow-x-auto">
+                                <table className="w-full border-collapse border-2 border-[#002060] text-xs bg-white">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={4} className="!bg-[#002060] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#002060]">
+                                                RESUMO DA ORDEM
+                                            </th>
+                                        </tr>
+                                        <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[10px]">
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Pacotes</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Quantidade</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Total (Malhas)</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-950">Peso (kg)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-black !text-slate-900">
+                                                {reportData.packages.length}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-black !text-slate-900">
+                                                {displayPackageQty}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-black !text-slate-900">
+                                                {computed.totalQuantity}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-right font-mono font-black !text-slate-900">
+                                                {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                        <tr className="bg-[#D9E1F2] font-black text-slate-950">
+                                            <td className="py-1 px-2 border border-slate-400 text-center !text-slate-950">Total Pesado:</td>
+                                            <td className="py-1 px-2 border border-slate-400 !text-slate-950"></td>
+                                            <td className="py-1 px-2 border border-slate-400 text-center font-mono !text-slate-950">
+                                                {computed.totalQuantity}
+                                            </td>
+                                            <td className="py-1 px-2 border border-slate-400 text-right font-mono !text-slate-950">
+                                                {computed.totalWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                        {totalDailyQty > 0 && (
+                                            <tr className="bg-emerald-50 font-black text-emerald-950">
+                                                <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center text-[10px] !text-emerald-950">
+                                                    Produzido (Marcações Diárias):
+                                                </td>
+                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono !text-emerald-800">
+                                                    {totalDailyQty}
+                                                </td>
+                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono !text-emerald-800">
+                                                    {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {pendingPiecesToPackage > 0 && (
+                                            <tr className="bg-amber-50 font-black text-amber-900">
+                                                <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center text-[10px] !text-amber-950">
+                                                    Saldo p/ Fechar Pacote:
+                                                </td>
+                                                <td colSpan={2} className="py-1 px-2 border border-slate-400 text-center font-mono text-[10px] !text-amber-950">
+                                                    {pendingPiecesToPackage} malhas em máquina
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* 3. CONSUMÍVEIS POR LOTE */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse border-2 border-[#002060] text-xs bg-white">
+                                <thead>
+                                    <tr>
+                                        <th colSpan={14} className="!bg-[#002060] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#002060]">
+                                            CONSUMÍVEIS POR LOTE (PACOTES DE 50 MALHAS • CONVERSÃO AUTOMÁTICA PELO PESO DO PACOTE)
+                                        </th>
+                                    </tr>
+                                    <tr className="bg-[#2F5597] text-white font-black uppercase text-[10px]">
+                                        <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">PACOTE DE 50 MALHAS & BITOLA REAL</th>
+                                        <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#1F4E79] !text-white">LONGITUDINAL</th>
+                                        <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#2E75B6] !text-white">TRANSVERSAL</th>
+                                        <th className="py-1 px-1 border border-slate-400 text-center print:hidden w-8 !bg-[#002060] !text-white"></th>
+                                    </tr>
+                                    <tr className="bg-[#D9E1F2] text-slate-950 font-black uppercase text-[10px]">
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-[#D9E1F2] !text-slate-950">LOTE (Etiq.)</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-10 !bg-[#D9E1F2] !text-slate-950">PCT</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-14 !bg-[#D9E1F2] !text-slate-950">QUNT.</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-24 !bg-emerald-200 !text-emerald-950">PESO PCT (kg)</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-emerald-100 !text-emerald-950">BITOLA CALC.</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-24 !bg-yellow-200 !text-slate-950">LOTE</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-yellow-200 !text-slate-950">PESO LOTE</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-right w-20 !bg-[#D9E1F2] !text-slate-950">PESO INICIAL</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-right w-20 !bg-[#D9E1F2] !text-slate-950">KG CONS.</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-24 !bg-yellow-200 !text-slate-950">LOTE</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-center w-20 !bg-yellow-200 !text-slate-950">PESO LOTE</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-right w-20 !bg-[#D9E1F2] !text-slate-950">PESO INICIAL</th>
+                                        <th className="py-1 px-1.5 border border-slate-400 text-right w-20 !bg-[#D9E1F2] !text-slate-950">KG CONS.</th>
+                                        <th className="py-1 px-1 border border-slate-400 text-center print:hidden !bg-[#D9E1F2] !text-slate-950"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {computed.computedRows.length > 0 ? (
+                                        computed.computedRows.map((row, idx, rows) => {
+                                            const cleanLongLot = (row.longLot || '').trim();
+                                            const prevLongLot = idx > 0 ? (rows[idx - 1].longLot || '').trim() : '';
+                                            let longSpan = 1;
+                                            if (cleanLongLot && cleanLongLot === prevLongLot) {
+                                                longSpan = 0;
+                                            } else if (cleanLongLot) {
+                                                while (
+                                                    idx + longSpan < rows.length &&
+                                                    (rows[idx + longSpan].longLot || '').trim() === cleanLongLot
+                                                ) {
+                                                    longSpan++;
+                                                }
                                             }
-                                        }
-                                        const longGroupRows = longSpan > 0 ? rows.slice(idx, idx + longSpan) : [row];
-                                        const longWeightRow = longGroupRows.find(r => r.longLotWeight > 0) || row;
-                                        const hasLongEntry = Boolean(cleanLongLot || longWeightRow.longLotWeight > 0);
+                                            const longGroupRows = longSpan > 0 ? rows.slice(idx, idx + longSpan) : [row];
+                                            const longWeightRow = longGroupRows.find(r => r.longLotWeight > 0) || row;
+                                            const hasLongEntry = Boolean(cleanLongLot || longWeightRow.longLotWeight > 0);
 
-                                        const cleanTransLot = (row.transLot || '').trim();
-                                        const prevTransLot = idx > 0 ? (rows[idx - 1].transLot || '').trim() : '';
-                                        let transSpan = 1;
-                                        if (cleanTransLot && cleanTransLot === prevTransLot) {
-                                            transSpan = 0;
-                                        } else if (cleanTransLot) {
-                                            while (
-                                                idx + transSpan < rows.length &&
-                                                (rows[idx + transSpan].transLot || '').trim() === cleanTransLot
-                                            ) {
-                                                transSpan++;
+                                            const cleanTransLot = (row.transLot || '').trim();
+                                            const prevTransLot = idx > 0 ? (rows[idx - 1].transLot || '').trim() : '';
+                                            let transSpan = 1;
+                                            if (cleanTransLot && cleanTransLot === prevTransLot) {
+                                                transSpan = 0;
+                                            } else if (cleanTransLot) {
+                                                while (
+                                                    idx + transSpan < rows.length &&
+                                                    (rows[idx + transSpan].transLot || '').trim() === cleanTransLot
+                                                ) {
+                                                    transSpan++;
+                                                }
                                             }
-                                        }
-                                        const transGroupRows = transSpan > 0 ? rows.slice(idx, idx + transSpan) : [row];
-                                        const transWeightRow = transGroupRows.find(r => r.transLotWeight > 0) || row;
-                                        const hasTransEntry = Boolean(cleanTransLot || transWeightRow.transLotWeight > 0);
+                                            const transGroupRows = transSpan > 0 ? rows.slice(idx, idx + transSpan) : [row];
+                                            const transWeightRow = transGroupRows.find(r => r.transLotWeight > 0) || row;
+                                            const hasTransEntry = Boolean(cleanTransLot || transWeightRow.transLotWeight > 0);
 
-                                        return (
-                                            <tr key={row.id} className="hover:bg-slate-50">
-                                                <td className="p-1 border border-slate-400 text-center">
-                                                    <input
-                                                        type="text"
-                                                        value={row.finishedLotNumber}
-                                                        onChange={e => updatePackageRow(row.id, 'finishedLotNumber', e.target.value)}
-                                                        placeholder="Ex: 88846"
-                                                        className="w-full text-center font-bold text-slate-800 bg-transparent outline-none focus:bg-amber-50 rounded py-0.5"
-                                                    />
-                                                </td>
-                                                <td className="p-1 border border-slate-400 text-center font-bold text-slate-700 bg-slate-50">
-                                                    {row.packageCode}
-                                                </td>
-                                                <td className="p-1 border border-slate-400 text-center bg-amber-50/30">
-                                                    <input
-                                                        type="number"
-                                                        value={row.quantity}
-                                                        onChange={e => updatePackageRow(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
-                                                        className="w-full text-center font-black text-slate-900 bg-transparent outline-none focus:bg-amber-100 rounded py-0.5"
-                                                    />
-                                                </td>
-                                                {/* Peso do Pacote (Balança) */}
-                                                <td className="p-1 border border-slate-400 text-center bg-emerald-100/70">
-                                                    <input
-                                                        type="number"
-                                                        step="0.1"
-                                                        value={row.measuredPackageWeight ?? ''}
-                                                        onChange={e => updatePackageRow(row.id, 'measuredPackageWeight', parseFloat(e.target.value) || null)}
-                                                        placeholder={row.packageWeightKg.toFixed(0)}
-                                                        className="w-full text-center font-black text-emerald-950 bg-transparent outline-none py-0.5"
-                                                    />
-                                                </td>
-                                                {/* Bitola Calculada Exata do Fio */}
-                                                <td className="p-1 border border-slate-400 text-center font-mono font-black text-emerald-800 bg-emerald-50/50">
-                                                    {row.calculatedBitola.toFixed(2).replace('.', ',')} mm
-                                                </td>
+                                            return (
+                                                <tr key={row.id} className="hover:bg-slate-50">
+                                                    <td className="p-1 border border-slate-400 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={row.finishedLotNumber}
+                                                            onChange={e => updatePackageRow(row.id, 'finishedLotNumber', e.target.value)}
+                                                            placeholder="Ex: 88846"
+                                                            className="malha-sheet-input print:hidden w-full text-center font-bold !text-slate-800"
+                                                        />
+                                                        <span className="hidden print-only-value font-mono font-bold text-slate-800">
+                                                            {row.finishedLotNumber || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-1 border border-slate-400 text-center font-black !text-slate-800 bg-slate-50">
+                                                        {row.packageCode}
+                                                    </td>
+                                                    <td className="p-1 border border-slate-400 text-center bg-amber-50/30">
+                                                        <input
+                                                            type="number"
+                                                            value={row.quantity}
+                                                            onChange={e => updatePackageRow(row.id, 'quantity', parseInt(e.target.value, 10) || 0)}
+                                                            className="malha-sheet-input print:hidden w-full text-center font-black !text-slate-950"
+                                                        />
+                                                        <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                            {row.quantity}
+                                                        </span>
+                                                    </td>
+                                                    {/* Peso do Pacote (Balança) */}
+                                                    <td className="p-1 border border-slate-400 text-center bg-emerald-100/70">
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={row.measuredPackageWeight ?? ''}
+                                                            onChange={e => updatePackageRow(row.id, 'measuredPackageWeight', parseFloat(e.target.value) || null)}
+                                                            placeholder={row.packageWeightKg.toFixed(0)}
+                                                            className="malha-sheet-input print:hidden w-full text-center font-black !text-emerald-950"
+                                                        />
+                                                        <span className="hidden print-only-value font-mono font-black text-emerald-950">
+                                                            {(row.measuredPackageWeight ?? row.packageWeightKg).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                                                        </span>
+                                                    </td>
+                                                    {/* Bitola Calculada Exata do Fio */}
+                                                    <td className="p-1 border border-slate-400 text-center font-mono font-black !text-emerald-900 bg-emerald-50/50">
+                                                        {row.calculatedBitola.toFixed(2).replace('.', ',')} mm
+                                                    </td>
 
-                                                {/* LONGITUDINAL (Mesclado quando mesmo lote em pacotes seguidos) */}
-                                                {longSpan > 0 && (
-                                                    <>
-                                                        <td
-                                                            rowSpan={longSpan}
-                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
-                                                        >
-                                                            <input
-                                                                type="text"
-                                                                list="malha-stock-lots-datalist"
-                                                                value={row.longLot}
-                                                                onChange={e => updatePackageRow(row.id, 'longLot', e.target.value)}
-                                                                placeholder="Nº Lote"
-                                                                className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
-                                                            />
-                                                            {longGroupRows
-                                                                .filter(r => r.longSplits.length > 1)
-                                                                .map(r => (
-                                                                    <div key={r.id} className="text-[9px] font-bold text-amber-900 leading-tight">
-                                                                        {r.longSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
-                                                                    </div>
-                                                                ))}
-                                                        </td>
-                                                        <td
-                                                            rowSpan={longSpan}
-                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
-                                                        >
-                                                            <input
-                                                                type="number"
-                                                                value={longWeightRow.longLotWeight || ''}
-                                                                onChange={e => updatePackageRow(longWeightRow.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
-                                                                placeholder="Kg Lote"
-                                                                className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
-                                                            />
-                                                        </td>
-                                                    </>
-                                                )}
-                                                <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
-                                                    row.longPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
-                                                }`}>
-                                                    {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
-                                                    {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
+                                                    {/* LONGITUDINAL (Mesclado quando mesmo lote em pacotes seguidos) */}
+                                                    {longSpan > 0 && (
+                                                        <>
+                                                            <td
+                                                                rowSpan={longSpan}
+                                                                className={`p-1 border border-slate-400 text-center align-middle ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                            >
+                                                                <input
+                                                                    type="text"
+                                                                    list="malha-stock-lots-datalist"
+                                                                    value={row.longLot}
+                                                                    onChange={e => updatePackageRow(row.id, 'longLot', e.target.value)}
+                                                                    placeholder="Nº Lote"
+                                                                    className="malha-sheet-input print:hidden w-full text-center font-black !text-slate-950"
+                                                                />
+                                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                                    {row.longLot || '-'}
+                                                                </span>
+                                                                {longGroupRows
+                                                                    .filter(r => r.longSplits.length > 1)
+                                                                    .map(r => (
+                                                                        <div key={r.id} className="text-[9px] font-bold !text-amber-950 leading-tight mt-0.5">
+                                                                            {r.longSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
+                                                                        </div>
+                                                                    ))}
+                                                            </td>
+                                                            <td
+                                                                rowSpan={longSpan}
+                                                                className={`p-1 border border-slate-400 text-center align-middle ${hasLongEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                            >
+                                                                <input
+                                                                    type="number"
+                                                                    value={longWeightRow.longLotWeight || ''}
+                                                                    onChange={e => updatePackageRow(longWeightRow.id, 'longLotWeight', parseFloat(e.target.value) || 0)}
+                                                                    placeholder="Kg Lote"
+                                                                    className="malha-sheet-input print:hidden w-full text-center font-black !text-slate-950"
+                                                                />
+                                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                                    {longWeightRow.longLotWeight ? longWeightRow.longLotWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '-'}
+                                                                </span>
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                    <td className={`p-1 border border-slate-400 text-right font-mono font-bold ${
+                                                        row.longPesoInicial < 0 ? '!text-rose-600 bg-rose-50' : '!text-slate-900 bg-slate-50'
+                                                    }`}>
+                                                        {row.longPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
+                                                    <td className="p-1 border border-slate-400 text-right font-mono font-semibold !text-slate-900 bg-slate-50">
+                                                        {row.longKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
 
-                                                {/* TRANSVERSAL (Mesclado quando mesmo lote em pacotes seguidos) */}
-                                                {transSpan > 0 && (
-                                                    <>
-                                                        <td
-                                                            rowSpan={transSpan}
-                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
-                                                        >
-                                                            <input
-                                                                type="text"
-                                                                list="malha-stock-lots-datalist"
-                                                                value={row.transLot}
-                                                                onChange={e => updatePackageRow(row.id, 'transLot', e.target.value)}
-                                                                placeholder="Nº Lote"
-                                                                className="w-full text-center font-black text-slate-900 bg-transparent outline-none py-0.5"
-                                                            />
-                                                            {transGroupRows
-                                                                .filter(r => r.transSplits.length > 1)
-                                                                .map(r => (
-                                                                    <div key={r.id} className="text-[9px] font-bold text-blue-900 leading-tight">
-                                                                        {r.transSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
-                                                                    </div>
-                                                                ))}
-                                                        </td>
-                                                        <td
-                                                            rowSpan={transSpan}
-                                                            className={`p-1 border border-slate-400 text-center align-middle ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
-                                                        >
-                                                            <input
-                                                                type="number"
-                                                                value={transWeightRow.transLotWeight || ''}
-                                                                onChange={e => updatePackageRow(transWeightRow.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
-                                                                placeholder="Kg Lote"
-                                                                className="w-full text-center font-bold text-slate-900 bg-transparent outline-none py-0.5"
-                                                            />
-                                                        </td>
-                                                    </>
-                                                )}
-                                                <td className={`p-1.5 border border-slate-400 text-right font-mono font-bold ${
-                                                    row.transPesoInicial < 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-800 bg-slate-50'
-                                                }`}>
-                                                    {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="p-1.5 border border-slate-400 text-right font-mono font-semibold text-slate-800 bg-slate-50">
-                                                    {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
+                                                    {/* TRANSVERSAL (Mesclado quando mesmo lote em pacotes seguidos) */}
+                                                    {transSpan > 0 && (
+                                                        <>
+                                                            <td
+                                                                rowSpan={transSpan}
+                                                                className={`p-1 border border-slate-400 text-center align-middle ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                            >
+                                                                <input
+                                                                    type="text"
+                                                                    list="malha-stock-lots-datalist"
+                                                                    value={row.transLot}
+                                                                    onChange={e => updatePackageRow(row.id, 'transLot', e.target.value)}
+                                                                    placeholder="Nº Lote"
+                                                                    className="malha-sheet-input print:hidden w-full text-center font-black !text-slate-950"
+                                                                />
+                                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                                    {row.transLot || '-'}
+                                                                </span>
+                                                                {transGroupRows
+                                                                    .filter(r => r.transSplits.length > 1)
+                                                                    .map(r => (
+                                                                        <div key={r.id} className="text-[9px] font-bold !text-blue-950 leading-tight mt-0.5">
+                                                                            {r.transSplits.map(s => `${s.lot} (${s.consumedKg.toFixed(0)}kg)`).join(' + ')}
+                                                                        </div>
+                                                                    ))}
+                                                            </td>
+                                                            <td
+                                                                rowSpan={transSpan}
+                                                                className={`p-1 border border-slate-400 text-center align-middle ${hasTransEntry ? 'bg-yellow-300/70' : 'bg-yellow-50/40'}`}
+                                                            >
+                                                                <input
+                                                                    type="number"
+                                                                    value={transWeightRow.transLotWeight || ''}
+                                                                    onChange={e => updatePackageRow(transWeightRow.id, 'transLotWeight', parseFloat(e.target.value) || 0)}
+                                                                    placeholder="Kg Lote"
+                                                                    className="malha-sheet-input print:hidden w-full text-center font-black !text-slate-950"
+                                                                />
+                                                                <span className="hidden print-only-value font-mono font-black text-slate-950">
+                                                                    {transWeightRow.transLotWeight ? transWeightRow.transLotWeight.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '-'}
+                                                                </span>
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                    <td className={`p-1 border border-slate-400 text-right font-mono font-bold ${
+                                                        row.transPesoInicial < 0 ? '!text-rose-600 bg-rose-50' : '!text-slate-900 bg-slate-50'
+                                                    }`}>
+                                                        {row.transPesoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
+                                                    <td className="p-1 border border-slate-400 text-right font-mono font-semibold !text-slate-900 bg-slate-50">
+                                                        {row.transKgCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
 
-                                                <td className="p-1 border border-slate-400 text-center print:hidden">
+                                                    <td className="p-1 border border-slate-400 text-center print:hidden">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemovePackage(row.id)}
+                                                            className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
+                                                            title="Remover pacote"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={14} className="py-6 text-center text-slate-400 italic">
+                                                Nenhum pacote confirmado ainda. Confirme os pacotes com o peso no app do operador.
+                                            </td>
+                                        </tr>
+                                    )}
+
+                                    <tr className="bg-[#D9E1F2] text-slate-950 font-black border-t-2 border-[#002060]">
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center !text-slate-950">TOTAL</td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-950">
+                                            {computed.totalQuantity}
+                                        </td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-950">
+                                            {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
+                                        </td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-emerald-950">
+                                            Ø {computed.effectiveBitola.toFixed(2).replace('.', ',')}
+                                        </td>
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
+                                            {computed.totalLongCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 !text-slate-950"></td>
+                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
+                                            {computed.totalTransCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-1.5 px-1 border border-slate-400 print:hidden !text-slate-950"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <datalist id="malha-stock-lots-datalist">
+                                {(stock || [])
+                                    .filter(s => s && s.internalLot && !String(s.status || '').toLowerCase().includes('consumido'))
+                                    .map(s => (
+                                        <option key={s.id} value={s.internalLot}>
+                                            Lote {s.internalLot} • {s.bitola}mm • {Number(s.initialQuantity || s.remainingQuantity || 0).toFixed(0)}kg
+                                        </option>
+                                    ))}
+                            </datalist>
+                        </div>
+
+                        {/* 4. LOTES CONSUMIDOS & ATUALIZAÇÃO PRODUÇÃO */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 print-two-cols gap-3.5 items-start">
+                            <div className="md:col-span-6 print-col-6 overflow-x-auto">
+                                <table className="w-full border-collapse border-2 border-[#002060] text-xs bg-white">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={5} className="!bg-[#002060] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#002060]">
+                                                LOTES CONSUMIDOS (CONVERSÃO E SOBRA)
+                                            </th>
+                                        </tr>
+                                        <tr className="bg-[#D9E1F2] text-slate-950 font-black uppercase text-[10px]">
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Posição</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Lote</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-950">kg. entra.</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-950">cons.</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-950">sobra</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {computed.consumedLots.length > 0 ? (
+                                            computed.consumedLots.map((item, idx) => (
+                                                <tr key={`${item.direction}-${item.lot}-${idx}`} className="hover:bg-slate-50">
+                                                    <td className="py-1 px-2 border border-slate-400 text-center text-[10px] font-bold !text-slate-600">
+                                                        {item.direction === 'LONGITUDINAL' ? 'LONG.' : 'TRANS.'}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-center font-black !text-slate-950">
+                                                        {item.lot}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-right font-mono !text-slate-900">
+                                                        {item.kgEntra.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold !text-rose-700">
+                                                        {item.cons.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-right font-mono font-black !text-emerald-700">
+                                                        {item.sobra.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={5} className="py-4 text-center text-slate-400 italic">
+                                                    Defina o Lote Ativo e o Peso para ver o cálculo de consumo e sobra.
+                                                </td>
+                                            </tr>
+                                        )}
+                                        <tr className="bg-[#D9E1F2] font-black text-slate-950 border-t-2 border-[#002060]">
+                                            <td colSpan={2} className="py-1.5 px-2 border border-slate-400 text-center !text-slate-950">Total</td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
+                                                {computed.totalLotEntraKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
+                                                {computed.totalLotConsKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-emerald-800">
+                                                {computed.totalLotSobraKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="md:col-span-6 print-col-6 overflow-x-auto">
+                                <table className="w-full border-collapse border-2 border-[#002060] text-xs bg-white">
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={4} className="!bg-[#002060] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#002060]">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span>ATUALIZAÇÃO DA PRODUÇÃO (MARCAÇÕES DIÁRIAS)</span>
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleRemovePackage(row.id)}
-                                                        className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
-                                                        title="Remover pacote"
+                                                        onClick={reloadDailyUpdates}
+                                                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase print:hidden no-print cursor-pointer"
+                                                        title="Sincronizar marcações com o Relatório Diário"
                                                     >
-                                                        ✕
+                                                        {isSyncingDaily ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
                                                     </button>
+                                                </div>
+                                            </th>
+                                        </tr>
+                                        <tr className="bg-[#D9E1F2] text-slate-950 font-black uppercase text-[10px]">
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Qnt.</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-950">Peso (kg)</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Média (kg/peça)</th>
+                                            <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">Data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dailyUpdates.length > 0 ? (
+                                            dailyUpdates.map((u, idx) => (
+                                                <tr key={u.isoDate || idx} className="hover:bg-slate-50">
+                                                    <td className="py-1 px-2 border border-slate-400 text-center font-black !text-[#002060]">
+                                                        {u.qty}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold !text-[#002060]">
+                                                        {u.weightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-center font-mono !text-slate-700 font-semibold">
+                                                        {u.avgKgPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
+                                                    <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold !text-[#002060]">
+                                                        {u.date}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={4} className="py-4 text-center text-slate-400 italic">
+                                                    Sem apontamentos diários registrados.
                                                 </td>
                                             </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td colSpan={14} className="py-6 text-center text-slate-400 italic">
-                                            Nenhum pacote confirmado ainda. Confirme os pacotes com o peso no app do operador.
-                                        </td>
-                                    </tr>
-                                )}
-
-                                <tr className="bg-[#2F5597] text-white font-black">
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center !text-white">TOTAL</td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-white">
-                                        {computed.totalQuantity}
-                                    </td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-white">
-                                        {computed.totalWeightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kg
-                                    </td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-white">
-                                        Ø {computed.effectiveBitola.toFixed(2).replace('.', ',')}
-                                    </td>
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-white">
-                                        {computed.totalLongCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 !text-white"></td>
-                                    <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-white">
-                                        {computed.totalTransCons.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="py-1.5 px-1 border border-slate-400 print:hidden !text-white"></td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <datalist id="malha-stock-lots-datalist">
-                            {(stock || [])
-                                .filter(s => s && s.internalLot && !String(s.status || '').toLowerCase().includes('consumido'))
-                                .map(s => (
-                                    <option key={s.id} value={s.internalLot}>
-                                        Lote {s.internalLot} • {s.bitola}mm • {Number(s.initialQuantity || s.remainingQuantity || 0).toFixed(0)}kg
-                                    </option>
-                                ))}
-                        </datalist>
-                    </div>
-
-                    {/* 4. LOTES CONSUMIDOS & ATUALIZAÇÃO PRODUÇÃO */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start max-w-4xl mx-auto">
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={5} className="!bg-[#1F3864] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
-                                            LOTES CONSUMIDOS (CONVERSÃO E SOBRA)
-                                        </th>
-                                    </tr>
-                                    <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Posição</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Lote</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">kg. entra.</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">cons.</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">sobra</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {computed.consumedLots.length > 0 ? (
-                                        computed.consumedLots.map((item, idx) => (
-                                            <tr key={`${item.direction}-${item.lot}-${idx}`} className="hover:bg-slate-50">
-                                                <td className="py-1 px-2 border border-slate-400 text-center text-[10px] font-bold text-slate-500">
-                                                    {item.direction === 'LONGITUDINAL' ? 'LONG.' : 'TRANS.'}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-black text-slate-900">
-                                                    {item.lot}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono">
-                                                    {item.kgEntra.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold text-rose-700">
-                                                    {item.cons.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono font-black text-emerald-700">
-                                                    {item.sobra.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="py-4 text-center text-slate-400 italic">
-                                                Defina o Lote Ativo e o Peso para ver o cálculo de consumo e sobra.
+                                        )}
+                                        <tr className="bg-[#D9E1F2] font-black text-slate-950 border-t-2 border-[#002060]">
+                                            <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-950 text-sm">
+                                                {totalDailyQty || op.actualProducedQuantity || 0}
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950 text-sm">
+                                                {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-900">
+                                                {avgDailyWeightPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="py-1.5 px-2 border border-slate-400 text-center uppercase text-[10px] !text-slate-950">
+                                                Total / Média
                                             </td>
                                         </tr>
-                                    )}
-                                    <tr className="bg-[#D9E1F2] font-black text-slate-900">
-                                        <td colSpan={2} className="py-1.5 px-2 border border-slate-400 text-center !text-slate-950">Total</td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
-                                            {computed.totalLotEntraKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950">
-                                            {computed.totalLotConsKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-emerald-800">
-                                            {computed.totalLotSobraKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse border-2 border-[#1F3864] text-xs bg-white shadow-sm">
-                                <thead>
-                                    <tr>
-                                        <th colSpan={4} className="!bg-[#1F3864] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#1F3864]">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span>ATUALIZAÇÃO DA PRODUÇÃO (MARCAÇÕES DIÁRIAS)</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={reloadDailyUpdates}
-                                                    className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase print:hidden cursor-pointer"
-                                                    title="Sincronizar marcações com o Relatório Diário"
-                                                >
-                                                    {isSyncingDaily ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
-                                                </button>
-                                            </div>
-                                        </th>
-                                    </tr>
-                                    <tr className="bg-[#D9E1F2] text-slate-900 font-black uppercase text-[11px]">
-                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Qnt.</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-right !bg-[#D9E1F2] !text-slate-900">Peso (kg)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Média (kg/peça)</th>
-                                        <th className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-900">Data</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {dailyUpdates.length > 0 ? (
-                                        dailyUpdates.map((u, idx) => (
-                                            <tr key={u.isoDate || idx} className="hover:bg-slate-50">
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-black !text-[#002060]">
-                                                    {u.qty}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-right font-mono font-bold !text-[#002060]">
-                                                    {u.weightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono !text-slate-700 font-semibold">
-                                                    {u.avgKgPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="py-1 px-2 border border-slate-400 text-center font-mono font-bold !text-[#002060]">
-                                                    {u.date}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={4} className="py-4 text-center text-slate-400 italic">
-                                                Sem apontamentos diários registrados.
-                                            </td>
-                                        </tr>
-                                    )}
-                                    <tr className="bg-[#D9E1F2] font-black text-slate-950">
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-950 text-sm">
-                                            {totalDailyQty || op.actualProducedQuantity || 0}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-right font-mono !text-slate-950 text-sm">
-                                            {totalDailyWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center font-mono !text-slate-900">
-                                            {avgDailyWeightPerPiece.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-1.5 px-2 border border-slate-400 text-center uppercase text-[10px] !text-slate-950">
-                                            Total / Média
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        {/* RODAPÉ OFICIAL */}
+                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                            <span>Observação: Fechamento de Ordem de Produção Malha gerado automaticamente - Sistema de Controle de Produção MSM</span>
+                            <span className="font-mono font-bold text-[#002060]">OP #{op.orderNumber} • {machineLabel}</span>
                         </div>
                     </div>
                 </div>
