@@ -1074,11 +1074,14 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
 
     const handleAddPackage = () => {
         const nextNum = reportData.packages.length + 1;
+        const lastPkgQty = reportData.packages.length > 0
+            ? (Number(reportData.packages[reportData.packages.length - 1].quantity) || 0)
+            : 0;
         const newRow: MalhaPackageRow = {
             id: `mpkg-${Date.now()}`,
             packageCode: `p${nextNum}`,
             finishedLotNumber: '',
-            quantity: reportData.techConfig.defaultQtyPerPackage || 50,
+            quantity: lastPkgQty || reportData.techConfig.defaultQtyPerPackage || 50,
             measuredPackageWeight: null,
             longLot: '',
             longLotWeight: 0,
@@ -1282,7 +1285,7 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                         onClick={handleAddPackage}
                         className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer"
                     >
-                        + Pacote (50 pçs)
+                        + Pacote ({displayPackageQty} pçs)
                     </button>
                     <button
                         type="button"
@@ -1570,11 +1573,11 @@ const MalhaConsumptionReportModal: React.FC<MalhaConsumptionReportModalProps> = 
                                 <thead>
                                     <tr>
                                         <th colSpan={14} className="!bg-[#002060] !text-white font-black uppercase py-1.5 px-3 text-center tracking-wider border border-[#002060]">
-                                            CONSUMÍVEIS POR LOTE (PACOTES DE 50 MALHAS • CONVERSÃO AUTOMÁTICA PELO PESO DO PACOTE)
+                                            CONSUMÍVEIS POR LOTE (PACOTES DE {displayPackageQty} MALHAS • CONVERSÃO AUTOMÁTICA PELO PESO DO PACOTE)
                                         </th>
                                     </tr>
                                     <tr className="bg-[#2F5597] text-white font-black uppercase text-[10px]">
-                                        <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">PACOTE DE 50 MALHAS & BITOLA REAL</th>
+                                        <th colSpan={5} className="py-1 px-2 border border-slate-400 text-center !bg-[#D9E1F2] !text-slate-950">PACOTE DE {displayPackageQty} MALHAS & BITOLA REAL</th>
                                         <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#1F4E79] !text-white">LONGITUDINAL</th>
                                         <th colSpan={4} className="py-1 px-2 border border-slate-400 text-center !bg-[#2E75B6] !text-white">TRANSVERSAL</th>
                                         <th className="py-1 px-1 border border-slate-400 text-center print:hidden w-8 !bg-[#002060] !text-white"></th>
@@ -2003,8 +2006,13 @@ export const MalhaPackagesOperatorPanel: React.FC<{
     const [showFullModal, setShowFullModal] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
-    // Estado para Fechar Novo Pacote de 50 Malhas + Peso do Pacote
-    const [newPkgQty, setNewPkgQty] = useState<number>(50);
+    // Estado para Fechar Novo Pacote + Peso do Pacote
+    const [newPkgQty, setNewPkgQty] = useState<number>(() => {
+        if (reportData.packages.length > 0) {
+            return Number(reportData.packages[reportData.packages.length - 1].quantity) || 50;
+        }
+        return reportData.techConfig.defaultQtyPerPackage || 50;
+    });
     const [newPkgWeight, setNewPkgWeight] = useState<string>('');
     const [newPkgTag, setNewPkgTag] = useState<string>('');
     const [validationError, setValidationError] = useState<{
@@ -2728,7 +2736,7 @@ export const MalhaPackagesOperatorPanel: React.FC<{
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-sm sm:text-base font-black uppercase text-slate-800">
-                                ⚖️ 2. Apontar Peso do Pacote (50 Malhas)
+                                ⚖️ 2. Apontar Peso do Pacote ({newPkgQty || 50} Malhas)
                             </h3>
                             <span className="text-xs font-mono font-black bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full">
                                 {reportData.packages.length} pacotes • {computed.totalQuantity} malhas • {computed.totalWeightKg.toFixed(0)} kg
