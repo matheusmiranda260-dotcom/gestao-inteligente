@@ -995,7 +995,11 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             const getLogEnd = (l: any) => l?.endTime ?? l?.end_time ?? null;
             const getLogStartQty = (l: any) => Number(l?.startQuantity ?? l?.start_quantity ?? 0) || 0;
             const getLogEndQty = (l: any) => Number(l?.endQuantity ?? l?.end_quantity ?? 0) || 0;
-            const isCreationLog = (l: any) => Boolean(l?.action?.includes('Criada no PCP') || l?.operator === 'GHOST_ORDER_FLAG');
+            const isCreationLog = (l: any) => Boolean(
+                l?.action?.includes('Criada no PCP') ||
+                l?.action?.includes('OP Pausada') ||
+                l?.operator === 'GHOST_ORDER_FLAG'
+            );
 
             // Garante que todos os logs fechados fiquem em ordem cronológica ANTES de qualquer log aberto (endTime == null)
             const sortLogsChronologically = (logs: any[]) => {
@@ -1216,20 +1220,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             // Se for ajuste de turno e houver relatório de turno correspondente (fechado)
             if (details?.mode === 'shift' && details.dayStats?.dateStr && details.shiftQty !== undefined) {
                 const targetDateStr = details.dayStats.dateStr;
-                const matchingRep = (shiftReports || []).find(r => {
+                const matchingReps = (shiftReports || []).filter(r => {
                     const isThisOp = r.productionOrderId === targetOrder.id || r.orderNumber === targetOrder.orderNumber;
                     if (!isThisOp) return false;
-                    const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+                    const repDate = getIsoDateStr(r.shiftStartTime || (r as any).shift_start_time || r.date || r.shiftEndTime || (r as any).shift_end_time);
                     return repDate === targetDateStr;
                 });
-                if (matchingRep) {
+                for (let rIdx = 0; rIdx < matchingReps.length; rIdx++) {
+                    const matchingRep = matchingReps[rIdx];
+                    const newRepVal = rIdx === 0 ? details.shiftQty : 0;
                     try {
                         const repUpdates: any = isTrefila
-                            ? { totalProducedWeight: details.shiftQty }
-                            : { totalProducedQuantity: details.shiftQty };
+                            ? { totalProducedWeight: newRepVal }
+                            : { totalProducedQuantity: newRepVal };
                         await updateItem('shift_reports', matchingRep.id, repUpdates);
-                        if (isTrefila) (matchingRep as any).totalProducedWeight = details.shiftQty;
-                        else (matchingRep as any).totalProducedQuantity = details.shiftQty;
+                        if (isTrefila) (matchingRep as any).totalProducedWeight = newRepVal;
+                        else (matchingRep as any).totalProducedQuantity = newRepVal;
                     } catch (e) {
                         console.warn('Erro ao atualizar shift_reports:', e);
                     }
@@ -4107,7 +4113,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         const matchingReports = (shiftReports || []).filter(r => {
             const isThisOp = r.productionOrderId === op.id || r.orderNumber === op.orderNumber;
             if (!isThisOp) return false;
-            const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+            const repDate = getIsoDateStr(r.shiftStartTime || (r as any).shift_start_time || r.date || r.shiftEndTime || (r as any).shift_end_time);
             return repDate === dateStr || (isEvaluatingActiveMonday && (repDate === saturdayStr || repDate === sundayStr || repDate === todayStr));
         });
         const reportsDayQty = matchingReports.reduce((acc, r) => acc + (isTrefila ? (Number(r.totalProducedWeight) || 0) : (Number(r.totalProducedQuantity) || 0)), 0);
@@ -4115,7 +4121,6 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         // Extração defensiva de coleções suportando camelCase e snake_case do Supabase
         const rawLots: any[] = op.processedLots || (op as any).processed_lots || [];
-        const rawPackages: any[] = op.weighedPackages || (op as any).weighed_packages || [];
         const rawLogs: any[] = op.operatorLogs || (op as any).operator_logs || [];
 
         // 2. Lotes processados e PESADOS finalizados nesta data (Trefila)
@@ -4132,25 +4137,22 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             return acc;
         }, 0);
 
-        // 3. Pacotes pesados nesta data (Treliça)
-        const dayPackagesQty = rawPackages.reduce((acc: number, p: any) => {
-            const rawTime = p.timestamp || p.createdAt || p.weighedAt;
-            if (!rawTime) return acc;
-            const pkgDate = getIsoDateStr(rawTime);
-            if (pkgDate === dateStr || (isEvaluatingActiveMonday && (pkgDate === saturdayStr || pkgDate === sundayStr || pkgDate === todayStr))) {
-                const q = Number(p.quantity) || 200;
-                return acc + q;
-            }
-            return acc;
-        }, 0);
+        // 3. Pacotes pesados nesta data: na Treliça e Malha os pacotes são o fechamento geral da OP (ex: 27 pacotes de 200 pçs lançados juntos)
+        // e não devem sobrescrever a produção diária individual de cada turno.
+        const dayPackagesQty = 0;
 
         // 4. Logs de operador desta data (prioriza startTime para não duplicar caso endTime caia em outro dia)
         const dayLogs = rawLogs.filter(l => {
+            if (l?.action?.includes('Criada no PCP') || l?.action?.includes('OP Pausada') || l?.operator === 'GHOST_ORDER_FLAG') return false;
             const s = getIsoDateStr(l.startTime || l.start_time);
             const e = getIsoDateStr(l.endTime || l.end_time);
             const logDate = s || e;
             return logDate === dateStr || (isEvaluatingActiveMonday && (logDate === saturdayStr || logDate === sundayStr || logDate === todayStr));
         });
+        const hasValidQuantityLogOnDay = dayLogs.some(l =>
+            l.startQuantity !== undefined || l.start_quantity !== undefined ||
+            l.endQuantity !== undefined || l.end_quantity !== undefined
+        );
         const logOperators = dayLogs.map(l => formatShortName(l.operator)).filter(Boolean)[0] || '';
 
         // Total acumulado real da OP
@@ -4204,11 +4206,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             if (openLog && sQty !== undefined) {
                 liveShiftPcs = Math.max(0, totalOverall - trailingClosedPiecesAfterOpen - sQty);
             }
-            // Evita duplicação: se já existe relatório de turno gerado para a data, ele consolida os pacotes
-            const isolatedProduction = reportsDayQty > 0
-                ? Math.max(reportsDayQty, dayPackagesQty)
-                : dayPackagesQty;
-            todayProduced = Math.max(isolatedProduction, dayLogsPcs, liveShiftPcs);
+            todayProduced = hasValidQuantityLogOnDay
+                ? Math.max(dayLogsPcs, liveShiftPcs)
+                : Math.max(reportsDayQty, liveShiftPcs);
         }
 
         const isHoliday = holidaysMap.has(dateStr);
@@ -4216,7 +4216,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const candidateLiveOperator = (dateStr === todayStr || isEvaluatingActiveMonday) ? getMachineOperator(machName) : null;
         const isOpLiveRightNow = Boolean(candidateLiveOperator) && (op.status === 'in_progress' || op.status === 'Em Produção' || op.status === 'running');
-        const hasWeekendActivity = isOpLiveRightNow || reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0;
+        const hasWeekendActivity = isOpLiveRightNow || reportsDayQty > 0 || dayLotsWeight > 0 || todayProduced > 0;
 
         // No fim de semana (Sábado/Domingo), a Segunda-feira seguinte só é tratada como "Hoje" se houver operação/produção real no fim de semana;
         // caso contrário, permanece como dia futuro planejado (~pçs / ~kg).
@@ -4248,7 +4248,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 status = 'closed';
                 produced = dailyReportPieces;
                 operatorName = dailyReportOp || reportOperators || logOperators || 'Turno Encerrado';
-            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || todayProduced > 0) {
+            } else if (reportsDayQty > 0 || dayLotsWeight > 0 || todayProduced > 0) {
                 status = 'closed';
                 produced = todayProduced;
                 operatorName = reportOperators || logOperators || 'Turno Encerrado';
@@ -4266,14 +4266,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 status = 'closed';
                 produced = dailyReportPieces;
                 operatorName = dailyReportOp || reportOperators || logOperators || 'Encerrado';
-            } else if (reportsDayQty > 0) {
-                status = 'closed';
-                produced = reportsDayQty;
-                operatorName = reportOperators || logOperators || 'Encerrado';
             } else if (isTrefila) {
-                // Na Trefila: a produção real é EXCLUSIVAMENTE a soma dos lotes pesados no dia ou relatórios de turno.
-                // JAMAIS usar dayLogsPcs na Trefila para não herdar o peso total histórico acumulado da ordem.
-                const trefilaVal = Math.max(dayLotsWeight, reportsDayQty);
+                // Na Trefila: se houve ajuste manual de turno ou lotes pesados no dia
+                const trefilaVal = dayLotsWeight > 0 ? dayLotsWeight : (reportsDayQty > 0 ? reportsDayQty : dayLogsPcs);
                 if (trefilaVal > 0) {
                     status = 'closed';
                     produced = trefilaVal;
@@ -4284,15 +4279,17 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     operatorName = logOperators || 'Sem Produção';
                 }
             } else {
-                const pastVal = Math.max(dayPackagesQty, dayLogsPcs);
+                // Na Treliça e Malha: se há log de turno na data (atualizado em tempo real quando o gestor altera a quantidade diária),
+                // usa dayLogsPcs com prioridade total para respeitar aumentos ou reduções feitos pelo gestor!
+                const pastVal = hasValidQuantityLogOnDay ? dayLogsPcs : reportsDayQty;
                 if (pastVal > 0) {
                     status = 'closed';
                     produced = pastVal;
-                    operatorName = reportOperators || logOperators || 'Encerrado';
+                    operatorName = logOperators || reportOperators || 'Encerrado';
                 } else {
                     status = 'closed';
                     produced = 0;
-                    operatorName = logOperators || 'Sem Produção';
+                    operatorName = logOperators || reportOperators || 'Sem Produção';
                 }
             }
             if (produced === 0 && isHoliday) {
@@ -4300,9 +4297,9 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         } else {
             // isFuture
-            if (reportsDayQty > 0 || dayLotsWeight > 0 || dayPackagesQty > 0 || dayLogsPcs > 0) {
+            if (reportsDayQty > 0 || dayLotsWeight > 0 || dayLogsPcs > 0) {
                 status = 'closed';
-                produced = isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (reportsDayQty > 0 ? reportsDayQty : (dayPackagesQty > 0 ? dayPackagesQty : dayLogsPcs));
+                produced = isTrefila ? (dayLotsWeight > 0 ? dayLotsWeight : reportsDayQty) : (hasValidQuantityLogOnDay ? dayLogsPcs : reportsDayQty);
                 operatorName = reportOperators || logOperators || 'Encerrado';
             } else if (isHoliday) {
                 status = 'idle';
@@ -4898,7 +4895,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const machineDayReports = (shiftReports || []).filter(r => {
             if (r.machine !== machName) return false;
-            const repDate = r.date || getIsoDateStr(r.shiftStartTime || r.shiftEndTime);
+            const repDate = getIsoDateStr(r.shiftStartTime || (r as any).shift_start_time || r.date || r.shiftEndTime || (r as any).shift_end_time);
             return repDate === dateStr;
         });
 
@@ -11815,7 +11812,7 @@ const DailyDowntimeReportModal: React.FC<DailyDowntimeReportModalProps> = ({
         // 1. ShiftReports correspondentes a esta OP e data (Deduplicados)
         const opReportsRaw = (shiftReports || []).filter(r =>
             (r.productionOrderId === activeOp.id || r.orderNumber === activeOp.orderNumber) &&
-            (r.date === targetReportDateStr || parseDateOnly(r.shiftStartTime || r.shiftEndTime) === targetReportDateStr)
+            (parseDateOnly(r.shiftStartTime || (r as any).shift_start_time || r.date || r.shiftEndTime || (r as any).shift_end_time) === targetReportDateStr)
         );
         const opReportsMap = new Map<string, ShiftReport>();
         opReportsRaw.forEach(r => {

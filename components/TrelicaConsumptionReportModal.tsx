@@ -978,27 +978,79 @@ export const extractDailyMarkingsForTrelicaOp = (
     const targetOpId = String(op.id || '').trim();
     const targetOrderNum = String(op.orderNumber || '').replace(/^#/, '').trim().toLowerCase();
 
-    const addEntry = (rawDate: string | undefined, qty: number, weight?: number) => {
-        if (!rawDate || qty <= 0) return;
-        let dateKey = rawDate.slice(0, 10);
-        if (rawDate.includes('/')) {
-            const parts = rawDate.split('/');
+    const toIsoLocal = (raw?: string | null): string => {
+        if (!raw) return '';
+        if (raw.includes('/')) {
+            const parts = raw.split('/');
             if (parts.length === 3) {
                 const dd = parts[0].padStart(2, '0');
                 const mm = parts[1].padStart(2, '0');
                 const yyyy = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-                dateKey = `${yyyy}-${mm}-${dd}`;
+                return `${yyyy}-${mm}-${dd}`;
             }
         }
+        try {
+            const dt = new Date(raw);
+            if (!isNaN(dt.getTime())) {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        } catch {}
+        return String(raw).slice(0, 10);
+    };
+
+    const addEntry = (rawDate: string | undefined, qty: number, weight?: number) => {
+        if (!rawDate || qty <= 0) return;
+        const dateKey = toIsoLocal(rawDate);
+        if (!dateKey) return;
         const prev = byDate.get(dateKey) || { qty: 0, weight: 0 };
         const calcW = Number(weight) > 0 ? Number(weight) : qty * unitWeightFallback;
-        // Usa o maior apontamento ou soma turnos distintos do mesmo dia
         byDate.set(dateKey, {
             qty: prev.qty + qty,
             weight: prev.weight + calcW
         });
     };
 
+    // 1. Extrair de operatorLogs (fonte principal atualizada quando o gestor altera a quantidade diária no PCP)
+    const rawLogs: any[] = op.operatorLogs || (op as any).operator_logs || [];
+    const totalOverall = Number(op.actualProducedQuantity || (op as any).actual_produced_quantity || 0);
+    const logsByDate = new Map<string, number>();
+
+    rawLogs.forEach((log: any) => {
+        if (!log || log?.action?.includes('Criada no PCP') || log?.action?.includes('OP Pausada') || log?.operator === 'GHOST_ORDER_FLAG') return;
+        const sTime = log.startTime || log.start_time || log.date || log.timestamp;
+        const eTime = log.endTime || log.end_time;
+        const dateKey = toIsoLocal(sTime || eTime);
+        if (!dateKey) return;
+
+        const sQty = log.startQuantity !== undefined ? Number(log.startQuantity) : (log.start_quantity !== undefined ? Number(log.start_quantity) : undefined);
+        const eQty = log.endQuantity !== undefined ? Number(log.endQuantity) : (log.end_quantity !== undefined ? Number(log.end_quantity) : undefined);
+        const directQ = Number(log.producedQuantity ?? log.quantity ?? 0);
+
+        let delta = 0;
+        if (directQ > 0) {
+            delta = directQ;
+        } else if (eTime && eQty !== undefined && sQty !== undefined) {
+            delta = Math.max(0, eQty - sQty);
+        } else if (!eTime && sQty !== undefined) {
+            delta = Math.max(0, totalOverall - sQty);
+        }
+
+        if (delta > 0) {
+            logsByDate.set(dateKey, (logsByDate.get(dateKey) || 0) + delta);
+        }
+    });
+
+    logsByDate.forEach((qty, dateKey) => {
+        byDate.set(dateKey, {
+            qty,
+            weight: qty * unitWeightFallback
+        });
+    });
+
+    // 2. Complementar com shiftReports para datas que não estejam em operatorLogs
     const matchingShifts = (shiftReports || []).filter(sr => {
         const srOpId = String(sr.productionOrderId || (sr as any).production_order_id || '').trim();
         const srOrderNum = String(sr.orderNumber || (sr as any).order_number || '').replace(/^#/, '').trim().toLowerCase();
@@ -1011,26 +1063,16 @@ export const extractDailyMarkingsForTrelicaOp = (
         matchingShifts.forEach(sr => {
             const qty = Number(sr.totalProducedQuantity ?? sr.totalPcs ?? (sr as any).total_produced_quantity ?? 0);
             const w = Number(sr.totalProducedWeight ?? sr.totalWeight ?? (sr as any).total_produced_weight ?? 0);
-            const d = sr.date || (sr.shiftStartTime ? sr.shiftStartTime.slice(0, 10) : '') || (sr.startTime ? sr.startTime.slice(0, 10) : '');
-            if (qty > 0 && d) {
-                addEntry(d, qty, w);
-            }
-        });
-    }
-
-    // Fallback: operatorLogs ou summary.dailyProductionHistory
-    if (byDate.size === 0 && Array.isArray(op.operatorLogs)) {
-        op.operatorLogs.forEach((log: any) => {
-            const q = Number(log.producedQuantity ?? log.quantity ?? 0);
-            const d = String(log.date || log.timestamp || '').slice(0, 10);
-            if (q > 0 && d) {
-                byDate.set(d, { qty: q, weight: q * unitWeightFallback });
+            const d = sr.shiftStartTime || (sr as any).shift_start_time || sr.date || sr.startTime || '';
+            const dateKey = toIsoLocal(d);
+            if (qty > 0 && dateKey && !logsByDate.has(dateKey)) {
+                addEntry(dateKey, qty, w);
             }
         });
     }
 
     if (byDate.size === 0 && Number(op.actualProducedQuantity || 0) > 0) {
-        const fallbackDate = (op.lastQuantityUpdate || op.startTime || new Date().toISOString()).slice(0, 10);
+        const fallbackDate = toIsoLocal(op.lastQuantityUpdate || op.startTime || new Date().toISOString());
         const q = Number(op.actualProducedQuantity || 0);
         byDate.set(fallbackDate, { qty: q, weight: q * unitWeightFallback });
     }
