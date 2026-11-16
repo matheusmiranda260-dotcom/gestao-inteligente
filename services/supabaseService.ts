@@ -331,6 +331,33 @@ export const insertItem = async <T extends { id?: string }>(
 export const updateItem = async <T>(table: string, id: string, updates: Partial<T>): Promise<T> => {
     const snakeUpdates = mapToSnakeCase(updates);
     let { payload } = sanitizeForTable(table, snakeUpdates);
+
+    // Proteção crítica: nunca sobrescrever a coluna JSONB 'summary' sem antes mesclar com o que já está salvo no banco
+    // (evita que auto-encerramento de turno ou atualizações parciais apaguem trelica_packages_data / malha_packages_data)
+    if (payload.summary !== undefined && KNOWN_COLUMNS_BY_TABLE[table]?.has('summary')) {
+        try {
+            const { data: existingRow } = await supabase
+                .from(table)
+                .select('summary')
+                .eq('id', id)
+                .maybeSingle();
+            const existingSummary =
+                existingRow && typeof existingRow.summary === 'object' && existingRow.summary !== null
+                    ? existingRow.summary
+                    : {};
+            const incomingSummary =
+                typeof payload.summary === 'object' && payload.summary !== null
+                    ? payload.summary
+                    : {};
+            payload.summary = {
+                ...existingSummary,
+                ...incomingSummary
+            };
+        } catch (mergeErr) {
+            console.warn(`Aviso ao mesclar summary de ${table}:`, mergeErr);
+        }
+    }
+
     let { data, error } = await supabase.from(table).update(payload).eq('id', id).select().single();
 
     // Resilience fallback: if any column does not exist yet in the DB schema, strip it and retry

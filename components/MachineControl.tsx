@@ -3596,7 +3596,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
     }
 
     return (
-        <div className="p-4 sm:p-6 md:p-8">
+        <div className={activeMachine.startsWith('Treliça') ? 'p-2 sm:p-3 md:p-4' : 'p-4 sm:p-6 md:p-8'}>
             {/* Overlay Fixed para Parada Operacional (Sempre Visível no Topo) */}
             {isMachineStopped && activeOrder && (
                 (() => {
@@ -4706,9 +4706,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
 
 
             {/* Machine Header for better context on mobile */}
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className={`${activeMachine.startsWith('Treliça') ? 'mb-2' : 'mb-6'} flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4`}>
                 <div className="flex flex-col">
-                    <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter uppercase">{machineHeader}</h1>
+                    <h1 className={`${activeMachine.startsWith('Treliça') ? 'text-lg md:text-xl' : 'text-2xl md:text-3xl'} font-black text-slate-800 tracking-tighter uppercase`}>{machineHeader}</h1>
                     <div className="flex items-center gap-2 mt-1">
                         <div className="h-1 w-8 bg-indigo-500 rounded-full"></div>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -4901,7 +4901,7 @@ const MachineControl: React.FC<MachineControlProps> = ({
                 <>
                     {/* Mobile Tab Switcher */}
                     {(activeOrder || postProductionOrder) && (
-                        <div className="flex md:hidden mb-6 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                        <div className="flex md:hidden mb-2 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
                             <button
                                 onClick={() => setMobileTab('monitor')}
                                 className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-tight transition-all duration-200 ${mobileTab === 'monitor' ? 'bg-white shadow-md text-slate-900 border border-slate-100' : 'text-slate-500'}`}
@@ -5047,9 +5047,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
                                 </div>
                             )}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-8 w-full max-w-full overflow-x-hidden">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-16 md:pb-16 w-full max-w-full overflow-x-hidden">
                                 {/* Coluna Esquerda: Visão Geral e Indicadores */}
-                                <div className={`lg:col-span-1 min-w-0 max-w-full space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                <div className={`${activeMachine.startsWith('Treliça') ? (mobileTab !== 'monitor' ? 'hidden' : 'md:hidden animate-fade-in') : `lg:col-span-1 min-w-0 max-w-full space-y-6 ${mobileTab !== 'monitor' ? 'hidden lg:block' : 'animate-fade-in'}`}`}>
                                     {/* Trefila Mobile: Optimized Panel (Enchuto) */}
                                     {activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira') ? (
                                         <div className="md:hidden animate-fade-in space-y-4">
@@ -5276,8 +5276,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                     </div>
 
                                 {/* Coluna Direita: Métricas e Controles de Produção */}
-                                    <div className={`lg:col-span-2 min-w-0 max-w-full space-y-4 md:space-y-6 ${(mobileTab !== 'monitor' && mobileTab !== 'performance' && mobileTab !== 'work' && mobileTab !== 'lots') ? 'hidden lg:block' : 'animate-fade-in'}`}>
-                                        <div className={`grid grid-cols-1 gap-6 ${(activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) ? 'hidden md:grid' : (mobileTab === 'lots' || mobileTab === 'work') ? 'hidden md:grid' : 'grid'}`}>
+                                    <div className={`${activeMachine.startsWith('Treliça') ? 'lg:col-span-3' : 'lg:col-span-2'} min-w-0 max-w-full space-y-3 md:space-y-4 ${(mobileTab !== 'monitor' && mobileTab !== 'performance' && mobileTab !== 'work' && mobileTab !== 'lots') ? 'hidden lg:block' : 'animate-fade-in'}`}>
+                                        <div className={`grid grid-cols-1 gap-6 ${(activeMachine.startsWith('Trefila') || activeMachine.startsWith('Desbobinadeira')) ? 'hidden md:grid' : activeMachine.startsWith('Treliça') ? (mobileTab === 'performance' ? 'grid' : 'hidden') : (mobileTab === 'lots' || mobileTab === 'work') ? 'hidden md:grid' : 'grid'}`}>
                                                 {/* Header Info - Simplified for Mobile */}
                                                 <div className="col-span-2">
                                                     <p className="text-[10px] md:text-xs text-slate-500 mb-2 uppercase tracking-widest font-bold">Produção do Turno</p>
@@ -5355,8 +5355,8 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         </div>
                                     )}
 
-                                    {/* Progresso de Produção - VISÍVEL APENAS NA ABA DE PERFORMANCE NO MOBILE OU SEMPRE NO DESKTOP */}
-                                    <div className={`bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group ${mobileTab === 'performance' ? 'block' : 'hidden lg:block'}`}>
+                                    {/* Progresso de Produção - VISÍVEL APENAS NA ABA DE PERFORMANCE NO MOBILE OU SEMPRE NO DESKTOP (EXCETO TRELIÇA QUE USA PAINEL INTEGRADO) */}
+                                    <div className={`bg-white p-6 rounded-2xl shadow-sm relative overflow-hidden group ${activeMachine.startsWith('Treliça') ? (mobileTab === 'performance' ? 'block' : 'hidden') : (mobileTab === 'performance' ? 'block' : 'hidden lg:block')}`}>
                                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
                                             <ChartBarIcon className="h-16 w-16" />
                                         </div>
@@ -6123,8 +6123,11 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                             stock={stock}
                                             shiftReports={shiftReports}
                                             machineName={activeMachine}
+                                            showManagerControls={isGestor}
                                             activeSection={mobileTab === 'lots' ? 'lots' : mobileTab === 'work' ? 'weigh' : 'all'}
                                             onRequestSwitchSection={(sec) => setMobileTab(sec === 'lots' ? 'lots' : 'work')}
+                                            shiftPieces={Math.max(0, (activeOrder.actualProducedQuantity || 0) - (currentOperatorLog?.startQuantity || 0))}
+                                            onLaunchPieces={() => setShowQuantityPrompt(true)}
                                         />
                                     ) : (
                                         <>
@@ -6311,15 +6314,15 @@ const MachineControl: React.FC<MachineControlProps> = ({
                         </div>
 
                         {orderForShift && (
-                                <div className={`fixed bottom-0 right-0 left-0 md:left-64 bg-white/90 backdrop-blur-xl border-t border-slate-200/50 ${(mobileTab === 'lots' || mobileTab === 'work') ? 'px-2 py-1.5' : 'px-3 py-2'} md:p-4 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-300 safe-area-bottom`}>
+                                <div className={`fixed bottom-0 right-0 left-0 md:left-64 bg-white/95 backdrop-blur-xl border-t border-slate-200/50 ${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'px-2 py-1.5 md:px-4 md:py-1.5' : 'px-3 py-2 md:p-4'} shadow-[0_-8px_30px_rgb(0,0,0,0.12)] z-40 transition-all duration-300 safe-area-bottom`}>
                                 <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
 
                                     {/* Esquerda: Info Rápida (Desktop only) */}
-                                    <div className="hidden md:flex items-center gap-4 w-1/4">
-                                        <div className={`w-1.5 h-10 rounded-full ${isMachineStopped ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]'}`}></div>
+                                    <div className="hidden md:flex items-center gap-3 w-1/4">
+                                        <div className={`w-1.5 h-8 rounded-full ${isMachineStopped ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]'}`}></div>
                                         <div className="truncate">
-                                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-0.5">Status em Tempo Real</p>
-                                            <p className={`text-sm font-black leading-tight truncate ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Status em Tempo Real</p>
+                                            <p className={`text-xs font-black leading-tight truncate ${isMachineStopped ? 'text-amber-600' : 'text-emerald-700'}`}>
                                                 {isMachineStopped ? 'MÁQUINA PARADA' : 'ESTADO ATIVO'}
                                             </p>
                                         </div>
@@ -6330,9 +6333,9 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                         {!isAnyActiveShift ? (
                                             <button
                                                 onClick={() => handleStartShift(false)}
-                                                className={`w-full md:w-auto md:px-14 ${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-12 text-sm' : 'h-14 text-lg'} bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black shadow-xl shadow-emerald-200 transition transform active:scale-90 flex items-center justify-center gap-3 animate-pulse`}
+                                                className={`w-full md:w-auto md:px-10 ${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-11 text-sm' : 'h-14 text-lg'} bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl md:rounded-full font-black shadow-xl shadow-emerald-200 transition transform active:scale-90 flex items-center justify-center gap-2 animate-pulse`}
                                             >
-                                                <PlayIcon className="h-6 w-6 md:h-8 md:w-8" />
+                                                <PlayIcon className="h-5 w-5 md:h-6 md:w-6" />
                                                 <span className="inline tracking-tight">INICIAR TURNO</span>
                                             </button>
                                         ) : (
@@ -6346,26 +6349,26 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                         }
                                                         if (activeOrder && logResumeProduction) logResumeProduction(activeOrder.id); 
                                                     }) : (() => setShowDowntimeModal(true))}
-                                                    className={`w-full ${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-12 flex-row gap-2 px-3' : 'h-24 flex-col gap-1'} md:h-20 md:flex-col md:gap-1 rounded-2xl md:rounded-3xl flex items-center justify-center transition-all duration-300 shadow-xl relative overflow-hidden group border-[2px] md:border-[3px]
+                                                    className={`w-full ${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-11 flex-row gap-2 px-4 rounded-xl' : 'h-24 md:h-20 flex-col gap-1 rounded-2xl md:rounded-3xl'} flex items-center justify-center transition-all duration-300 shadow-lg relative overflow-hidden group border-[2px]
                                                         ${isMachineStopped 
                                                             ? 'bg-rose-600 shadow-rose-200 animate-stop-pulse border-rose-400 active:scale-95' 
                                                             : 'bg-emerald-600 shadow-emerald-200 animate-producing-pulse border-emerald-400 active:scale-95'
                                                         }`}
                                                 >
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                                                    <div className="relative z-10 flex items-center gap-2 md:gap-3">
+                                                    <div className="relative z-10 flex items-center gap-2">
                                                         {isMachineStopped ? (
-                                                            <PlayIcon className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-5 w-5' : 'h-8 w-8'} md:h-10 md:w-10 text-white animate-bounce-horizontal`} />
+                                                            <PlayIcon className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-5 w-5' : 'h-8 w-8 md:h-10 md:w-10'} text-white animate-bounce-horizontal`} />
                                                         ) : (
-                                                            <PauseIcon className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-5 w-5' : 'h-8 w-8'} md:h-10 md:w-10 text-white`} />
+                                                            <PauseIcon className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-5 w-5' : 'h-8 w-8 md:h-10 md:w-10'} text-white`} />
                                                         )}
-                                                        <span className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'text-xs' : 'text-xl'} md:text-2xl font-black text-white uppercase tracking-tighter whitespace-nowrap`}>
+                                                        <span className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'text-xs sm:text-sm' : 'text-xl md:text-2xl'} font-black text-white uppercase tracking-tighter whitespace-nowrap`}>
                                                             {isMachineStopped ? 'RETOMAR PRODUÇÃO' : 'PARAR MÁQUINA'}
                                                         </span>
                                                     </div>
-                                                    <div className={`relative z-10 flex items-center gap-1.5 ${(mobileTab === 'lots' || mobileTab === 'work') ? 'px-2 py-0.5' : 'px-3 py-1'} md:px-4 md:py-1.5 bg-black/20 rounded-full backdrop-blur-md border border-white/10`}>
-                                                        <ClockIcon className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-3.5 w-3.5' : 'h-4 w-4'} md:h-5 md:w-5 text-white/80`} />
-                                                        <span className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'text-xs' : 'text-base'} md:text-lg font-black text-white font-mono tracking-wider`}>
+                                                    <div className={`relative z-10 flex items-center gap-1.5 ${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'px-2 py-0.5' : 'px-3 py-1 md:px-4 md:py-1.5'} bg-black/20 rounded-full backdrop-blur-md border border-white/10`}>
+                                                        <ClockIcon className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-3.5 w-3.5' : 'h-4 w-4 md:h-5 md:w-5'} text-white/80`} />
+                                                        <span className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'text-xs' : 'text-base md:text-lg'} font-black text-white font-mono tracking-wider`}>
                                                             {statusDurationString}
                                                         </span>
                                                     </div>
@@ -6375,10 +6378,10 @@ const MachineControl: React.FC<MachineControlProps> = ({
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowDowntimeModal(true)}
-                                                        className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-12 px-2.5 rounded-2xl' : 'h-24 md:h-20 px-4 rounded-3xl'} md:h-20 md:px-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs uppercase flex flex-col items-center justify-center gap-0.5 md:gap-1.5 shadow-xl active:scale-95 transition border-2 border-amber-500/50 flex-shrink-0`}
+                                                        className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-11 px-2.5 rounded-xl flex-row gap-1' : 'h-24 md:h-20 px-4 rounded-3xl flex-col gap-1'} bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs uppercase flex items-center justify-center shadow-lg active:scale-95 transition border-2 border-amber-500/50 flex-shrink-0`}
                                                         title="Abrir Menu Operacional (Troca de Rolo, etc.)"
                                                     >
-                                                        <PauseIcon className={`${(mobileTab === 'lots' || mobileTab === 'work') ? 'h-4 w-4' : 'h-6 w-6'} text-amber-400`} />
+                                                        <PauseIcon className={`${(activeMachine.startsWith('Treliça') || mobileTab === 'lots' || mobileTab === 'work') ? 'h-4 w-4' : 'h-6 w-6'} text-amber-400`} />
                                                         <span className="text-[9px] md:text-[10px] font-black tracking-wider text-center leading-tight whitespace-nowrap">Menu<br/>Paradas</span>
                                                     </button>
                                                 )}
