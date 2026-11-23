@@ -40,44 +40,17 @@ export const calculateTrelicaWeightsFromGauges = (
     const cleanSup = (superior || '').trim().replace('.', ',');
     const cleanInf = (inferior || '').trim().replace('.', ',');
     const cleanSen = (senozoide || '').trim().replace('.', ',');
-    const cleanTam = (tamanhoStr || '12').replace(/\D/g, '') || '12';
-
-    // 1. Se bater exatamente com as bitolas e tamanho de algum modelo da tabela técnica de referência, usa os pesos oficiais
-    const nameUpper = (trName || '').toUpperCase();
-    const exactDefault = DEFAULT_TRELICA_MODELS.find(d => {
-        if (d.tamanho !== cleanTam || d.superior !== cleanSup || d.inferior !== cleanInf || d.senozoide !== cleanSen) {
-            return false;
-        }
-        // Se houver menção à altura (ET6/H6, ET8/H8, ET10/H10, ET12/H12, ET16/H16, ET25/H25), valida também
-        if ((nameUpper.includes('ET6') || nameUpper.includes('H-6') || nameUpper.includes('H6')) && !d.modelo.includes('H-6')) return false;
-        if ((nameUpper.includes('ET8') || nameUpper.includes('H-8') || nameUpper.includes('H8')) && !d.modelo.includes('H-8')) return false;
-        if ((nameUpper.includes('ET10') || nameUpper.includes('H-10') || nameUpper.includes('H10')) && !d.modelo.includes('H-10')) return false;
-        if ((nameUpper.includes('ET12') || nameUpper.includes('H-12') || nameUpper.includes('H12')) && !d.modelo.includes('H-12')) return false;
-        if ((nameUpper.includes('ET16') || nameUpper.includes('H-16') || nameUpper.includes('H16')) && !d.modelo.includes('H-16')) return false;
-        if ((nameUpper.includes('ET25') || nameUpper.includes('H-25') || nameUpper.includes('H25')) && !d.modelo.includes('H-25')) return false;
-        return true;
-    });
-
-    if (exactDefault) {
-        return {
-            pesoSuperior: exactDefault.pesoSuperior,
-            pesoInferior: exactDefault.pesoInferior,
-            pesoSenozoide: exactDefault.pesoSenozoide,
-            pesoFinal: exactDefault.pesoFinal
-        };
-    }
-
-    // 2. Cálculo geométrico pelas bitolas e comprimento
     const tamanho = parseFloat((tamanhoStr || '12').replace(',', '.')) || 12;
-    let senozoideMultiplier = 2.58; // padrão H-8 / ET8
-    if (nameUpper.includes('H6') || nameUpper.includes('H-6') || nameUpper.includes('ET6') || nameUpper.includes('ET-6') || nameUpper.includes('TR6') || nameUpper.includes('TR-6') || nameUpper.includes('664')) senozoideMultiplier = 2.41;
-    else if (nameUpper.includes('H8') || nameUpper.includes('H-8') || nameUpper.includes('ET8') || nameUpper.includes('ET-8') || nameUpper.includes('TR8') || nameUpper.includes('TR-8') || nameUpper.includes('864')) senozoideMultiplier = 2.58;
-    else if (nameUpper.includes('H10') || nameUpper.includes('H-10') || nameUpper.includes('ET10') || nameUpper.includes('ET-10') || nameUpper.includes('TR10') || nameUpper.includes('TR-10') || nameUpper.includes('1064')) senozoideMultiplier = 2.86;
-    else if (nameUpper.includes('H12') || nameUpper.includes('H-12') || nameUpper.includes('ET12') || nameUpper.includes('ET-12') || nameUpper.includes('TR12') || nameUpper.includes('TR-12') || nameUpper.includes('1264')) senozoideMultiplier = 3.19;
-    else if (nameUpper.includes('H16') || nameUpper.includes('H-16') || nameUpper.includes('ET16') || nameUpper.includes('ET-16') || nameUpper.includes('TR16') || nameUpper.includes('TR-16') || nameUpper.includes('1664')) senozoideMultiplier = 3.74;
-    else if (nameUpper.includes('H20') || nameUpper.includes('H-20') || nameUpper.includes('ET20') || nameUpper.includes('ET-20') || nameUpper.includes('TR20') || nameUpper.includes('TR-20')) senozoideMultiplier = 4.50;
-    else if (nameUpper.includes('H25') || nameUpper.includes('H-25') || nameUpper.includes('ET25') || nameUpper.includes('ET-25') || nameUpper.includes('TR25') || nameUpper.includes('TR-25') || nameUpper.includes('2564')) senozoideMultiplier = 5.40;
-    else if (nameUpper.includes('H30') || nameUpper.includes('H-30') || nameUpper.includes('ET30') || nameUpper.includes('ET-30') || nameUpper.includes('TR30') || nameUpper.includes('TR-30')) senozoideMultiplier = 6.30;
+
+    // Mesma fórmula exata utilizada na tela de Cadastro (GaugesManager.tsx) para paridade 100% entre Cadastro e Relatórios
+    let senozoideMultiplier = 2.58; // default H-8
+    const nameUpper = (trName || '').toUpperCase();
+    if (nameUpper.includes('H6') || nameUpper.includes('H-6')) senozoideMultiplier = 2.41;
+    else if (nameUpper.includes('H8') || nameUpper.includes('H-8')) senozoideMultiplier = 2.58;
+    else if (nameUpper.includes('H10') || nameUpper.includes('H-10')) senozoideMultiplier = 2.86;
+    else if (nameUpper.includes('H12') || nameUpper.includes('H-12')) senozoideMultiplier = 3.19;
+    else if (nameUpper.includes('H16') || nameUpper.includes('H-16')) senozoideMultiplier = 3.74;
+    else if (nameUpper.includes('H25') || nameUpper.includes('H-25')) senozoideMultiplier = 5.40;
 
     const wSup = getWeightPerMeter(cleanSup) * tamanho;
     const wInf = getWeightPerMeter(cleanInf) * tamanho * 2;
@@ -85,10 +58,10 @@ export const calculateTrelicaWeightsFromGauges = (
     const wTotal = wSup + wInf + wSen;
 
     return {
-        pesoSuperior: (wSup > 0 ? wSup : 2.322).toFixed(3).replace('.', ','),
-        pesoInferior: (wInf > 0 ? wInf : 1.517).toFixed(3).replace('.', ','),
-        pesoSenozoide: (wSen > 0 ? wSen : 1.958).toFixed(3).replace('.', ','),
-        pesoFinal: (wTotal > 0 ? wTotal : 5.797).toFixed(3).replace('.', ',')
+        pesoSuperior: (wSup > 0 ? wSup : 2.320).toFixed(3).replace('.', ','),
+        pesoInferior: (wInf > 0 ? wInf : 1.515).toFixed(3).replace('.', ','),
+        pesoSenozoide: (wSen > 0 ? wSen : 1.955).toFixed(3).replace('.', ','),
+        pesoFinal: (wTotal > 0 ? wTotal : 5.790).toFixed(3).replace('.', ',')
     };
 };
 

@@ -4993,33 +4993,25 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
 
         const opText = `${op.productCode || ''} ${op.productDescription || ''} ${op.trelicaModel || ''} ${op.malhaModel || ''} ${op.tamanho || ''}`.toUpperCase();
 
-        // 1. Treliça (TL 1 e TL 2)
+        // 1. Treliça (TL 1 e TL 2) - Prioriza SEMPRE o peso do item no Cadastro Oficial (trelicaModels / stock_gauges)
         if (mach.startsWith('Treliça')) {
-            // Se for ET8 (6m ou 12m)
-            if (opText.includes('ET8') || opText.includes('ET-8') || opText.includes('H8') || opText.includes('H-8') || opText.includes('3884')) {
-                const is12m = opText.includes('12M') || opText.includes('12 METROS') || op.tamanho === '12';
-                return is12m ? 8.174 : 4.087;
-            }
-            // Se for ET10 (6m ou 12m)
-            if (opText.includes('ET10') || opText.includes('ET-10') || opText.includes('H10') || opText.includes('H-10') || opText.includes('8702')) {
-                const is6m = opText.includes('6M') || opText.includes('6 METROS') || op.tamanho === '6';
-                return is6m ? 3.843 : 9.057;
-            }
-            // Se for ET6
-            if (opText.includes('ET6') || opText.includes('H6')) {
-                return 5.502;
-            }
-            // Se for ET12
-            if (opText.includes('ET12') || opText.includes('H12')) {
-                const is6m = opText.includes('6M') || op.tamanho === '6';
-                return is6m ? 5.270 : 10.540;
-            }
-
+            const opCod = String(op.productCode || '').toUpperCase().trim();
+            const opMod = String(op.trelicaModel || op.productDescription || '').toUpperCase().trim();
+            const opTam = String(op.tamanho || '12').replace(/\D/g, '') || '12';
             const allTrelicaList = [...(trelicaModels || []), ...DEFAULT_TRELICA_MODELS];
-            const found = allTrelicaList.find(m =>
+
+            // 1a. Busca por código exato do cadastro
+            const byCod = opCod ? allTrelicaList.find(m => String(m.cod || '').toUpperCase().trim() === opCod) : undefined;
+            const byDesc = !byCod ? allTrelicaList.find(m => {
+                const mMod = String(m.modelo || '').toUpperCase().trim();
+                const mTam = String(m.tamanho || '12').replace(/\D/g, '') || '12';
+                return mMod && (mMod === opMod || opText.includes(mMod)) && mTam === opTam;
+            }) : undefined;
+            const found = byCod || byDesc || allTrelicaList.find(m =>
                 (m.cod && (m.cod === op.trelicaModel || opText.includes(m.cod.toUpperCase()))) ||
                 (m.modelo && (m.modelo === op.trelicaModel || opText.includes(m.modelo.toUpperCase())))
             );
+
             if (found) {
                 const p = found.pesoFinal || (found as any).peso_final;
                 if (p) {
@@ -5029,7 +5021,25 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
 
             if (op.pieceWeight && op.pieceWeight > 0) return op.pieceWeight;
-            return 4.087;
+
+            // Fallbacks secundários caso a OP não esteja vinculada ao cadastro
+            if (opText.includes('ET8') || opText.includes('ET-8') || opText.includes('H8') || opText.includes('H-8') || opText.includes('3884')) {
+                const is12m = opText.includes('12M') || opText.includes('12 METROS') || op.tamanho === '12';
+                return is12m ? 5.790 : 2.895;
+            }
+            if (opText.includes('ET10') || opText.includes('ET-10') || opText.includes('H10') || opText.includes('H-10') || opText.includes('8702')) {
+                const is6m = opText.includes('6M') || opText.includes('6 METROS') || op.tamanho === '6';
+                return is6m ? 3.843 : 9.057;
+            }
+            if (opText.includes('ET6') || opText.includes('H6')) {
+                return 5.790;
+            }
+            if (opText.includes('ET12') || opText.includes('H12')) {
+                const is6m = opText.includes('6M') || op.tamanho === '6';
+                return is6m ? 5.270 : 10.540;
+            }
+
+            return 5.790;
         }
 
         // 2. Malha (ML 1)

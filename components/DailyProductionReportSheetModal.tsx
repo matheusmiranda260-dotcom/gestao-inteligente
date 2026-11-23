@@ -4,7 +4,7 @@ import { DefaultMalhaGauges } from '../types';
 import { supabase } from '../supabaseClient';
 import html2canvas from 'html2canvas';
 import { resolveMachineShiftConfig } from '../services/shiftConfigService';
-import { DEFAULT_TRELICA_MODELS } from '../utils/trelicaModelsData';
+import { DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels, calculateTrelicaWeightsFromGauges } from '../utils/trelicaModelsData';
 
 export interface DailyProductionReportSheetModalProps {
     isOpen: boolean;
@@ -907,33 +907,108 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         return 99999999;
     };
 
-    // Helper para obter o peso teórico por peça (em kg) a partir do catálogo oficial
+    // Helper para obter o peso teórico por peça (em kg) a partir do catálogo oficial (stock_gauges)
     const getTheoreticalWeightPerPiece = (modelStr: string, sizeMts: number): number => {
         const cleanModel = (modelStr || '').toUpperCase().trim();
+        const opCode = String(op?.productCode || (op as any)?.product_code || '').toUpperCase().trim();
+        const opDesc = String(op?.productDescription || op?.trelicaModel || op?.malhaModel || '').toUpperCase().trim();
+        const searchTarget = `${opCode} ${opDesc} ${cleanModel}`.trim();
+        const currentGauges = gauges && gauges.length > 0 ? gauges : cachedGauges;
 
         // 1. Se for Malha, buscar no catálogo de malhas ou gauges
-        const currentGauges = gauges && gauges.length > 0 ? gauges : cachedGauges;
-        const matchedMalha = (currentGauges || []).find((g: any) => {
-            const isM = (g.materialType || g.material_type || '').toLowerCase().includes('malha');
-            if (!isM) return false;
-            const desc = (g.description || '').toUpperCase();
-            const code = (g.productCode || g.product_code || '').toUpperCase();
-            return (code && cleanModel.includes(code)) || (desc && cleanModel.includes(desc)) || (desc && desc.includes(cleanModel));
-        }) || DefaultMalhaGauges.find(m => {
-            const desc = m.description.toUpperCase();
-            const code = (m.productCode || '').toUpperCase();
-            return (code && cleanModel.includes(code)) || cleanModel.includes(desc) || desc.includes(cleanModel);
-        });
+        if (isMalha) {
+            const matchedMalha = (currentGauges || []).find((g: any) => {
+                const isM = (g.materialType || g.material_type || '').toLowerCase().includes('malha');
+                if (!isM) return false;
+                const desc = (g.description || '').toUpperCase().trim();
+                const code = (g.productCode || g.product_code || '').toUpperCase().trim();
+                return (code && (code === opCode || cleanModel.includes(code))) ||
+                       (desc && (cleanModel.includes(desc) || desc.includes(cleanModel) || (opDesc && (opDesc.includes(desc) || desc.includes(opDesc)))));
+            }) || DefaultMalhaGauges.find(m => {
+                const desc = m.description.toUpperCase();
+                const code = (m.productCode || '').toUpperCase();
+                return (code && (code === opCode || cleanModel.includes(code))) || cleanModel.includes(desc) || desc.includes(cleanModel);
+            });
 
-        if (matchedMalha) {
-            const raw = parseFloat(((matchedMalha as any).peso_peca || matchedMalha.peso_final || '0').replace(',', '.'));
+            if (matchedMalha) {
+                const raw = parseFloat(String((matchedMalha as any).peso_peca || matchedMalha.peso_final || '0').replace(',', '.'));
+                if (raw > 0) return raw;
+            }
+        }
+
+        // 2. Se for Treliça, buscar PRIMEIRO nos itens do Cadastro Oficial (stock_gauges via buildMergedTrelicaModels)
+        const catalogTrelicas = buildMergedTrelicaModels([], currentGauges || [], []);
+        if (catalogTrelicas.length > 0) {
+            // 2a. Match por código exato do produto (ex: 8697, 8703, 8775)
+            const byCode = catalogTrelicas.find(m => {
+                const mCod = String(m.cod || '').toUpperCase().trim();
+                if (!mCod) return false;
+                if (opCode && mCod === opCode) return true;
+                const regex = new RegExp(`\\b${mCod.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                return regex.test(searchTarget);
+            });
+            if (byCode) {
+                const raw = parseFloat(String(byCode.pesoFinal || byCode.peso_final || '0').replace(',', '.'));
+                if (raw > 0) return raw;
+            }
+
+            // 2b. Match por descrição + tamanho
+            const byDescAndSize = catalogTrelicas.find(m => {
+                const mMod = String(m.modelo || '').toUpperCase().trim();
+                const mTam = parseInt(String(m.tamanho || '12').replace(/\D/g, ''), 10) || 12;
+                if (!mMod || mTam !== sizeMts) return false;
+                return cleanModel === mMod || cleanModel.includes(mMod) || mMod.includes(cleanModel) ||
+                       (opDesc && (opDesc === mMod || opDesc.includes(mMod) || mMod.includes(opDesc)));
+            });
+            if (byDescAndSize) {
+                const raw = parseFloat(String(byDescAndSize.pesoFinal || byDescAndSize.peso_final || '0').replace(',', '.'));
+                if (raw > 0) return raw;
+            }
+
+            // 2c. Match pelas bitolas salvas na OP (superior, inferior, senozoide) + tamanho
+            if (op?.trelicaSuperior && op?.trelicaInferior && op?.trelicaSinusoide) {
+                const normB = (v: string) => parseFloat(String(v || '').replace(',', '.')) || 0;
+                const opSup = normB(op.trelicaSuperior);
+                const opInf = normB(op.trelicaInferior);
+                const opSen = normB(op.trelicaSinusoide);
+                const byGauges = catalogTrelicas.find(m => {
+                    const mTam = parseInt(String(m.tamanho || '12').replace(/\D/g, ''), 10) || 12;
+                    return mTam === sizeMts &&
+                           normB(m.superior) === opSup &&
+                           normB(m.inferior) === opInf &&
+                           normB(m.senozoide) === opSen;
+                });
+                if (byGauges) {
+                    const raw = parseFloat(String(byGauges.pesoFinal || byGauges.peso_final || '0').replace(',', '.'));
+                    if (raw > 0) return raw;
+                }
+            }
+        }
+
+        // 3. Peso unitário salvo diretamente na OP (quando o modelo foi selecionado do cadastro)
+        if (op?.pieceWeight && Number(op.pieceWeight) > 0) {
+            return Number(op.pieceWeight);
+        }
+
+        // 4. Cálculo direto pelas bitolas da OP (mesma fórmula do Cadastro)
+        if (op?.trelicaSuperior && op?.trelicaInferior && op?.trelicaSinusoide) {
+            const calc = calculateTrelicaWeightsFromGauges(
+                String(sizeMts),
+                op.trelicaSuperior,
+                op.trelicaInferior,
+                op.trelicaSinusoide,
+                searchTarget
+            );
+            const raw = parseFloat(String(calc.pesoFinal || '0').replace(',', '.'));
             if (raw > 0) return raw;
         }
 
+        // 5. Fallback para modelos legados (DEFAULT_TRELICA_MODELS)
         const match = DEFAULT_TRELICA_MODELS.find(m => {
+            const mCod = m.cod.toUpperCase().trim();
             const mModel = m.modelo.toUpperCase().trim();
             const mTam = parseInt(m.tamanho, 10);
-            return cleanModel.includes(mModel) && mTam === sizeMts;
+            return (opCode && mCod === opCode) || (cleanModel.includes(mModel) && mTam === sizeMts);
         }) || DEFAULT_TRELICA_MODELS.find(m => {
             const mModel = m.modelo.toUpperCase().trim();
             return cleanModel.includes(mModel);
@@ -949,17 +1024,17 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         }
 
-        // Fallbacks industriais por bitola/modelo
-        if (cleanModel.includes('SUPER PESADO') || cleanModel.includes('SP')) {
+        // Fallbacks industriais por modelo (sem 'SP' isolado para não confundir com 'ESPAÇADOR')
+        if (cleanModel.includes('SUPER PESADO')) {
             return sizeMts === 12 ? 8.647 : 4.324;
         }
-        if (cleanModel.includes('H-10') || cleanModel.includes('H10')) {
+        if (cleanModel.includes('H-10') || cleanModel.includes('H10') || cleanModel.includes('ET10')) {
             return sizeMts === 12 ? 7.686 : 3.843;
         }
-        if (cleanModel.includes('H-8') || cleanModel.includes('H8')) {
-            return sizeMts === 12 ? 5.797 : 2.898;
+        if (cleanModel.includes('H-8') || cleanModel.includes('H8') || cleanModel.includes('ET8') || cleanModel.includes('ET6')) {
+            return sizeMts === 12 ? 5.790 : 2.895;
         }
-        return sizeMts === 12 ? 7.044 : 3.522;
+        return sizeMts === 12 ? 5.790 : 2.895;
     };
 
     // Helper para gerar o histórico diário da OP desde o início da ordem até o momento com peso teórico
@@ -1039,10 +1114,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const sortedDates = [...dayMap.keys()].filter(d => !upToDateStr || d <= upToDateStr).sort();
 
         if (sortedDates.length === 0 && (initialProduced || targetOp.actualProducedQuantity)) {
-            const fallbackQty = initialProduced || Number(targetOp.actualProducedQuantity) || 0;
+            const fallbackQty = Math.round(initialProduced || Number(targetOp.actualProducedQuantity) || 0);
             if (fallbackQty > 0) {
                 const targetD = upToDateStr || getLocalDateString(new Date());
-                const peso = Math.round(fallbackQty * unitWeight * 100) / 100;
+                const peso = Math.round(fallbackQty * unitWeight);
                 return [{
                     id: `auto-prod-${targetD}-fallback`,
                     qnt: fallbackQty,
@@ -1053,8 +1128,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         }
 
         return sortedDates.map((dStr, idx) => {
-            const qnt = dayMap.get(dStr) || 0;
-            const peso = Math.round(qnt * unitWeight * 100) / 100;
+            const qnt = Math.round(dayMap.get(dStr) || 0);
+            const peso = Math.round(qnt * unitWeight);
             return {
                 id: `auto-prod-${dStr}-${idx}`,
                 qnt,
@@ -1814,7 +1889,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             const rawMalha = op.malhaModel || (op as any).malha_model || op.productDescription || (op as any).product_description || (op as any).product || '';
             prodDesc = (rawMalha || 'MALHA SOLDADA/IND. PAINEL Q138-6,00X2,45 10X10 4,20MM- SOB MEDIDA').toUpperCase();
         } else {
-            prodDesc = (op.trelicaModel || op.product || 'TRELIÇA H-12 LEVE 6 MTS').toUpperCase();
+            const rawTrelica = op.productDescription || op.trelicaModel || (op as any).product || '';
+            const rawCode = op.productCode || (op as any).product_code || '';
+            prodDesc = `${rawCode && !rawTrelica.toUpperCase().startsWith(rawCode.toUpperCase()) ? `${rawCode} - ` : ''}${rawTrelica || 'TRELIÇA'}`.toUpperCase();
         }
         const prodDescIn = resolvedTrefila ? resolvedTrefila.descIn : '';
         const prodDescOut = resolvedTrefila ? resolvedTrefila.descOut : '';
@@ -2392,7 +2469,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                         setProductDescription(savedDesc);
                     }
                 } else {
-                    setProductDescription(dbReport.product_description || op.trelicaModel || 'TRELIÇA H-12 LEVE 6 MTS');
+                    setProductDescription(auto.productDescription || dbReport.product_description || op.trelicaModel || 'TRELIÇA');
                 }
                 setPiecesToProduce(Number(dbReport.pieces_to_produce ?? (op.quantityToProduce || (isTrefila ? 10000 : 4500))));
                 // Sincronização inteligente de paradas:
@@ -2506,7 +2583,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const netDurationB = calculateShiftNetDuration(horarioTurnoB || defaultSchedB, shiftCfg.noLunch);
                 const defaultShiftB = netDurationB.timeStr;
 
-                const currentDesc = dbReport.product_description || op.trelicaModel || 'TRELIÇA';
+                const currentDesc = auto.productDescription || dbReport.product_description || op.trelicaModel || 'TRELIÇA';
                 const currentSize = resolvedTamanhoA;
                 const theoreticalUnitWeight = getTheoreticalWeightPerPiece(currentDesc, currentSize);
                 const autoHistory = isTrefila
@@ -2535,12 +2612,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
 
                 if (!isTrefila && finalUpdates && finalUpdates.length > 0) {
                     finalUpdates = finalUpdates.map((u: any) => {
-                        const q = Number(u.qnt) || 0;
+                        const q = Math.round(Number(u.qnt) || 0);
                         let p = Number(u.peso) || 0;
-                        if (p === 0 && q > 0) {
-                            p = Math.round(q * theoreticalUnitWeight * 100) / 100;
+                        if (q > 0 && theoreticalUnitWeight > 0) {
+                            const expectedWeight = Math.round(q * theoreticalUnitWeight);
+                            const isAutoRow = String(u.id || '').startsWith('auto-prod-');
+                            const hasDecimals = p % 1 !== 0;
+                            const oldAvg = p / q;
+                            const hasDivergence = Math.abs(oldAvg - theoreticalUnitWeight) > 0.05;
+                            if (p === 0 || isAutoRow || hasDecimals || hasDivergence) {
+                                p = expectedWeight;
+                            }
                         }
-                        return { ...u, qnt: q, peso: p };
+                        return { ...u, qnt: q, peso: Math.round(p) };
                     });
                 }
 
@@ -2920,11 +3004,14 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
     const updateProductionUpdateField = (id: string, field: keyof ProductionUpdateRow, value: any) => {
         setProductionUpdates(prev => prev.map(r => {
             if (r.id !== id) return r;
-            const updated = { ...r, [field]: value };
-            if (field === 'qnt' && (!r.peso || r.peso === 0)) {
+            const cleanValue = (field === 'peso' || field === 'qnt' || field === 'kgEntrada' || field === 'saida')
+                ? Math.round(Number(value) || 0)
+                : value;
+            const updated = { ...r, [field]: cleanValue };
+            if (field === 'qnt') {
                 const size = statsShiftA.tamanhoPeca || 12;
                 const unitWeight = getTheoreticalWeightPerPiece(productDescription, size);
-                updated.peso = Math.round((Number(value) || 0) * unitWeight * 100) / 100;
+                updated.peso = Math.round((Number(cleanValue) || 0) * unitWeight);
             }
             return updated;
         }));
@@ -3029,8 +3116,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         let velocidadeStrA = '';
         if (isTrefila) {
             const mPerSec = secondsEfetivoA > 0
-                ? (metrosProduzidosA / secondsEfetivoA).toFixed(1).replace('.', ',')
-                : ((initialDayStats?.speedUnit === 'm/s' && initialDayStats?.speedFormatted) ? initialDayStats.speedFormatted : '0,0');
+                ? Math.round(metrosProduzidosA / secondsEfetivoA)
+                : ((initialDayStats?.speedUnit === 'm/s' && initialDayStats?.speedValue) ? Math.round(initialDayStats.speedValue) : 0);
             velocidadeStrA = `${mPerSec} m/s`;
         } else if (isMalha) {
             const secPerPc = (statsShiftA.pecasProduzidas > 0 && secondsEfetivoA > 0)
@@ -3040,8 +3127,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         } else {
             // Treliça
             const mPerMin = velocidadeMinutoA > 0
-                ? velocidadeMinutoA.toFixed(1).replace('.', ',')
-                : ((initialDayStats?.speedUnit === 'm/min' && initialDayStats?.speedFormatted) ? initialDayStats.speedFormatted : '0,0');
+                ? Math.round(velocidadeMinutoA)
+                : ((initialDayStats?.speedUnit === 'm/min' && initialDayStats?.speedValue) ? Math.round(initialDayStats.speedValue) : 0);
             velocidadeStrA = `${mPerMin} metros/ minuto`;
         }
 
@@ -3060,20 +3147,25 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             ? (statsShiftA.pecasProduzidas + statsShiftB.pecasProduzidas)
             : statsShiftA.pecasProduzidas;
 
-        const totalUpdateQnt = productionUpdates.reduce((sum, r) => sum + (Number(r.qnt) || 0), 0);
-        const totalUpdateWeight = productionUpdates.reduce((sum, r) => sum + (Number(r.peso) || 0), 0);
-        const totalUpdateAverage = totalUpdateQnt > 0 ? (totalUpdateWeight / totalUpdateQnt) : 0;
+        const totalUpdateQnt = Math.round(productionUpdates.reduce((sum, r) => sum + (Number(r.qnt) || 0), 0));
+        const totalUpdateWeight = Math.round(productionUpdates.reduce((sum, r) => sum + (Number(r.peso) || 0), 0));
+        const unitWeightFromCatalog = getTheoreticalWeightPerPiece(productDescription, statsShiftA.tamanhoPeca || 12);
+        const isTheoreticalTotal = totalUpdateQnt > 0 && unitWeightFromCatalog > 0 && Math.abs(totalUpdateWeight - Math.round(totalUpdateQnt * unitWeightFromCatalog)) <= Math.max(2, productionUpdates.length);
+        const totalUpdateAverage = totalUpdateQnt > 0
+            ? (isTheoreticalTotal ? unitWeightFromCatalog : (totalUpdateWeight / totalUpdateQnt))
+            : 0;
 
         return {
             totalPecasProduzidas,
             totalUpdateQnt,
             totalUpdateWeight,
             totalUpdateAverage,
+            unitWeightFromCatalog,
             turnoA: {
                 tempoParadoStr: secondsToTime(secondsParadoA),
-                percentParado: percentParadoA.toFixed(1).replace('.', ','),
+                percentParado: String(Math.round(percentParadoA)),
                 tempoEfetivoStr: secondsToTime(secondsEfetivoA),
-                percentEfetivo: percentEfetivoA.toFixed(1).replace('.', ','),
+                percentEfetivo: String(Math.round(percentEfetivoA)),
                 overtimeSeconds: overtimeA.totalSeconds,
                 overtimeStr: overtimeA.formattedStr,
                 overtimeShortStr: overtimeA.shortStr,
@@ -3088,9 +3180,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             },
             turnoB: {
                 tempoParadoStr: secondsToTime(secondsParadoB),
-                percentParado: percentParadoB.toFixed(1).replace('.', ','),
+                percentParado: String(Math.round(percentParadoB)),
                 tempoEfetivoStr: secondsToTime(secondsEfetivoB),
-                percentEfetivo: percentEfetivoB.toFixed(1).replace('.', ','),
+                percentEfetivo: String(Math.round(percentEfetivoB)),
                 overtimeSeconds: overtimeB.totalSeconds,
                 overtimeStr: overtimeB.formattedStr,
                 overtimeShortStr: overtimeB.shortStr,
@@ -3101,10 +3193,44 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 ratePerHour: ratePerHourB,
                 rateUnit: rateUnitB,
                 ratePerHourStr: ratePerHourStrB,
-                velocidadeStr: `${velocidadeMinutoB.toFixed(1).replace('.', ',')} metros/ minuto`
+                velocidadeStr: `${Math.round(velocidadeMinutoB)} metros/ minuto`
             }
         };
-    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift, isTrefila, op, cleanShiftReports, selectedDate, shiftCfg, initialDayStats]);
+    }, [stopsShiftA, stopsShiftB, statsShiftA, statsShiftB, productionUpdates, hasSecondShift, isTrefila, op, cleanShiftReports, selectedDate, shiftCfg, initialDayStats, productDescription, gauges, cachedGauges]);
+
+    // Garante que o peso dos lançamentos de Treliça/Malha acompanhe exatamente o peso do cadastro (em números inteiros)
+    useEffect(() => {
+        if (isTrefila || !productionUpdates || productionUpdates.length === 0) return;
+        const size = statsShiftA.tamanhoPeca || 12;
+        const unitWeight = getTheoreticalWeightPerPiece(productDescription, size);
+        if (!unitWeight || unitWeight <= 0) return;
+
+        let changed = false;
+        const next = productionUpdates.map(u => {
+            const q = Math.round(Number(u.qnt) || 0);
+            const p = Number(u.peso) || 0;
+            if (q <= 0) return u;
+            const expectedWeight = Math.round(q * unitWeight);
+            const isAutoRow = String(u.id || '').startsWith('auto-prod-');
+            const hasDecimals = p % 1 !== 0;
+            const oldAvg = p / q;
+            const hasDivergence = Math.abs(oldAvg - unitWeight) > 0.05;
+            if (p === 0 || isAutoRow || hasDecimals || hasDivergence) {
+                if (p !== expectedWeight || u.qnt !== q) {
+                    changed = true;
+                    return { ...u, qnt: q, peso: expectedWeight };
+                }
+            } else if (p !== Math.round(p) || u.qnt !== q) {
+                changed = true;
+                return { ...u, qnt: q, peso: Math.round(p) };
+            }
+            return u;
+        });
+
+        if (changed) {
+            setProductionUpdates(next);
+        }
+    }, [productDescription, statsShiftA.tamanhoPeca, gauges, cachedGauges, isTrefila]);
 
     // AÇÃO 1: IMPRESSÃO LIMPA EM FOLHA A4
     const handlePrint = () => {
@@ -4676,13 +4802,19 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                         ) : (
                                             <>
                                                 {productionUpdates.map(row => {
-                                                    const weightAverage = row.qnt > 0 ? (row.peso / row.qnt) : 0;
+                                                    const rowQnt = Math.round(Number(row.qnt) || 0);
+                                                    const rowPeso = Math.round(Number(row.peso) || 0);
+                                                    const catUnitW = calculatedData.unitWeightFromCatalog || 0;
+                                                    const isRowTheoretical = rowQnt > 0 && catUnitW > 0 && Math.abs(rowPeso - Math.round(rowQnt * catUnitW)) <= 1;
+                                                    const weightAverage = rowQnt > 0
+                                                        ? (isRowTheoretical ? catUnitW : (rowPeso / rowQnt))
+                                                        : 0;
                                                     return (
                                                         <tr key={row.id} className="border-b border-slate-200 hover:bg-slate-50/50 group text-xs">
                                                             <td className="p-1 border-r border-slate-200 text-center">
                                                                 <input
                                                                     type="number"
-                                                                    value={row.qnt || ''}
+                                                                    value={rowQnt || ''}
                                                                     onChange={e => updateProductionUpdateField(row.id, 'qnt', parseInt(e.target.value, 10) || 0)}
                                                                     className="modern-editable-input text-center w-full font-black text-xs"
                                                                     placeholder="Qnt."
@@ -4691,14 +4823,15 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                             <td className="p-1 border-r border-slate-200 text-center">
                                                                 <input
                                                                     type="number"
-                                                                    value={row.peso || ''}
-                                                                    onChange={e => updateProductionUpdateField(row.id, 'peso', parseFloat(e.target.value) || 0)}
+                                                                    step="1"
+                                                                    value={rowPeso || ''}
+                                                                    onChange={e => updateProductionUpdateField(row.id, 'peso', Math.round(parseFloat(e.target.value) || 0))}
                                                                     className="modern-editable-input text-center w-full font-black text-xs"
                                                                     placeholder="Peso (Kg)"
                                                                 />
                                                             </td>
                                                             <td className="p-1 border-r border-slate-200 text-center font-black text-slate-800 text-xs">
-                                                                {weightAverage > 0 ? weightAverage.toFixed(2).replace('.', ',') : ''}
+                                                                {weightAverage > 0 ? weightAverage.toFixed(3).replace('.', ',') : ''}
                                                             </td>
                                                             <td className="p-1 border-r border-slate-200 text-center">
                                                                 <input
@@ -4727,10 +4860,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                         {calculatedData.totalUpdateQnt}
                                                     </td>
                                                     <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                        {calculatedData.totalUpdateWeight > 0 ? calculatedData.totalUpdateWeight.toLocaleString('pt-BR') : '0'}
+                                                        {calculatedData.totalUpdateWeight > 0 ? Math.round(calculatedData.totalUpdateWeight).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '0'}
                                                     </td>
                                                     <td className="p-2 border-r border-slate-700 text-center font-black text-white">
-                                                        {calculatedData.totalUpdateAverage > 0 ? calculatedData.totalUpdateAverage.toFixed(2).replace('.', ',') : '0,00'}
+                                                        {calculatedData.totalUpdateAverage > 0 ? calculatedData.totalUpdateAverage.toFixed(3).replace('.', ',') : '0'}
                                                     </td>
                                                     <td className="p-2 border-r border-slate-700 text-center uppercase tracking-wider text-[10px] font-black text-white">
                                                         TOTAL / MÉDIA
