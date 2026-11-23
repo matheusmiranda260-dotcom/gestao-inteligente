@@ -3996,11 +3996,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                 </div>
                                 <table className="w-full border-collapse">
                                     <thead>
-                                        <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
-                                            <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
-                                            <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
-                                            <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
-                                            <th className="py-1.5 text-left pl-3">Motivo</th>
+                                        <tr className="bg-slate-100 border-b border-slate-300 text-[10px] font-black text-[#002060] uppercase">
+                                            <th className="py-1.5 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '75px' }}>Início</th>
+                                            <th className="py-1.5 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '75px' }}>Fim</th>
+                                            <th className="py-1.5 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '70px' }}>Duração</th>
+                                            <th className="py-1.5 text-left pl-3 !bg-slate-100 !text-[#002060] font-black">Motivo</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -4088,11 +4088,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                     </div>
                                     <table className="w-full border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-700 uppercase">
-                                                <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Início</th>
-                                                <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '75px' }}>Fim</th>
-                                                <th className="py-1.5 border-r border-slate-200 text-center" style={{ width: '70px' }}>Duração</th>
-                                                <th className="py-1.5 text-left pl-3">Motivo</th>
+                                            <tr className="bg-slate-100 border-b border-slate-300 text-[10px] font-black text-[#002060] uppercase">
+                                                <th className="py-1.5 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '75px' }}>Início</th>
+                                                <th className="py-1.5 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '75px' }}>Fim</th>
+                                                <th className="py-1.5 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '70px' }}>Duração</th>
+                                                <th className="py-1.5 text-left pl-3 !bg-slate-100 !text-[#002060] font-black">Motivo</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -4559,21 +4559,21 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                 <table className="w-full border-collapse">
                                     <thead>
                                         {isTrefila ? (
-                                            <tr className="bg-[#002060] text-white text-[10px] font-black uppercase border-b border-slate-700">
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '15%' }}>Data</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '20%' }}>Lote</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '20%' }}>KG (Entrada)</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '20%' }}>Saída (KG)</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '15%' }}>Bitola</th>
-                                                <th className="py-2 text-center no-print" style={{ width: '60px' }}>Ações</th>
+                                            <tr className="bg-slate-100 text-[#002060] text-[10px] font-black uppercase border-y border-slate-300">
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '15%' }}>Data</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '20%' }}>Lote</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '20%' }}>KG (Entrada)</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '20%' }}>Saída (KG)</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '15%' }}>Bitola</th>
+                                                <th className="py-2 text-center no-print !bg-slate-100 !text-[#002060] font-black" style={{ width: '60px' }}>Ações</th>
                                             </tr>
                                         ) : (
-                                            <tr className="bg-[#002060] text-white text-[10px] font-black uppercase border-b border-slate-700">
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Qnt.</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Peso (kg)</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Média (kg/peça)</th>
-                                                <th className="py-2 border-r border-slate-700 text-center" style={{ width: '25%' }}>Data</th>
-                                                <th className="py-2 text-center no-print" style={{ width: '60px' }}>Ações</th>
+                                            <tr className="bg-slate-100 text-[#002060] text-[10px] font-black uppercase border-y border-slate-300">
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '25%' }}>Qnt.</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '25%' }}>Peso (kg)</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '25%' }}>Média (kg/peça)</th>
+                                                <th className="py-2 border-r border-slate-300 text-center !bg-slate-100 !text-[#002060] font-black" style={{ width: '25%' }}>Data</th>
+                                                <th className="py-2 text-center no-print !bg-slate-100 !text-[#002060] font-black" style={{ width: '60px' }}>Ações</th>
                                             </tr>
                                         )}
                                     </thead>

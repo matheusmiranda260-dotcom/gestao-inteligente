@@ -227,9 +227,6 @@ table {
 }
 
 th {
-  background: #F1F5F9;
-  /* Slate 100 */
-  color: var(--text-secondary);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.75rem;
