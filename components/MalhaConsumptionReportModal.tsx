@@ -309,8 +309,8 @@ export const saveMalhaPackagesData = async (op: ProductionOrderData, data: Malha
     return payload;
 };
 
-// Constante física oficial do aço CA-60 da planilha: Massa Linear (kg/m) = Bitola(mm)^2 * 0.006162
-export const STEEL_LINEAR_MASS_CONSTANT = 0.006162;
+// Constante física oficial do aço CA-60 da planilha: Massa Linear (kg/m) = Bitola(mm)^2 * 0.006169
+export const STEEL_LINEAR_MASS_CONSTANT = 0.006169;
 
 export const calculateMalhaPhysics = (techConfig: MalhaTechnicalConfig, overrideBitola?: number) => {
     const effectiveBitola = (overrideBitola && overrideBitola > 0) ? overrideBitola : techConfig.bitola;

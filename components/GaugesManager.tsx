@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { StockGauge, MaterialType } from '../types';
 import { MaterialOptions, DefaultElectrodeGauges, DefaultSabaoGauges, DefaultTrelicaGauges, DefaultMalhaGauges, DefaultAmarrilGauges } from '../types';
 import { TrashIcon, PlusIcon, CheckCircleIcon, ScaleIcon, ArrowPathIcon, PencilIcon, XIcon, SearchIcon } from './icons';
-import { supabase } from '../supabaseClient';
+import { calculateTrelicaWeightsFromGauges, isLegacyAutoCalculatedWeight } from '../utils/trelicaModelsData';
 
 interface GaugesManagerProps {
     gauges: StockGauge[];
@@ -12,41 +12,23 @@ interface GaugesManagerProps {
     onRestoreDefaults: () => void;
 }
 
+import { supabase } from '../supabaseClient';
+
 const getWeightPerMeter = (d: string) => {
     const dNum = parseFloat((d || '').replace(',', '.'));
     if (isNaN(dNum)) return 0;
-    return dNum * dNum * 0.0061654;
+    return Number((dNum * dNum * 0.006169).toFixed(4));
 };
 
 const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior: string, senozoide: string, trName: string) => {
-    const tamanho = parseFloat((tamanhoStr || '12').replace(',', '.'));
-    if (isNaN(tamanho) || !superior || !inferior || !senozoide) return null;
-
-    let senozoideMultiplier = 2.58; // default to H-8
-    const nameUpper = (trName || '').toUpperCase();
-    if (nameUpper.includes('H6') || nameUpper.includes('H-6')) senozoideMultiplier = 2.41;
-    else if (nameUpper.includes('H8') || nameUpper.includes('H-8')) senozoideMultiplier = 2.58;
-    else if (nameUpper.includes('H10') || nameUpper.includes('H-10')) senozoideMultiplier = 2.86;
-    else if (nameUpper.includes('H12') || nameUpper.includes('H-12')) senozoideMultiplier = 3.19;
-    else if (nameUpper.includes('H16') || nameUpper.includes('H-16')) senozoideMultiplier = 3.74;
-    else if (nameUpper.includes('H25') || nameUpper.includes('H-25')) senozoideMultiplier = 5.40;
-
-    const wSup = getWeightPerMeter(superior) * tamanho;
-    const wInf = getWeightPerMeter(inferior) * tamanho * 2;
-    const wSen = getWeightPerMeter(senozoide) * tamanho * senozoideMultiplier;
-
-    return {
-        pesoSuperior: wSup.toFixed(3).replace('.', ','),
-        pesoInferior: wInf.toFixed(3).replace('.', ','),
-        pesoSenozoide: wSen.toFixed(3).replace('.', ','),
-        pesoFinal: (wSup + wInf + wSen).toFixed(3).replace('.', ',')
-    };
+    if (!tamanhoStr || !superior || !inferior || !senozoide) return null;
+    return calculateTrelicaWeightsFromGauges(tamanhoStr, superior, inferior, senozoide, trName);
 };
 
 const calculateMalhaWeight = (bitolaStr: string, linearMetersNum: number) => {
     const bitola = parseFloat((bitolaStr || '').replace(',', '.'));
     if (isNaN(bitola) || bitola <= 0 || !linearMetersNum || linearMetersNum <= 0) return 0;
-    return parseFloat((bitola * bitola * 0.0061654 * linearMetersNum).toFixed(3));
+    return parseFloat((bitola * bitola * 0.006169 * linearMetersNum).toFixed(3));
 };
 
 const syncTrelicaModelToCache = (modelData: any) => {
@@ -1591,7 +1573,15 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
                                                                     <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 bg-cyan-50/50 px-2 py-0.5 rounded border border-cyan-100 mt-0.5">
                                                                         <span className="text-[9px] text-slate-400 uppercase">Peso Barra:</span>
                                                                         <span className="text-cyan-800 font-black">
-                                                                            {g.peso_final || calculateTrelicaWeights(g.tamanho || g.gauge.replace(/\D/g, '') || '12', g.superior || '', g.inferior || '', g.senozoide || '', `${g.productCode || ''} ${g.description || ''}`)?.pesoFinal || '-'} kg
+                                                                            {(() => {
+                                                                                const tam = g.tamanho || g.gauge.replace(/\D/g, '') || '12';
+                                                                                const sup = g.superior || '';
+                                                                                const inf = g.inferior || '';
+                                                                                const sen = g.senozoide || '';
+                                                                                const calc = calculateTrelicaWeights(tam, sup, inf, sen, `${g.productCode || ''} ${g.description || ''}`);
+                                                                                const useCalc = isLegacyAutoCalculatedWeight(g.peso_final, tam, sup, inf, sen);
+                                                                                return (!useCalc && g.peso_final) ? g.peso_final : (calc?.pesoFinal || g.peso_final || '-');
+                                                                            })()} kg
                                                                         </span>
                                                                     </div>
                                                                 </>

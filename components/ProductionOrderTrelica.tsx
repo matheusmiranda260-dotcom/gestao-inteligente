@@ -5,39 +5,13 @@ import { ArrowLeftIcon, WarningIcon, ClipboardListIcon, DocumentReportIcon, Chec
 import ProductionOrderHistoryModal from './ProductionOrderHistoryModal';
 import ProductionOrderReport from './ProductionOrderReport';
 
-import { DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels } from '../utils/trelicaModelsData';
+import { DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels, calculateTrelicaWeightsFromGauges } from '../utils/trelicaModelsData';
 export { trelicaModels, DEFAULT_TRELICA_MODELS, buildMergedTrelicaModels } from '../utils/trelicaModelsData';
 import { supabase } from '../supabaseClient';
 
-const getWeightPerMeter = (d: string) => {
-    const dNum = parseFloat(d.replace(',', '.'));
-    if (isNaN(dNum)) return 0;
-    return dNum * dNum * 0.0061654;
-};
-
 const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior: string, senozoide: string, trName: string) => {
-    const tamanho = parseFloat(tamanhoStr.replace(',', '.'));
-    if (isNaN(tamanho) || !superior || !inferior || !senozoide || !trName) return null;
-
-    let senozoideMultiplier = 2.58; // default to H-8
-    const nameUpper = trName.toUpperCase();
-    if (nameUpper.includes('H6') || nameUpper.includes('H-6')) senozoideMultiplier = 2.41;
-    else if (nameUpper.includes('H8') || nameUpper.includes('H-8')) senozoideMultiplier = 2.58;
-    else if (nameUpper.includes('H10') || nameUpper.includes('H-10')) senozoideMultiplier = 2.86;
-    else if (nameUpper.includes('H12') || nameUpper.includes('H-12')) senozoideMultiplier = 3.19;
-    else if (nameUpper.includes('H16') || nameUpper.includes('H-16')) senozoideMultiplier = 3.74;
-    else if (nameUpper.includes('H25') || nameUpper.includes('H-25')) senozoideMultiplier = 5.40;
-
-    const wSup = getWeightPerMeter(superior) * tamanho;
-    const wInf = getWeightPerMeter(inferior) * tamanho * 2;
-    const wSen = getWeightPerMeter(senozoide) * tamanho * senozoideMultiplier;
-
-    return {
-        pesoSuperior: wSup.toFixed(3).replace('.', ','),
-        pesoInferior: wInf.toFixed(3).replace('.', ','),
-        pesoSenozoide: wSen.toFixed(3).replace('.', ','),
-        pesoFinal: (wSup + wInf + wSen).toFixed(3).replace('.', ',')
-    };
+    if (!tamanhoStr || !superior || !inferior || !senozoide || !trName) return null;
+    return calculateTrelicaWeightsFromGauges(tamanhoStr, superior, inferior, senozoide, trName);
 };
 type TrelicaModel = typeof DEFAULT_TRELICA_MODELS[number];
 type AvailableStockItem = StockItem & { availableQuantity: number };

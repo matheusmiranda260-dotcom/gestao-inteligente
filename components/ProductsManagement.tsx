@@ -20,7 +20,7 @@ interface ProductsManagementProps {
 const getWeightPerMeter = (d: string) => {
     const dNum = parseFloat(d.replace(',', '.'));
     if (isNaN(dNum)) return 0;
-    return dNum * dNum * 0.0061654;
+    return Number((dNum * dNum * 0.006169).toFixed(4));
 };
 
 const calculateTrelicaWeights = (tamanhoStr: string, superior: string, inferior: string, senozoide: string, trName: string) => {

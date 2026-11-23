@@ -27,7 +27,40 @@ export const trelicaModels = DEFAULT_TRELICA_MODELS;
 const getWeightPerMeter = (d: string) => {
     const dNum = parseFloat((d || '').replace(',', '.'));
     if (isNaN(dNum) || dNum <= 0) return 0;
+    // Massa linear da planilha oficial de engenharia: arredondada em 4 casas decimais com constante 0,006169
+    return Number((dNum * dNum * 0.006169).toFixed(4));
+};
+
+const getLegacyWeightPerMeter = (d: string) => {
+    const dNum = parseFloat((d || '').replace(',', '.'));
+    if (isNaN(dNum) || dNum <= 0) return 0;
     return dNum * dNum * 0.0061654;
+};
+
+export const isLegacyAutoCalculatedWeight = (
+    pesoFinalStr: string | undefined,
+    tamanhoStr: string,
+    superior: string,
+    inferior: string,
+    senozoide: string
+): boolean => {
+    if (!pesoFinalStr) return true;
+    const saved = parseFloat(String(pesoFinalStr).replace(',', '.'));
+    if (isNaN(saved) || saved <= 0) return true;
+    const tam = parseFloat((tamanhoStr || '12').replace(',', '.')) || 12;
+    const multipliers = [2.41, 2.58, 2.86, 3.19, 3.74, 4.50, 5.40, 6.30];
+
+    // Checa se o valor salvo foi gerado automaticamente pela fórmula antiga (0.0061654) ou por outro multiplicador padrão (ex: ET6 salvo com multiplicador 2.58 de H8)
+    const wSupOld = getLegacyWeightPerMeter(superior) * tam;
+    const wInfOld = getLegacyWeightPerMeter(inferior) * tam * 2;
+    const wSupNew = getWeightPerMeter(superior) * tam;
+    const wInfNew = getWeightPerMeter(inferior) * tam * 2;
+
+    return multipliers.some(mult => {
+        const legacyTotal = wSupOld + wInfOld + (getLegacyWeightPerMeter(senozoide) * tam * mult);
+        const stdTotal = wSupNew + wInfNew + (getWeightPerMeter(senozoide) * tam * mult);
+        return Math.abs(saved - legacyTotal) <= 0.015 || Math.abs(saved - stdTotal) <= 0.015;
+    });
 };
 
 export const calculateTrelicaWeightsFromGauges = (
@@ -42,26 +75,28 @@ export const calculateTrelicaWeightsFromGauges = (
     const cleanSen = (senozoide || '').trim().replace('.', ',');
     const tamanho = parseFloat((tamanhoStr || '12').replace(',', '.')) || 12;
 
-    // Mesma fórmula exata utilizada na tela de Cadastro (GaugesManager.tsx) para paridade 100% entre Cadastro e Relatórios
-    let senozoideMultiplier = 2.58; // default H-8
+    // Fator de metragem da Sinuzoide por altura da treliça (H / ET / TR) conforme planilha oficial
+    let senozoideMultiplier = 2.58; // padrão H-8 / ET8 (30,960m em 12m)
     const nameUpper = (trName || '').toUpperCase();
-    if (nameUpper.includes('H6') || nameUpper.includes('H-6')) senozoideMultiplier = 2.41;
-    else if (nameUpper.includes('H8') || nameUpper.includes('H-8')) senozoideMultiplier = 2.58;
-    else if (nameUpper.includes('H10') || nameUpper.includes('H-10')) senozoideMultiplier = 2.86;
-    else if (nameUpper.includes('H12') || nameUpper.includes('H-12')) senozoideMultiplier = 3.19;
-    else if (nameUpper.includes('H16') || nameUpper.includes('H-16')) senozoideMultiplier = 3.74;
-    else if (nameUpper.includes('H25') || nameUpper.includes('H-25')) senozoideMultiplier = 5.40;
+    if (nameUpper.includes('H6') || nameUpper.includes('H-6') || nameUpper.includes('ET6') || nameUpper.includes('ET-6') || nameUpper.includes('TR6') || nameUpper.includes('TR-6') || nameUpper.includes('664')) senozoideMultiplier = 2.41; // 28,920m em 12m
+    else if (nameUpper.includes('H8') || nameUpper.includes('H-8') || nameUpper.includes('ET8') || nameUpper.includes('ET-8') || nameUpper.includes('TR8') || nameUpper.includes('TR-8') || nameUpper.includes('864')) senozoideMultiplier = 2.58;
+    else if (nameUpper.includes('H10') || nameUpper.includes('H-10') || nameUpper.includes('ET10') || nameUpper.includes('ET-10') || nameUpper.includes('TR10') || nameUpper.includes('TR-10') || nameUpper.includes('1064')) senozoideMultiplier = 2.86;
+    else if (nameUpper.includes('H12') || nameUpper.includes('H-12') || nameUpper.includes('ET12') || nameUpper.includes('ET-12') || nameUpper.includes('TR12') || nameUpper.includes('TR-12') || nameUpper.includes('1264')) senozoideMultiplier = 3.19;
+    else if (nameUpper.includes('H16') || nameUpper.includes('H-16') || nameUpper.includes('ET16') || nameUpper.includes('ET-16') || nameUpper.includes('TR16') || nameUpper.includes('TR-16') || nameUpper.includes('1664')) senozoideMultiplier = 3.74;
+    else if (nameUpper.includes('H20') || nameUpper.includes('H-20') || nameUpper.includes('ET20') || nameUpper.includes('ET-20') || nameUpper.includes('TR20') || nameUpper.includes('TR-20') || nameUpper.includes('2064')) senozoideMultiplier = 4.50;
+    else if (nameUpper.includes('H25') || nameUpper.includes('H-25') || nameUpper.includes('ET25') || nameUpper.includes('ET-25') || nameUpper.includes('TR25') || nameUpper.includes('TR-25') || nameUpper.includes('2564')) senozoideMultiplier = 5.40;
+    else if (nameUpper.includes('H30') || nameUpper.includes('H-30') || nameUpper.includes('ET30') || nameUpper.includes('ET-30') || nameUpper.includes('TR30') || nameUpper.includes('TR-30') || nameUpper.includes('3064')) senozoideMultiplier = 6.30;
 
-    const wSup = getWeightPerMeter(cleanSup) * tamanho;
-    const wInf = getWeightPerMeter(cleanInf) * tamanho * 2;
-    const wSen = getWeightPerMeter(cleanSen) * tamanho * senozoideMultiplier;
-    const wTotal = wSup + wInf + wSen;
+    const wSup = Number((getWeightPerMeter(cleanSup) * tamanho).toFixed(3));
+    const wInf = Number((getWeightPerMeter(cleanInf) * tamanho * 2).toFixed(3));
+    const wSen = Number((getWeightPerMeter(cleanSen) * tamanho * senozoideMultiplier).toFixed(3));
+    const wTotal = Number((wSup + wInf + wSen).toFixed(3));
 
     return {
-        pesoSuperior: (wSup > 0 ? wSup : 2.320).toFixed(3).replace('.', ','),
-        pesoInferior: (wInf > 0 ? wInf : 1.515).toFixed(3).replace('.', ','),
-        pesoSenozoide: (wSen > 0 ? wSen : 1.955).toFixed(3).replace('.', ','),
-        pesoFinal: (wTotal > 0 ? wTotal : 5.790).toFixed(3).replace('.', ',')
+        pesoSuperior: (wSup > 0 ? wSup : 2.322).toFixed(3).replace('.', ','),
+        pesoInferior: (wInf > 0 ? wInf : 1.517).toFixed(3).replace('.', ','),
+        pesoSenozoide: (wSen > 0 ? wSen : 1.828).toFixed(3).replace('.', ','),
+        pesoFinal: (wTotal > 0 ? wTotal : 5.667).toFixed(3).replace('.', ',')
     };
 };
 
@@ -114,11 +149,12 @@ export const buildMergedTrelicaModels = (
 
             const existingDb = dbLookup.get(rawCod.toUpperCase()) || dbLookup.get(`${modelo}_${tamanho}`.toUpperCase()) || {};
             const calc = calculateTrelicaWeightsFromGauges(tamanho, sup, inf, sen, `${rawCod} ${modelo}`);
+            const useRecalculated = isLegacyAutoCalculatedWeight(g.peso_final, tamanho, sup, inf, sen);
 
-            const pFinal = g.peso_final || existingDb.peso_final || existingDb.pesoFinal || calc.pesoFinal;
-            const pSup = g.peso_superior || existingDb.peso_superior || existingDb.pesoSuperior || calc.pesoSuperior;
-            const pInf = g.peso_inferior || existingDb.peso_inferior || existingDb.pesoInferior || calc.pesoInferior;
-            const pSen = g.peso_senozoide || existingDb.peso_senozoide || existingDb.pesoSenozoide || calc.pesoSenozoide;
+            const pFinal = (!useRecalculated && g.peso_final) ? g.peso_final : calc.pesoFinal;
+            const pSup = (!useRecalculated && g.peso_superior) ? g.peso_superior : calc.pesoSuperior;
+            const pInf = (!useRecalculated && g.peso_inferior) ? g.peso_inferior : calc.pesoInferior;
+            const pSen = (!useRecalculated && g.peso_senozoide) ? g.peso_senozoide : calc.pesoSenozoide;
 
             map.set(key, {
                 id: g.id || existingDb.id || String(idx + 1),
