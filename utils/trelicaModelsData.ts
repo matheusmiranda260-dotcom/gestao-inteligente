@@ -24,75 +24,137 @@ export const DEFAULT_TRELICA_MODELS: TrelicaModel[] = [
 
 export const trelicaModels = DEFAULT_TRELICA_MODELS;
 
+const getWeightPerMeter = (d: string) => {
+    const dNum = parseFloat((d || '').replace(',', '.'));
+    if (isNaN(dNum) || dNum <= 0) return 0;
+    return dNum * dNum * 0.0061654;
+};
+
+export const calculateTrelicaWeightsFromGauges = (
+    tamanhoStr: string,
+    superior: string,
+    inferior: string,
+    senozoide: string,
+    trName: string
+) => {
+    const cleanSup = (superior || '').trim().replace('.', ',');
+    const cleanInf = (inferior || '').trim().replace('.', ',');
+    const cleanSen = (senozoide || '').trim().replace('.', ',');
+    const cleanTam = (tamanhoStr || '12').replace(/\D/g, '') || '12';
+
+    // 1. Se bater exatamente com as bitolas e tamanho de algum modelo da tabela técnica de referência, usa os pesos oficiais
+    const nameUpper = (trName || '').toUpperCase();
+    const exactDefault = DEFAULT_TRELICA_MODELS.find(d => {
+        if (d.tamanho !== cleanTam || d.superior !== cleanSup || d.inferior !== cleanInf || d.senozoide !== cleanSen) {
+            return false;
+        }
+        // Se houver menção à altura (ET6/H6, ET8/H8, ET10/H10, ET12/H12, ET16/H16, ET25/H25), valida também
+        if ((nameUpper.includes('ET6') || nameUpper.includes('H-6') || nameUpper.includes('H6')) && !d.modelo.includes('H-6')) return false;
+        if ((nameUpper.includes('ET8') || nameUpper.includes('H-8') || nameUpper.includes('H8')) && !d.modelo.includes('H-8')) return false;
+        if ((nameUpper.includes('ET10') || nameUpper.includes('H-10') || nameUpper.includes('H10')) && !d.modelo.includes('H-10')) return false;
+        if ((nameUpper.includes('ET12') || nameUpper.includes('H-12') || nameUpper.includes('H12')) && !d.modelo.includes('H-12')) return false;
+        if ((nameUpper.includes('ET16') || nameUpper.includes('H-16') || nameUpper.includes('H16')) && !d.modelo.includes('H-16')) return false;
+        if ((nameUpper.includes('ET25') || nameUpper.includes('H-25') || nameUpper.includes('H25')) && !d.modelo.includes('H-25')) return false;
+        return true;
+    });
+
+    if (exactDefault) {
+        return {
+            pesoSuperior: exactDefault.pesoSuperior,
+            pesoInferior: exactDefault.pesoInferior,
+            pesoSenozoide: exactDefault.pesoSenozoide,
+            pesoFinal: exactDefault.pesoFinal
+        };
+    }
+
+    // 2. Cálculo geométrico pelas bitolas e comprimento
+    const tamanho = parseFloat((tamanhoStr || '12').replace(',', '.')) || 12;
+    let senozoideMultiplier = 2.58; // padrão H-8 / ET8
+    if (nameUpper.includes('H6') || nameUpper.includes('H-6') || nameUpper.includes('ET6') || nameUpper.includes('ET-6') || nameUpper.includes('TR6') || nameUpper.includes('TR-6') || nameUpper.includes('664')) senozoideMultiplier = 2.41;
+    else if (nameUpper.includes('H8') || nameUpper.includes('H-8') || nameUpper.includes('ET8') || nameUpper.includes('ET-8') || nameUpper.includes('TR8') || nameUpper.includes('TR-8') || nameUpper.includes('864')) senozoideMultiplier = 2.58;
+    else if (nameUpper.includes('H10') || nameUpper.includes('H-10') || nameUpper.includes('ET10') || nameUpper.includes('ET-10') || nameUpper.includes('TR10') || nameUpper.includes('TR-10') || nameUpper.includes('1064')) senozoideMultiplier = 2.86;
+    else if (nameUpper.includes('H12') || nameUpper.includes('H-12') || nameUpper.includes('ET12') || nameUpper.includes('ET-12') || nameUpper.includes('TR12') || nameUpper.includes('TR-12') || nameUpper.includes('1264')) senozoideMultiplier = 3.19;
+    else if (nameUpper.includes('H16') || nameUpper.includes('H-16') || nameUpper.includes('ET16') || nameUpper.includes('ET-16') || nameUpper.includes('TR16') || nameUpper.includes('TR-16') || nameUpper.includes('1664')) senozoideMultiplier = 3.74;
+    else if (nameUpper.includes('H20') || nameUpper.includes('H-20') || nameUpper.includes('ET20') || nameUpper.includes('ET-20') || nameUpper.includes('TR20') || nameUpper.includes('TR-20')) senozoideMultiplier = 4.50;
+    else if (nameUpper.includes('H25') || nameUpper.includes('H-25') || nameUpper.includes('ET25') || nameUpper.includes('ET-25') || nameUpper.includes('TR25') || nameUpper.includes('TR-25') || nameUpper.includes('2564')) senozoideMultiplier = 5.40;
+    else if (nameUpper.includes('H30') || nameUpper.includes('H-30') || nameUpper.includes('ET30') || nameUpper.includes('ET-30') || nameUpper.includes('TR30') || nameUpper.includes('TR-30')) senozoideMultiplier = 6.30;
+
+    const wSup = getWeightPerMeter(cleanSup) * tamanho;
+    const wInf = getWeightPerMeter(cleanInf) * tamanho * 2;
+    const wSen = getWeightPerMeter(cleanSen) * tamanho * senozoideMultiplier;
+    const wTotal = wSup + wInf + wSen;
+
+    return {
+        pesoSuperior: (wSup > 0 ? wSup : 2.322).toFixed(3).replace('.', ','),
+        pesoInferior: (wInf > 0 ? wInf : 1.517).toFixed(3).replace('.', ','),
+        pesoSenozoide: (wSen > 0 ? wSen : 1.958).toFixed(3).replace('.', ','),
+        pesoFinal: (wTotal > 0 ? wTotal : 5.797).toFixed(3).replace('.', ',')
+    };
+};
+
 /**
- * Mescla e unifica modelos de treliça oriundos de:
- * 1. Modelos padrão fixos
- * 2. Cache local (localStorage)
- * 3. Tabela trelica_models do Supabase
- * 4. Tabela stock_gauges do Supabase (Configuração de Bitolas / Estoque)
+ * Retorna os modelos de treliça priorizando EXCLUSIVAMENTE os itens cadastrados
+ * no catálogo oficial de produtos (stock_gauges onde materialType === 'Treliça').
+ * Apenas se não houver nenhum item cadastrado em stock_gauges usa dbModels/cache/defaults.
  */
 export const buildMergedTrelicaModels = (
     dbModels: any[] = [], 
     stockGaugesList: StockGauge[] = [], 
     cachedList: any[] = []
 ): TrelicaModel[] => {
-    const map = new Map<string, TrelicaModel>();
+    const registeredGauges = (stockGaugesList || []).filter(
+        g => g && (g.materialType === 'Treliça' || (g.materialType as string) === 'Trelica')
+    );
 
-    // 1. Modelos padrão (fallback base)
-    DEFAULT_TRELICA_MODELS.forEach(m => {
-        const key = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
-        map.set(key, { ...m });
-    });
-
-    // 2. Cache local do navegador
-    cachedList.forEach(m => {
-        if (!m) return;
-        const key = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
-        map.set(key, {
-            ...m,
-            pesoFinal: m.pesoFinal || m.peso_final,
-            pesoSuperior: m.pesoSuperior || m.peso_superior,
-            pesoSenozoide: m.pesoSenozoide || m.peso_senozoide,
-            pesoInferior: m.pesoInferior || m.peso_inferior
+    // Se existem treliças cadastradas no catálogo de produtos (stock_gauges), exibe APENAS os itens do cadastro!
+    if (registeredGauges.length > 0) {
+        const dbLookup = new Map<string, any>();
+        (dbModels || []).forEach(m => {
+            if (!m) return;
+            const k = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
+            dbLookup.set(k, m);
         });
-    });
 
-    // 3. Tabela dedicada trelica_models do Supabase
-    dbModels.forEach(m => {
-        if (!m) return;
-        const key = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
-        map.set(key, {
-            ...m,
-            pesoFinal: m.peso_final || m.pesoFinal,
-            pesoSuperior: m.peso_superior || m.pesoSuperior,
-            pesoSenozoide: m.peso_senozoide || m.pesoSenozoide,
-            pesoInferior: m.peso_inferior || m.pesoInferior
+        const sortedGauges = [...registeredGauges].sort((a, b) => {
+            const compDesc = (a.description || '').localeCompare(b.description || '');
+            if (compDesc !== 0) return compDesc;
+            const sizeA = parseInt(a.tamanho || a.gauge || '0', 10) || 0;
+            const sizeB = parseInt(b.tamanho || b.gauge || '0', 10) || 0;
+            return sizeA - sizeB;
         });
-    });
 
-    // 4. Cadastros em stock_gauges (Configurações de Bitolas / Estoque)
-    (stockGaugesList || [])
-        .filter(g => (g.materialType === 'Treliça' || (g.materialType as string) === 'Trelica'))
-        .forEach(g => {
-            const cod = g.productCode || g.code || '';
-            const modelo = g.description || g.name || g.gauge;
-            const tamanho = g.tamanho || (g.gauge ? g.gauge.replace(/\D/g, '') : '12') || '12';
-            const key = (cod || `${modelo}_${tamanho}`).toUpperCase();
-            
-            const existing = map.get(key) || {} as Partial<TrelicaModel>;
-            const pFinal = g.peso_final || existing.peso_final || existing.pesoFinal || '5,502';
-            const pSup = g.peso_superior || existing.peso_superior || existing.pesoSuperior || '';
-            const pInf = g.peso_inferior || existing.peso_inferior || existing.pesoInferior || '';
-            const pSen = g.peso_senozoide || existing.peso_senozoide || existing.pesoSenozoide || '';
+        const map = new Map<string, TrelicaModel>();
+        sortedGauges.forEach((g, idx) => {
+            const rawCod = (g.productCode || (g as any).code || '').trim();
+            const modelo = (g.description || (g as any).name || g.gauge || 'Treliça').trim();
+            const tamanho = (g.tamanho || (g.gauge ? g.gauge.replace(/\D/g, '') : '12') || '12').trim();
+            const sup = (g.superior || '5,6').trim();
+            const inf = (g.inferior || '3,2').trim();
+            const sen = (g.senozoide || '3,2').trim();
+
+            let cod = rawCod || `${modelo}_${tamanho}`;
+            let key = cod.toUpperCase();
+            if (map.has(key)) {
+                cod = rawCod ? `${rawCod}_${tamanho}M` : `${modelo}_${tamanho}_${idx + 1}`;
+                key = `${cod}_${g.id || idx}`.toUpperCase();
+            }
+
+            const existingDb = dbLookup.get(rawCod.toUpperCase()) || dbLookup.get(`${modelo}_${tamanho}`.toUpperCase()) || {};
+            const calc = calculateTrelicaWeightsFromGauges(tamanho, sup, inf, sen, `${rawCod} ${modelo}`);
+
+            const pFinal = g.peso_final || existingDb.peso_final || existingDb.pesoFinal || calc.pesoFinal;
+            const pSup = g.peso_superior || existingDb.peso_superior || existingDb.pesoSuperior || calc.pesoSuperior;
+            const pInf = g.peso_inferior || existingDb.peso_inferior || existingDb.pesoInferior || calc.pesoInferior;
+            const pSen = g.peso_senozoide || existingDb.peso_senozoide || existingDb.pesoSenozoide || calc.pesoSenozoide;
 
             map.set(key, {
-                id: g.id || existing.id || String(Date.now()),
-                cod: cod || existing.cod || key,
-                modelo: modelo,
-                tamanho: tamanho,
-                superior: g.superior || existing.superior || '5,6',
-                inferior: g.inferior || existing.inferior || '3,2',
-                senozoide: g.senozoide || existing.senozoide || '3,2',
+                id: g.id || existingDb.id || String(idx + 1),
+                cod,
+                modelo,
+                tamanho,
+                superior: sup,
+                inferior: inf,
+                senozoide: sen,
                 peso_final: pFinal,
                 peso_superior: pSup,
                 peso_inferior: pInf,
@@ -103,6 +165,52 @@ export const buildMergedTrelicaModels = (
                 pesoSenozoide: pSen
             });
         });
+
+        return Array.from(map.values());
+    }
+
+    // Fallback caso stock_gauges ainda não tenha carregado ou esteja vazio:
+    const map = new Map<string, TrelicaModel>();
+
+    // Se houver cache vindo de cadastros reais (que não sejam os 19 códigos legados H6LE12S/H8L6/etc.)
+    const defaultCodes = new Set(DEFAULT_TRELICA_MODELS.map(d => d.cod.toUpperCase()));
+    const customCached = (cachedList || []).filter(m => m && m.cod && !defaultCodes.has(String(m.cod).toUpperCase()));
+
+    if (customCached.length > 0) {
+        customCached.forEach(m => {
+            const key = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
+            const calc = calculateTrelicaWeightsFromGauges(m.tamanho || '12', m.superior || '5,6', m.inferior || '3,2', m.senozoide || '3,2', `${m.cod || ''} ${m.modelo || ''}`);
+            map.set(key, {
+                ...m,
+                pesoFinal: m.pesoFinal || m.peso_final || calc.pesoFinal,
+                pesoSuperior: m.pesoSuperior || m.peso_superior || calc.pesoSuperior,
+                pesoSenozoide: m.pesoSenozoide || m.peso_senozoide || calc.pesoSenozoide,
+                pesoInferior: m.pesoInferior || m.peso_inferior || calc.pesoInferior
+            });
+        });
+        return Array.from(map.values());
+    }
+
+    if (dbModels && dbModels.length > 0) {
+        dbModels.forEach(m => {
+            if (!m) return;
+            const key = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
+            const calc = calculateTrelicaWeightsFromGauges(m.tamanho || '12', m.superior || '5,6', m.inferior || '3,2', m.senozoide || '3,2', `${m.cod || ''} ${m.modelo || ''}`);
+            map.set(key, {
+                ...m,
+                pesoFinal: m.peso_final || m.pesoFinal || calc.pesoFinal,
+                pesoSuperior: m.peso_superior || m.pesoSuperior || calc.pesoSuperior,
+                pesoSenozoide: m.peso_senozoide || m.pesoSenozoide || calc.pesoSenozoide,
+                pesoInferior: m.peso_inferior || m.pesoInferior || calc.pesoInferior
+            });
+        });
+        return Array.from(map.values());
+    }
+
+    DEFAULT_TRELICA_MODELS.forEach(m => {
+        const key = (m.cod || `${m.modelo}_${m.tamanho}`).toUpperCase();
+        map.set(key, { ...m });
+    });
 
     return Array.from(map.values());
 };

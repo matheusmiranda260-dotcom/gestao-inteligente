@@ -217,41 +217,47 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
             }
         });
 
-        // 3. Treliças: inclui os modelos padrão que ainda não estejam no banco ou substituídos
-        DefaultTrelicaGauges.forEach(d => {
-            const defId = d.id || `default_tr_${d.productCode}`;
-            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
-            const exists = result.some(g => 
-                g.materialType === 'Treliça' && 
-                ((d.productCode && g.productCode === d.productCode) || 
-                 (g.description === d.description && (g.tamanho === d.tamanho || g.gauge === d.gauge)) ||
-                 g.id === defId)
-            );
-            if (!exists) {
-                result.push({
-                    id: defId,
-                    ...d
-                });
-            }
-        });
+        // 3. Treliças: só inclui os modelos padrão caso ainda não exista NENHUMA treliça cadastrada no banco (stock_gauges)
+        const hasRegisteredTrelicas = gauges.some(g => g.materialType === 'Treliça' || (g.materialType as string) === 'Trelica');
+        if (!hasRegisteredTrelicas) {
+            DefaultTrelicaGauges.forEach(d => {
+                const defId = d.id || `default_tr_${d.productCode}`;
+                if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                const exists = result.some(g => 
+                    g.materialType === 'Treliça' && 
+                    ((d.productCode && g.productCode === d.productCode) || 
+                     (g.description === d.description && (g.tamanho === d.tamanho || g.gauge === d.gauge)) ||
+                     g.id === defId)
+                );
+                if (!exists) {
+                    result.push({
+                        id: defId,
+                        ...d
+                    });
+                }
+            });
+        }
 
-        // 4. Malhas: inclui os modelos padrão do catálogo que ainda não estejam no banco ou substituídos
-        DefaultMalhaGauges.forEach(d => {
-            const defId = d.id || `default_ml_${d.productCode}`;
-            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
-            const exists = result.some(g => 
-                g.materialType === 'Malha' && 
-                ((d.productCode && g.productCode === d.productCode) || 
-                 (g.description === d.description && g.gauge === d.gauge) ||
-                 g.id === defId)
-            );
-            if (!exists) {
-                result.push({
-                    id: defId,
-                    ...d
-                });
-            }
-        });
+        // 4. Malhas: só inclui os modelos padrão caso ainda não exista NENHUMA malha cadastrada no banco (stock_gauges)
+        const hasRegisteredMalhas = gauges.some(g => g.materialType === 'Malha');
+        if (!hasRegisteredMalhas) {
+            DefaultMalhaGauges.forEach(d => {
+                const defId = d.id || `default_ml_${d.productCode}`;
+                if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                const exists = result.some(g => 
+                    g.materialType === 'Malha' && 
+                    ((d.productCode && g.productCode === d.productCode) || 
+                     (g.description === d.description && g.gauge === d.gauge) ||
+                     g.id === defId)
+                );
+                if (!exists) {
+                    result.push({
+                        id: defId,
+                        ...d
+                    });
+                }
+            });
+        }
 
         // 5. Amarril (Fitas e Presilhas): inclui itens padrão
         DefaultAmarrilGauges.forEach(d => {
@@ -1584,7 +1590,9 @@ const GaugesManager: React.FC<GaugesManagerProps> = ({ gauges, onAdd, onDelete, 
 
                                                                     <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 bg-cyan-50/50 px-2 py-0.5 rounded border border-cyan-100 mt-0.5">
                                                                         <span className="text-[9px] text-slate-400 uppercase">Peso Barra:</span>
-                                                                        <span className="text-cyan-800 font-black">{g.peso_final || '-'} kg</span>
+                                                                        <span className="text-cyan-800 font-black">
+                                                                            {g.peso_final || calculateTrelicaWeights(g.tamanho || g.gauge.replace(/\D/g, '') || '12', g.superior || '', g.inferior || '', g.senozoide || '', `${g.productCode || ''} ${g.description || ''}`)?.pesoFinal || '-'} kg
+                                                                        </span>
                                                                     </div>
                                                                 </>
                                                             ) : isItemMalha ? (

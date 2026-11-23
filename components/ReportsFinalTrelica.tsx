@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Page, StockItem, StockGauge } from '../types';
 import html2canvas from 'html2canvas';
-import { trelicaModels } from './ProductionOrderTrelica';
+import { buildMergedTrelicaModels } from './ProductionOrderTrelica';
 import { supabase } from '../services/supabaseService';
 
 interface ReportsFinalTrelicaProps {
@@ -58,6 +58,7 @@ const ReportsFinalTrelica: React.FC<ReportsFinalTrelicaProps> = ({ stock = [], s
 
     // Modelo de Treliça Selecionado
     const [selectedModelCod, setSelectedModelCod] = useState<string>('');
+    const trelicaModels = useMemo(() => buildMergedTrelicaModels([], gauges, []), [gauges]);
 
     const normalizeBitolaVal = (val: string): string => {
         if (!val) return '';

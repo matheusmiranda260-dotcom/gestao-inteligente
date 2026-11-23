@@ -1904,7 +1904,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
     }, []);
 
     // --- Campos de TRELIÇA (Regras idênticas a ProductionOrderTrelica.tsx) ---
-    const [selectedTrelicaCod, setSelectedTrelicaCod] = useState<string>(trelicaModels[0]?.cod || 'H8L6');
+    const [selectedTrelicaCod, setSelectedTrelicaCod] = useState<string>(trelicaModels[0]?.cod || '');
+
+    // Mantém o código selecionado sincronizado com os itens do cadastro quando trelicaModels atualizar
+    useEffect(() => {
+        if (trelicaModels.length > 0 && !trelicaModels.some(m => m.cod === selectedTrelicaCod)) {
+            setSelectedTrelicaCod(trelicaModels[0].cod);
+        }
+    }, [trelicaModels, selectedTrelicaCod]);
 
     // Modelo de Treliça Selecionado
     const selectedTrelicaModel = useMemo(() => {
@@ -2051,30 +2058,32 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             });
         });
 
-        // 2. Modelos padrão do catálogo (DefaultMalhaGauges) se não estiverem deletados ou substituídos
-        DefaultMalhaGauges.forEach(d => {
-            const defId = d.id || `default_ml_${d.productCode}`;
-            if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
-            const exists = result.some(g =>
-                (d.productCode && g.productCode === d.productCode) ||
-                (g.description === d.description && g.gauge === d.gauge) ||
-                g.id === defId
-            );
-            if (!exists) {
-                result.push({
-                    id: defId,
-                    productCode: d.productCode,
-                    description: d.description,
-                    gauge: d.gauge,
-                    meshSpacing: d.meshSpacing,
-                    panelDimensions: d.panelDimensions,
-                    peso_peca: d.peso_peca ? String(d.peso_peca) : d.peso_final ? String(d.peso_final) : undefined,
-                    peso_final: d.peso_final,
-                    longitudinal: d.longitudinal,
-                    transversal: d.transversal
-                });
-            }
-        });
+        // 2. Modelos padrão do catálogo (DefaultMalhaGauges) apenas se não houver malhas cadastradas no banco
+        if (result.length === 0) {
+            DefaultMalhaGauges.forEach(d => {
+                const defId = d.id || `default_ml_${d.productCode}`;
+                if (deletedDefaults.includes(defId) || overriddenDefaults.includes(defId)) return;
+                const exists = result.some(g =>
+                    (d.productCode && g.productCode === d.productCode) ||
+                    (g.description === d.description && g.gauge === d.gauge) ||
+                    g.id === defId
+                );
+                if (!exists) {
+                    result.push({
+                        id: defId,
+                        productCode: d.productCode,
+                        description: d.description,
+                        gauge: d.gauge,
+                        meshSpacing: d.meshSpacing,
+                        panelDimensions: d.panelDimensions,
+                        peso_peca: d.peso_peca ? String(d.peso_peca) : d.peso_final ? String(d.peso_final) : undefined,
+                        peso_final: d.peso_final,
+                        longitudinal: d.longitudinal,
+                        transversal: d.transversal
+                    });
+                }
+            });
+        }
 
         return result;
     }, [gauges]);
@@ -7789,13 +7798,13 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                                         <div className="flex flex-col gap-1">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modelo da Treliça</label>
                                             <select
-                                                value={selectedTrelicaCod}
+                                                value={selectedTrelicaModel?.cod || selectedTrelicaCod}
                                                 onChange={(e) => setSelectedTrelicaCod(e.target.value)}
                                                 className="w-full bg-[#07131B] border border-white/10 rounded-xl py-2 px-3 text-xs text-white font-bold"
                                             >
                                                 {trelicaModels.map(m => (
                                                     <option key={m.cod} value={m.cod}>
-                                                        {m.modelo} - {m.tamanho}m (Sup: {m.superior} | Inf: {m.inferior} | Sen: {m.senozoide})
+                                                        {m.cod && !m.modelo.startsWith(m.cod) ? `${m.cod} - ` : ''}{m.modelo} - {m.tamanho}m (Sup: {m.superior} | Inf: {m.inferior} | Sen: {m.senozoide})
                                                     </option>
                                                 ))}
                                             </select>
