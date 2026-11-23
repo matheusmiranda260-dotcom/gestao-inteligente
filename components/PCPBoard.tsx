@@ -1283,12 +1283,24 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         }
     };
 
-    // Salvar edição de OP em andamento (Nome, Meta, Turnos Finalizados)
+    // Salvar edição de OP em andamento (Nome, Modelo Técnico, Meta, Turnos Finalizados)
     const handleSaveActiveOPEdit = async (
         orderId: string,
         data: {
             newOrderNumber: string;
             newQuantityToProduce: number;
+            newModelData?: {
+                productCode?: string;
+                productDescription?: string;
+                trelicaModel?: string;
+                tamanho?: string;
+                pieceWeight?: number;
+                targetBitola?: Bitola;
+                trelicaSuperior?: string;
+                trelicaInferior?: string;
+                trelicaSinusoide?: string;
+                malhaModel?: string;
+            };
             updatedFinalizedShifts: {
                 logIndex: number;
                 reportId?: string;
@@ -1304,6 +1316,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         if (!targetOrder) return;
 
         const isTrefila = typeof targetOrder.machine === 'string' && targetOrder.machine.startsWith('Trefila') || (typeof targetOrder.scheduledMachine === 'string' && targetOrder.scheduledMachine.startsWith('Trefila'));
+        const isTrelica = typeof targetOrder.machine === 'string' && targetOrder.machine.startsWith('Treliça') || (typeof targetOrder.scheduledMachine === 'string' && targetOrder.scheduledMachine.startsWith('Treliça'));
         const unit = isTrefila ? 'kg' : 'pçs';
         const now = new Date().toISOString();
         const oldOrderNumber = targetOrder.orderNumber;
@@ -1317,6 +1330,32 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             // 1. Atualizar Número / Nome da Ordem se alterado
             if (cleanNewOrderNumber && cleanNewOrderNumber !== oldOrderNumber) {
                 updates.orderNumber = cleanNewOrderNumber;
+            }
+
+            // 1.5. Atualizar Modelo Técnico da Peça se alterado pelo Gestor
+            if (data.newModelData) {
+                if (data.newModelData.productCode !== undefined) updates.productCode = data.newModelData.productCode;
+                if (data.newModelData.productDescription !== undefined) updates.productDescription = data.newModelData.productDescription;
+                if (data.newModelData.targetBitola !== undefined) updates.targetBitola = data.newModelData.targetBitola;
+                if (data.newModelData.pieceWeight !== undefined) updates.pieceWeight = data.newModelData.pieceWeight;
+
+                if (isTrelica) {
+                    if (data.newModelData.trelicaModel !== undefined) updates.trelicaModel = data.newModelData.trelicaModel;
+                    if (data.newModelData.tamanho !== undefined) updates.tamanho = data.newModelData.tamanho;
+                    if (data.newModelData.trelicaSuperior !== undefined) updates.trelicaSuperior = data.newModelData.trelicaSuperior;
+                    if (data.newModelData.trelicaInferior !== undefined) updates.trelicaInferior = data.newModelData.trelicaInferior;
+                    if (data.newModelData.trelicaSinusoide !== undefined) updates.trelicaSinusoide = data.newModelData.trelicaSinusoide;
+                    if (data.newModelData.pieceWeight && data.newModelData.pieceWeight > 0) {
+                        updates.totalWeight = data.newModelData.pieceWeight * data.newQuantityToProduce;
+                        updates.plannedOutputWeight = data.newModelData.pieceWeight * data.newQuantityToProduce;
+                    }
+                } else if (!isTrefila) {
+                    if (data.newModelData.malhaModel !== undefined) updates.malhaModel = data.newModelData.malhaModel;
+                    updates.malhaPieces = data.newQuantityToProduce;
+                    if (data.newModelData.pieceWeight && data.newModelData.pieceWeight > 0) {
+                        updates.totalWeight = data.newModelData.pieceWeight * data.newQuantityToProduce;
+                    }
+                }
             }
 
             // 2. Atualizar Quantidade a Produzir (Meta)
@@ -11315,12 +11354,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 />
             )}
 
-            {/* Modal de Edição da OP em Produção (Nome, Meta, Turnos Finalizados) */}
+            {/* Modal de Edição da OP em Produção (Nome, Modelo Técnico, Meta, Turnos Finalizados) */}
             {editingInProgressOP && (
                 <EditActiveOPModal
                     order={editingInProgressOP}
                     shiftReports={shiftReports}
                     gauges={gauges}
+                    trelicaModels={trelicaModels}
+                    availableMalhaModels={availableMalhaModels}
+                    availableTrefilaGaugesData={availableTrefilaGaugesData}
                     onClose={() => setEditingInProgressOP(null)}
                     onSave={handleSaveActiveOPEdit}
                 />
@@ -12909,19 +12951,34 @@ const ManagerAuthModalForAdjust: React.FC<{
 };
 
 // ============================================================================
-// COMPONENTE: Modal de Edição da OP em Produção (Nome, Meta, Turnos Finalizados)
-// Modelo técnico bloqueado para preservar a rastreabilidade dos lotes.
+// COMPONENTE: Modal de Edição da OP em Produção (Nome, Modelo Técnico, Meta, Turnos Finalizados)
+// Permite ao Gestor alterar o modelo da peça com alerta inteligente caso mude as bitolas.
 // ============================================================================
 interface EditActiveOPModalProps {
     order: ProductionOrderData;
     shiftReports?: ShiftReport[];
     gauges?: any[];
+    trelicaModels?: any[];
+    availableMalhaModels?: any[];
+    availableTrefilaGaugesData?: any[];
     onClose: () => void;
     onSave: (
         orderId: string,
         data: {
             newOrderNumber: string;
             newQuantityToProduce: number;
+            newModelData?: {
+                productCode?: string;
+                productDescription?: string;
+                trelicaModel?: string;
+                tamanho?: string;
+                pieceWeight?: number;
+                targetBitola?: Bitola;
+                trelicaSuperior?: string;
+                trelicaInferior?: string;
+                trelicaSinusoide?: string;
+                malhaModel?: string;
+            };
             updatedFinalizedShifts: {
                 logIndex: number;
                 reportId?: string;
@@ -12947,15 +13004,27 @@ interface FinalizedShiftItem {
     pieces: number;
 }
 
+const normBitolaCompare = (val?: string | null): string => {
+    if (!val) return '';
+    const cleaned = String(val).replace(/mm/gi, '').replace(',', '.').trim();
+    const num = parseFloat(cleaned);
+    if (isNaN(num) || num <= 0) return '';
+    return num.toFixed(2).replace('.', ',');
+};
+
 const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
     order,
     shiftReports = [],
     gauges = [],
+    trelicaModels = [],
+    availableMalhaModels = [],
+    availableTrefilaGaugesData = [],
     onClose,
     onSave
 }) => {
     const isTrefila = typeof order.machine === 'string' && order.machine.startsWith('Trefila') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Trefila'));
     const isTrelica = typeof order.machine === 'string' && order.machine.startsWith('Treliça') || (typeof order.scheduledMachine === 'string' && order.scheduledMachine.startsWith('Treliça'));
+    const isMalha = !isTrefila && !isTrelica;
     const unit = isTrefila ? 'kg' : 'pçs';
 
     // 1. Nome / Número da Ordem
@@ -12971,36 +13040,196 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
 
     const [quantityToProduce, setQuantityToProduce] = useState<number>(initialMeta);
 
-    // 3. Modelo Técnico (BLOQUEADO)
-    const modelDisplay = useMemo(() => {
-        if (isTrelica) {
-            return `${order.trelicaModel || 'Treliça'}${order.tamanho ? ` • ${order.tamanho}` : ''}`;
+    // 3. Catálogo e Seleção de Modelo Técnico (Editável pelo Gestor com Alerta de Bitola)
+    const catalogTrelicaList = useMemo(() => {
+        if (trelicaModels && trelicaModels.length > 0) return trelicaModels;
+        return buildMergedTrelicaModels([], gauges, []);
+    }, [trelicaModels, gauges]);
+
+    // Localizar modelo original de Treliça da OP
+    const initialTrelicaMatch = useMemo(() => {
+        if (!isTrelica) return null;
+        const pCod = (order.productCode || '').trim().toUpperCase();
+        const tMod = (order.trelicaModel || order.productDescription || '').trim().toUpperCase();
+        const tTam = String(order.tamanho || '').replace(/\D/g, '');
+
+        // 1. Tenta achar no catálogo atual por código exato
+        if (pCod) {
+            const byCod = catalogTrelicaList.find(m => String(m.cod || '').trim().toUpperCase() === pCod);
+            if (byCod) return byCod;
         }
-        if (isTrefila) {
-            let pCode = order.productCode || '';
-            let pDesc = order.productDescription || '';
-            if (!pDesc || !pCode) {
-                // Fallback for old orders: lookup in gauges
-                const cleanTarget = String(order.targetBitola || '').replace('mm', '').trim();
-                const matchedGauge = gauges.find((g: any) => {
-                    const mat = (g.materialType || '').toLowerCase();
-                    const isCa60 = mat === 'ca-60' || mat === 'ca60' || mat.includes('trefila');
-                    if (!isCa60) return false;
-                    const gClean = String(g.gauge || '').replace('mm', '').trim();
-                    return g.gauge === order.targetBitola || gClean === cleanTarget || parseFloat(gClean.replace(',', '.')) === parseFloat(cleanTarget.replace(',', '.'));
-                });
-                if (matchedGauge) {
-                    if (!pCode) pCode = matchedGauge.productCode || (matchedGauge as any).code || '';
-                    if (!pDesc) pDesc = matchedGauge.description || (matchedGauge as any).gaugeDescription || '';
-                }
-            }
-            if (pDesc) {
-                return pCode && !pDesc.startsWith(pCode) ? `[${pCode}] ${pDesc}` : pDesc;
-            }
-            return `Bitola ${order.targetBitola || 'N/A'}mm${order.inputBitola ? ` (Entrada: ${order.inputBitola}mm)` : ''}`;
+        // 2. Tenta achar no catálogo atual por descrição + tamanho
+        if (tMod) {
+            const byModAndTam = catalogTrelicaList.find(m => {
+                const mMod = String(m.modelo || '').trim().toUpperCase();
+                const mTam = String(m.tamanho || '').replace(/\D/g, '');
+                return mMod === tMod && (!tTam || !mTam || mTam === tTam);
+            });
+            if (byModAndTam) return byModAndTam;
         }
-        return order.malhaModel || 'Malha Padrão';
-    }, [order, isTrelica, isTrefila, gauges]);
+        // 3. Tenta achar nos modelos legados apenas para identificar as bitolas originais da OP caso não estejam salvas diretamente
+        const legacyMatch = DEFAULT_TRELICA_MODELS.find(m => {
+            const mCod = String(m.cod || '').trim().toUpperCase();
+            const mMod = String(m.modelo || '').trim().toUpperCase();
+            const mTam = String(m.tamanho || '').replace(/\D/g, '');
+            if (pCod && mCod === pCod) return true;
+            return mMod === tMod && (!tTam || mTam === tTam);
+        });
+        return legacyMatch || null;
+    }, [isTrelica, order, catalogTrelicaList]);
+
+    // Bitolas originais da OP (Treliça)
+    const origTrelicaBitolas = useMemo(() => {
+        return {
+            sup: normBitolaCompare(order.trelicaSuperior || initialTrelicaMatch?.superior || order.targetBitola),
+            inf: normBitolaCompare(order.trelicaInferior || initialTrelicaMatch?.inferior),
+            sen: normBitolaCompare(order.trelicaSinusoide || initialTrelicaMatch?.senozoide)
+        };
+    }, [order, initialTrelicaMatch]);
+
+    // Opções do select de Treliça (inclui item legado no topo caso a OP atual esteja com um modelo antigo fora do cadastro)
+    const selectableTrelicaOptions = useMemo(() => {
+        if (!isTrelica) return [];
+        const inCatalog = catalogTrelicaList.some(m =>
+            (order.productCode && String(m.cod).toUpperCase() === String(order.productCode).toUpperCase()) ||
+            (String(m.modelo).toUpperCase() === String(order.trelicaModel || order.productDescription || '').toUpperCase() &&
+             String(m.tamanho).replace(/\D/g, '') === String(order.tamanho || '').replace(/\D/g, ''))
+        );
+        if (inCatalog) return catalogTrelicaList;
+
+        const currentSynthetic = {
+            cod: order.productCode || '__CURRENT_LEGACY__',
+            modelo: order.trelicaModel || order.productDescription || 'Modelo Atual',
+            tamanho: String(order.tamanho || initialTrelicaMatch?.tamanho || '12').replace(/\D/g, '') || '12',
+            superior: order.trelicaSuperior || initialTrelicaMatch?.superior || String(order.targetBitola || '5,6'),
+            inferior: order.trelicaInferior || initialTrelicaMatch?.inferior || '3,2',
+            senozoide: order.trelicaSinusoide || initialTrelicaMatch?.senozoide || '3,2',
+            pesoFinal: String(order.pieceWeight || initialTrelicaMatch?.pesoFinal || '5,502').replace('.', ','),
+            isLegacyCurrent: true
+        };
+        return [currentSynthetic, ...catalogTrelicaList];
+    }, [isTrelica, catalogTrelicaList, order, initialTrelicaMatch]);
+
+    const initialSelectedTrelicaCod = useMemo(() => {
+        if (!isTrelica || selectableTrelicaOptions.length === 0) return '';
+        const pCod = (order.productCode || '').trim().toUpperCase();
+        if (pCod) {
+            const byCod = selectableTrelicaOptions.find(m => String(m.cod).trim().toUpperCase() === pCod);
+            if (byCod) return byCod.cod;
+        }
+        const tMod = (order.trelicaModel || order.productDescription || '').trim().toUpperCase();
+        const tTam = String(order.tamanho || '').replace(/\D/g, '');
+        const byMod = selectableTrelicaOptions.find(m =>
+            String(m.modelo).trim().toUpperCase() === tMod &&
+            (!tTam || String(m.tamanho).replace(/\D/g, '') === tTam)
+        );
+        return byMod ? byMod.cod : selectableTrelicaOptions[0].cod;
+    }, [isTrelica, selectableTrelicaOptions, order]);
+
+    const [selectedTrelicaCod, setSelectedTrelicaCod] = useState<string>(initialSelectedTrelicaCod);
+
+    const selectedTrelicaObj = useMemo(() => {
+        if (!isTrelica) return null;
+        return selectableTrelicaOptions.find(m => m.cod === selectedTrelicaCod) || selectableTrelicaOptions[0] || null;
+    }, [isTrelica, selectableTrelicaOptions, selectedTrelicaCod]);
+
+    // Seleção de Malha (quando OP é de Malha)
+    const initialSelectedMalhaKey = useMemo(() => {
+        if (!isMalha) return '';
+        const pCod = (order.productCode || '').trim();
+        const mMod = (order.malhaModel || order.productDescription || '').trim();
+        const found = availableMalhaModels.find(m =>
+            (pCod && m.productCode === pCod) ||
+            (mMod && m.description === mMod)
+        );
+        return found ? (found.productCode || found.description) : (mMod || availableMalhaModels[0]?.productCode || availableMalhaModels[0]?.description || '');
+    }, [isMalha, order, availableMalhaModels]);
+
+    const [selectedMalhaKey, setSelectedMalhaKey] = useState<string>(initialSelectedMalhaKey);
+
+    const selectedMalhaObj = useMemo(() => {
+        if (!isMalha) return null;
+        return availableMalhaModels.find(m => (m.productCode || m.description) === selectedMalhaKey || m.description === selectedMalhaKey) || null;
+    }, [isMalha, availableMalhaModels, selectedMalhaKey]);
+
+    // Seleção de Trefila (quando OP é de Trefila)
+    const initialSelectedTrefilaKey = useMemo(() => {
+        if (!isTrefila) return '';
+        const pCod = (order.productCode || '').trim();
+        const cleanTarget = normBitolaCompare(order.targetBitola);
+        const found = availableTrefilaGaugesData.find(g =>
+            (pCod && g.productCode === pCod) ||
+            (cleanTarget && normBitolaCompare(g.gauge) === cleanTarget)
+        );
+        return found ? (found.id || found.productCode || found.gauge) : (cleanTarget || '');
+    }, [isTrefila, order, availableTrefilaGaugesData]);
+
+    const [selectedTrefilaKey, setSelectedTrefilaKey] = useState<string>(initialSelectedTrefilaKey);
+
+    const selectedTrefilaObj = useMemo(() => {
+        if (!isTrefila) return null;
+        return availableTrefilaGaugesData.find(g => (g.id || g.productCode || g.gauge) === selectedTrefilaKey) || null;
+    }, [isTrefila, availableTrefilaGaugesData, selectedTrefilaKey]);
+
+    // Diagnóstico de alteração de Modelo e Alerta de Mudança de Bitola
+    const gaugeChangeDiagnostics = useMemo(() => {
+        if (isTrelica && selectedTrelicaObj) {
+            const isModelChanged = selectedTrelicaObj.cod !== initialSelectedTrelicaCod;
+            const newSup = normBitolaCompare(selectedTrelicaObj.superior);
+            const newInf = normBitolaCompare(selectedTrelicaObj.inferior);
+            const newSen = normBitolaCompare(selectedTrelicaObj.senozoide);
+
+            const supChanged = Boolean(origTrelicaBitolas.sup && newSup && origTrelicaBitolas.sup !== newSup);
+            const infChanged = Boolean(origTrelicaBitolas.inf && newInf && origTrelicaBitolas.inf !== newInf);
+            const senChanged = Boolean(origTrelicaBitolas.sen && newSen && origTrelicaBitolas.sen !== newSen);
+            const hasBitolaChanged = supChanged || infChanged || senChanged;
+
+            return {
+                isModelChanged,
+                hasBitolaChanged,
+                details: [
+                    { label: 'Superior (1 fio)', oldVal: origTrelicaBitolas.sup || '-', newVal: newSup || '-', changed: supChanged },
+                    { label: 'Inferior (2 fios)', oldVal: origTrelicaBitolas.inf || '-', newVal: newInf || '-', changed: infChanged },
+                    { label: 'Senozoide (2 fios)', oldVal: origTrelicaBitolas.sen || '-', newVal: newSen || '-', changed: senChanged }
+                ]
+            };
+        }
+
+        if (isMalha && selectedMalhaObj) {
+            const isModelChanged = (selectedMalhaObj.productCode || selectedMalhaObj.description) !== initialSelectedMalhaKey;
+            const oldBitola = normBitolaCompare(order.targetBitola);
+            const newBitola = normBitolaCompare(selectedMalhaObj.gauge);
+            const changed = Boolean(oldBitola && newBitola && oldBitola !== newBitola);
+            return {
+                isModelChanged,
+                hasBitolaChanged: changed,
+                details: [
+                    { label: 'Bitola da Malha', oldVal: oldBitola || '-', newVal: newBitola || '-', changed }
+                ]
+            };
+        }
+
+        if (isTrefila && selectedTrefilaObj) {
+            const isModelChanged = (selectedTrefilaObj.id || selectedTrefilaObj.productCode || selectedTrefilaObj.gauge) !== initialSelectedTrefilaKey;
+            const oldBitola = normBitolaCompare(order.targetBitola);
+            const newBitola = normBitolaCompare(selectedTrefilaObj.gauge);
+            const changed = Boolean(oldBitola && newBitola && oldBitola !== newBitola);
+            return {
+                isModelChanged,
+                hasBitolaChanged: changed,
+                details: [
+                    { label: 'Bitola CA-60 Saída', oldVal: oldBitola || '-', newVal: newBitola || '-', changed }
+                ]
+            };
+        }
+
+        return { isModelChanged: false, hasBitolaChanged: false, details: [] };
+    }, [
+        isTrelica, selectedTrelicaObj, initialSelectedTrelicaCod, origTrelicaBitolas,
+        isMalha, selectedMalhaObj, initialSelectedMalhaKey,
+        isTrefila, selectedTrefilaObj, initialSelectedTrefilaKey,
+        order.targetBitola
+    ]);
 
     // 4. Turnos Finalizados (Peças Produzidas)
     const initialShifts = useMemo(() => {
@@ -13117,11 +13346,63 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (gaugeChangeDiagnostics.isModelChanged && gaugeChangeDiagnostics.hasBitolaChanged) {
+            const changedSummary = gaugeChangeDiagnostics.details
+                .filter(d => d.changed)
+                .map(d => `• ${d.label}: ${d.oldVal} mm ➔ ${d.newVal} mm`)
+                .join('\n');
+            const confirmed = window.confirm(
+                `⚠️ ALERTA DE MUDANÇA DE BITOLA!\n\nO novo modelo selecionado possui bitolas diferentes das configuradas anteriormente nesta OP:\n\n${changedSummary}\n\nDeseja confirmar a alteração do modelo da peça?`
+            );
+            if (!confirmed) return;
+        }
+
+        let newModelData: EditActiveOPModalProps['onSave'] extends (id: string, d: infer D) => any
+            ? D extends { newModelData?: infer M } ? M : undefined
+            : undefined = undefined;
+
+        if (gaugeChangeDiagnostics.isModelChanged) {
+            if (isTrelica && selectedTrelicaObj) {
+                const unitPieceWeight = parseFloat(String(selectedTrelicaObj.pesoFinal || selectedTrelicaObj.peso_final || '0').replace(',', '.')) || 0;
+                newModelData = {
+                    productCode: selectedTrelicaObj.cod === '__CURRENT_LEGACY__' ? (order.productCode || '') : selectedTrelicaObj.cod,
+                    productDescription: selectedTrelicaObj.modelo,
+                    trelicaModel: selectedTrelicaObj.modelo,
+                    tamanho: selectedTrelicaObj.tamanho,
+                    pieceWeight: unitPieceWeight,
+                    targetBitola: selectedTrelicaObj.superior as Bitola,
+                    trelicaSuperior: selectedTrelicaObj.superior,
+                    trelicaInferior: selectedTrelicaObj.inferior,
+                    trelicaSinusoide: selectedTrelicaObj.senozoide
+                };
+            } else if (isMalha && selectedMalhaObj) {
+                const rawPeso = selectedMalhaObj.peso_peca || selectedMalhaObj.peso_final;
+                const pieceWeight = rawPeso ? parseFloat(String(rawPeso).replace(',', '.')) : 5;
+                const cleanBitola = String(selectedMalhaObj.gauge || order.targetBitola || '').replace(/mm/gi, '').trim().replace(',', '.') as Bitola;
+                newModelData = {
+                    productCode: selectedMalhaObj.productCode || '',
+                    productDescription: selectedMalhaObj.description,
+                    malhaModel: selectedMalhaObj.description,
+                    pieceWeight: pieceWeight > 0 ? pieceWeight : 5,
+                    targetBitola: cleanBitola
+                };
+            } else if (isTrefila && selectedTrefilaObj) {
+                const cleanBitola = String(selectedTrefilaObj.gauge || order.targetBitola || '').replace(/mm/gi, '').trim().replace(',', '.') as Bitola;
+                newModelData = {
+                    productCode: selectedTrefilaObj.productCode || '',
+                    productDescription: selectedTrefilaObj.description || '',
+                    targetBitola: cleanBitola
+                };
+            }
+        }
+
         setIsSaving(true);
         try {
             await onSave(order.id, {
                 newOrderNumber: orderNumber,
                 newQuantityToProduce: quantityToProduce,
+                newModelData,
                 updatedFinalizedShifts: finalizedShifts.map(s => ({
                     logIndex: s.logIndex,
                     reportId: s.reportId,
@@ -13189,28 +13470,112 @@ const EditActiveOPModal: React.FC<EditActiveOPModalProps> = ({
                         </div>
                     </div>
 
-                    {/* 2. Modelo Técnico Bloqueado */}
-                    <div className="bg-slate-900/70 border border-amber-500/30 rounded-xl p-3.5 flex flex-col gap-2">
+                    {/* 2. Modelo Técnico do Produto (Editável pelo Gestor com Alerta de Bitola) */}
+                    <div className={`bg-slate-900/80 border rounded-xl p-3.5 flex flex-col gap-2.5 transition-all ${
+                        gaugeChangeDiagnostics.isModelChanged
+                            ? gaugeChangeDiagnostics.hasBitolaChanged
+                                ? 'border-amber-500/70 shadow-[0_0_20px_rgba(245,158,11,0.18)]'
+                                : 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.12)]'
+                            : 'border-purple-500/30'
+                    }`}>
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                <LockClosedIcon className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                                <PencilIcon className="w-3.5 h-3.5 text-purple-400" />
                                 <span>Modelo Técnico do Produto</span>
                             </span>
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 font-mono">
-                                <span>🔒</span> BLOQUEADO
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1 font-mono">
+                                <span>🔓</span> GESTOR LIBERADO
                             </span>
                         </div>
-                        <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-lg px-3 py-2">
-                            <span className="font-mono text-sm font-bold text-slate-200">
-                                {modelDisplay}
-                            </span>
-                            <span className="text-[11px] font-mono text-slate-400">
-                                {order.scheduledMachine || order.machine}
-                            </span>
-                        </div>
-                        <p className="text-[11px] text-amber-300/80 leading-snug">
-                            ⚠️ O modelo técnico não pode ser trocado com a OP em andamento para não corromper a rastreabilidade dos lotes de matéria-prima e bobinas já consumidas.
-                        </p>
+
+                        {isTrelica ? (
+                            <select
+                                value={selectedTrelicaObj?.cod || selectedTrelicaCod}
+                                onChange={(e) => setSelectedTrelicaCod(e.target.value)}
+                                className="w-full bg-black/60 border border-white/15 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-white outline-none transition-all cursor-pointer"
+                            >
+                                {selectableTrelicaOptions.map((m: any) => (
+                                    <option key={m.cod} value={m.cod} className="bg-slate-900 text-white">
+                                        {m.isLegacyCurrent ? '[ATUAL FORA DO CADASTRO] ' : ''}
+                                        {m.cod && m.cod !== '__CURRENT_LEGACY__' && !String(m.modelo).startsWith(m.cod) ? `${m.cod} - ` : ''}
+                                        {m.modelo} - {m.tamanho}m (Sup: {m.superior} | Inf: {m.inferior} | Sen: {m.senozoide})
+                                    </option>
+                                ))}
+                            </select>
+                        ) : isMalha ? (
+                            <select
+                                value={selectedMalhaKey}
+                                onChange={(e) => setSelectedMalhaKey(e.target.value)}
+                                className="w-full bg-black/60 border border-white/15 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-white outline-none transition-all cursor-pointer"
+                            >
+                                {availableMalhaModels.map((m: any, idx: number) => {
+                                    const key = m.productCode || m.description || String(idx);
+                                    return (
+                                        <option key={key} value={key} className="bg-slate-900 text-white">
+                                            {m.productCode ? `${m.productCode} - ` : ''}{m.description} ({m.gauge || 'Padrão'})
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        ) : (
+                            <select
+                                value={selectedTrefilaKey}
+                                onChange={(e) => setSelectedTrefilaKey(e.target.value)}
+                                className="w-full bg-black/60 border border-white/15 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-white outline-none transition-all cursor-pointer"
+                            >
+                                {availableTrefilaGaugesData.map((g: any, idx: number) => {
+                                    const key = g.id || g.productCode || g.gauge || String(idx);
+                                    return (
+                                        <option key={key} value={key} className="bg-slate-900 text-white">
+                                            {g.productCode ? `${g.productCode} - ` : ''}{g.description || `CA-60 ${g.gauge}mm`} (Bitola: {g.gauge}mm)
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        )}
+
+                        {/* Alerta inteligente de mudança de bitola */}
+                        {gaugeChangeDiagnostics.isModelChanged && gaugeChangeDiagnostics.hasBitolaChanged && (
+                            <div className="bg-amber-500/15 border border-amber-500/50 rounded-xl p-3 flex flex-col gap-2 animate-fade">
+                                <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wide">
+                                    <span>⚠️</span>
+                                    <span>Atenção: Este modelo altera as bitolas da peça!</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                                    {gaugeChangeDiagnostics.details.map((d, i) => (
+                                        <div
+                                            key={i}
+                                            className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono flex flex-col ${
+                                                d.changed
+                                                    ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
+                                                    : 'bg-black/30 border-white/10 text-slate-400'
+                                            }`}
+                                        >
+                                            <span className="text-[9px] uppercase font-bold opacity-80">{d.label}</span>
+                                            {d.changed ? (
+                                                <span className="font-black text-amber-300">
+                                                    {d.oldVal}mm ➔ {d.newVal}mm
+                                                </span>
+                                            ) : (
+                                                <span className="font-bold text-emerald-400">
+                                                    Mantém {d.newVal}mm
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-amber-200/90 leading-snug">
+                                    Você pode confirmar a alteração normalmente. Lembre-se apenas de verificar se os lotes abastecidos na máquina correspondem às novas bitolas.
+                                </p>
+                            </div>
+                        )}
+
+                        {gaugeChangeDiagnostics.isModelChanged && !gaugeChangeDiagnostics.hasBitolaChanged && (
+                            <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-xl px-3 py-2 flex items-center gap-2 text-[11px] text-emerald-300 font-bold">
+                                <span>✓</span>
+                                <span>Novo modelo compatível com as mesmas bitolas atuais da OP.</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* 3. Quantidade a Produzir (Meta) */}

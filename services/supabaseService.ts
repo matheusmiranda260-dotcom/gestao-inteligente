@@ -324,7 +324,10 @@ export const insertItem = async <T extends { id?: string }>(
         throw error;
     }
     const camelResult = mapToCamelCase(data) as any;
-    return { ...item, ...camelResult } as T;
+    const summaryFields = (camelResult?.summary && typeof camelResult.summary === 'object')
+        ? mapToCamelCase(camelResult.summary)
+        : {};
+    return { ...summaryFields, ...item, ...camelResult } as T;
 };
 
 /** Update item with mapping */
@@ -418,7 +421,10 @@ export const updateItem = async <T>(table: string, id: string, updates: Partial<
         throw error;
     }
     const camelResult = mapToCamelCase(data) as any;
-    return { ...updates, ...camelResult } as T;
+    const summaryFields = (camelResult?.summary && typeof camelResult.summary === 'object')
+        ? mapToCamelCase(camelResult.summary)
+        : {};
+    return { ...summaryFields, ...updates, ...camelResult } as T;
 };
 
 /** Upsert item (Insert or Update if exists) */
@@ -431,7 +437,10 @@ export const upsertItem = async <T>(table: string, item: T, onConflict: string =
         throw error;
     }
     const camelResult = mapToCamelCase(data) as any;
-    return { ...item, ...camelResult } as T;
+    const summaryFields = (camelResult?.summary && typeof camelResult.summary === 'object')
+        ? mapToCamelCase(camelResult.summary)
+        : {};
+    return { ...summaryFields, ...item, ...camelResult } as T;
 };
 
 /** Delete item by id */
