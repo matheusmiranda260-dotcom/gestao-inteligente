@@ -721,10 +721,22 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         };
     };
 
-    // Helpers de tempo
+    // Helpers de tempo (suporta HH:MM:SS, HH:MM, HHhMM, HH.MM e dígitos puros como 0800 ou 080000)
     const timeToSeconds = (timeStr: string): number => {
         if (!timeStr) return 0;
-        const parts = timeStr.trim().split(':');
+        const clean = String(timeStr).trim().toLowerCase().replace(/[h.]/g, ':');
+        if (/^\d{4}$/.test(clean)) {
+            const hrs = parseInt(clean.slice(0, 2), 10) || 0;
+            const mins = parseInt(clean.slice(2, 4), 10) || 0;
+            return hrs * 3600 + mins * 60;
+        }
+        if (/^\d{6}$/.test(clean)) {
+            const hrs = parseInt(clean.slice(0, 2), 10) || 0;
+            const mins = parseInt(clean.slice(2, 4), 10) || 0;
+            const secs = parseInt(clean.slice(4, 6), 10) || 0;
+            return hrs * 3600 + mins * 60 + secs;
+        }
+        const parts = clean.split(':');
         const hrs = parseInt(parts[0], 10) || 0;
         const mins = parseInt(parts[1], 10) || 0;
         const secs = parseInt(parts[2], 10) || 0;
@@ -931,7 +943,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             });
 
             if (matchedMalha) {
-                const raw = parseFloat(String((matchedMalha as any).peso_peca || matchedMalha.peso_final || '0').replace(',', '.'));
+                const raw = parseFloat(String((matchedMalha as any).peso_peca || (matchedMalha as any).pesoPeca || matchedMalha.peso_final || (matchedMalha as any).pesoFinal || '0').replace(',', '.'));
                 if (raw > 0) return raw;
             }
         }
@@ -1070,7 +1082,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         });
 
-        // 2. Dos Operator Logs (Ground truth fiel de medidores de máquina, somando múltiplos turnos do mesmo dia)
+        // 2. Dos Operator Logs (Fonte oficial e prioritária do Dashboard PCP, incluindo ajustes manuais de quantidade)
         const logsDayMap = new Map<string, number>();
         (targetOp.operatorLogs || []).forEach((l: any) => {
             if (!l || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG') return;
@@ -1092,11 +1104,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 logsDayMap.set(d, (logsDayMap.get(d) || 0) + diff);
             }
         });
+        // IMPORTANTE: operatorLogs sobrescreve shift_reports para refletir fielmente qualquer ajuste manual feito no Dashboard
         logsDayMap.forEach((qty, d) => {
-            dayMap.set(d, Math.max(dayMap.get(d) || 0, qty));
+            dayMap.set(d, qty);
         });
 
-        // 3. De pacotes pesados
+        // 3. De pacotes pesados (apenas se não houver registro em operatorLogs/shiftReports naquela data)
         (targetOp.weighedPackages || []).forEach((p: any) => {
             if (!p.timestamp) return;
             const d = getLocalDateString(p.timestamp);
@@ -1106,9 +1119,9 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         });
 
-        // 4. Se initialProduced estiver definido para a data de corte/selecionada, fixar o valor exato do card
-        if (initialProduced && initialProduced > 0 && upToDateStr) {
-            dayMap.set(upToDateStr, initialProduced);
+        // 4. Se initialProduced estiver definido para a data inicial do card aberto no Dashboard, garante paridade exata
+        if (initialProduced !== undefined && initialProduced > 0 && dateStr && (!upToDateStr || upToDateStr >= dateStr)) {
+            dayMap.set(dateStr, initialProduced);
         }
 
         const sortedDates = [...dayMap.keys()].filter(d => !upToDateStr || d <= upToDateStr).sort();
@@ -1853,8 +1866,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         (stops || []).forEach(s => {
             if (!s || !s.inicio || !s.fim) return;
             const startSec = timeToSeconds(s.inicio);
-            const endSec = timeToSeconds(s.fim);
-            if (endSec > startSec) {
+            let endSec = timeToSeconds(s.fim);
+            if (endSec < startSec) {
+                endSec += 24 * 3600;
+            }
+            const dur = endSec - startSec;
+            if (dur > 0 && dur <= 12 * 3600) {
                 intervals.push([startSec, endSec]);
             }
         });
@@ -1913,17 +1930,44 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         let piecesB = 0;
         let hasTurnoBReport = false;
 
+        // 1. Prioridade máxima: operatorLogs desta data (mesma fonte oficial do Dashboard PCP, incluindo ajustes manuais)
+        const dayLogs = (op.operatorLogs || []).filter((l: any) => {
+            if (!l || l.action === 'Criada no PCP' || l.operator === 'GHOST_ORDER_FLAG') return false;
+            const s = l.startTime || l.start_time;
+            const e = l.endTime || l.end_time;
+            // Usar prioritariamente a data de início do turno (igual ao getOpDayStats do PCPBoard)
+            if (s) return matchesDate(s, selectedDate);
+            return matchesDate(e, selectedDate);
+        });
+
+        let logsPiecesA = 0;
+        dayLogs.forEach((l: any) => {
+            if (!opA && l.operator) opA = l.operator;
+            const sQ = l.startQuantity ?? l.start_quantity;
+            const eQ = l.endQuantity ?? l.end_quantity;
+            const hasEnd = Boolean(l.endTime || l.end_time);
+            if (hasEnd && eQ !== undefined && sQ !== undefined) {
+                const diff = Math.max(0, (Number(eQ) || 0) - (Number(sQ) || 0));
+                logsPiecesA += diff;
+            } else if (!hasEnd && sQ !== undefined) {
+                const currentTotal = Number(op.actualProducedQuantity) || 0;
+                const diff = Math.max(0, currentTotal - Number(sQ));
+                logsPiecesA += diff;
+            }
+        });
+
+        // 2. Relatórios de Turno desta OP nesta data específica (usados para Turno B, operador ou fallback se não houver operatorLogs)
         dayShiftReports.forEach(r => {
             const shiftName = (r.shift || '').toLowerCase();
             const sStart = r.shiftStartTime ? new Date(r.shiftStartTime) : null;
             const hour = sStart && !isNaN(sStart.getTime()) ? sStart.getHours() : -1;
-            
-            // Turno B apenas se a máquina estiver configurada para 2 turnos E explicitamente marcado ou se o turno iniciou após as 15h (sem ser A)
             const isTurnoB = shiftCfg.shiftCount === 2 && (shiftName.includes('b') || shiftName.includes('2') || (hour >= 15 && !shiftName.includes('a')));
 
             if (!isTurnoB) {
                 if (!opA && r.operator) opA = r.operator;
-                piecesA += Number(r.totalProducedQuantity || r.totalProducedWeight || 0);
+                if (dayLogs.length === 0) {
+                    piecesA += Number(r.totalProducedQuantity || r.totalProducedWeight || 0);
+                }
             } else {
                 hasTurnoBReport = true;
                 if (!opB && r.operator) opB = r.operator;
@@ -1931,28 +1975,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             }
         });
 
-        // 2. Se não encontrou quantidade em shiftReports, checar operatorLogs desta data
-        if (piecesA === 0 && piecesB === 0) {
-            const dayLogs = (op.operatorLogs || []).filter(l => {
-                return matchesDate(l.startTime, selectedDate) || matchesDate(l.endTime, selectedDate);
-            });
-
-            dayLogs.forEach(l => {
-                if (!opA && l.operator) opA = l.operator;
-                if (l.endQuantity !== undefined && l.startQuantity !== undefined) {
-                    const diff = Math.max(0, (Number(l.endQuantity) || 0) - (Number(l.startQuantity) || 0));
-                    piecesA += diff;
-                } else if (!l.endTime && l.startQuantity !== undefined) {
-                    // Turno ativo em andamento hoje!
-                    const currentTotal = Number(op.actualProducedQuantity) || 0;
-                    const diff = Math.max(0, currentTotal - Number(l.startQuantity));
-                    piecesA += diff;
-                }
-            });
+        if (logsPiecesA > 0 || dayLogs.length > 0) {
+            piecesA = logsPiecesA;
         }
 
-        // 3. Sincronizar com initialProduced calculado pelo PCP (garante paridade exata)
-        if (initialProduced !== undefined && initialProduced > 0) {
+        // 3. Sincronizar com initialProduced calculado pelo PCP quando na mesma data inicial do card aberto
+        if (initialProduced !== undefined && initialProduced > 0 && (!dateStr || matchesDate(selectedDate, dateStr))) {
             piecesA = initialProduced;
         }
 
@@ -2554,10 +2582,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     ? defaultShiftA
                     : (rawStatsA.horasTrabalhadas || defaultShiftA);
 
-                // Sincronização inteligente com a produção real do chão de fábrica:
-                let piecesAFromDb = (initialProduced !== undefined && initialProduced > 0)
+                // Sincronização inteligente com a produção real do Dashboard / chão de fábrica:
+                let piecesAFromDb = (initialProduced !== undefined && initialProduced > 0 && (!dateStr || matchesDate(targetDate, dateStr)))
                     ? initialProduced
-                    : (Number(rawStatsA.pecasProduzidas || 0) || auto.statsShiftA.pecasProduzidas || 0);
+                    : (auto.statsShiftA.pecasProduzidas > 0 ? auto.statsShiftA.pecasProduzidas : Number(rawStatsA.pecasProduzidas || 0));
 
                 const expectedPieceSize = resolvePieceSize(op, dbReport.product_description);
 
@@ -2597,14 +2625,20 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     ? [...dbReport.production_updates]
                     : (autoHistory.length > 0 ? autoHistory : (auto.productionUpdates.length > 0 ? auto.productionUpdates : (dbReport.production_updates || [])));
 
-                // Para Malha e Treliça, mesclar novas marcações diárias de autoHistory que ainda não estavam salvas no dbReport
+                // Para Malha e Treliça, sincronizar todas as marcações diárias com autoHistory (garante que alterações manuais no Dashboard reflitam 100% no relatório)
                 if (!isTrefila && hasValidDbUpdates && autoHistory.length > 0) {
                     autoHistory.forEach(autoRow => {
-                        const alreadyHasDate = finalUpdates.some((u: any) =>
+                        const existingIdx = finalUpdates.findIndex((u: any) =>
                             matchesDate(u.data, autoRow.data) || String(u.data || '').trim() === String(autoRow.data || '').trim()
                         );
-                        if (!alreadyHasDate && Number(autoRow.qnt) > 0) {
+                        if (existingIdx === -1 && Number(autoRow.qnt) > 0) {
                             finalUpdates.push(autoRow);
+                        } else if (existingIdx !== -1 && Number(autoRow.qnt) > 0) {
+                            finalUpdates[existingIdx] = {
+                                ...finalUpdates[existingIdx],
+                                qnt: autoRow.qnt,
+                                peso: autoRow.peso
+                            };
                         }
                     });
                     finalUpdates.sort((a: any, b: any) => parseDateSortKey(a.data) - parseDateSortKey(b.data));
@@ -3012,6 +3046,10 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                 const size = statsShiftA.tamanhoPeca || 12;
                 const unitWeight = getTheoreticalWeightPerPiece(productDescription, size);
                 updated.peso = Math.round((Number(cleanValue) || 0) * unitWeight);
+                // Se a linha editada for da data selecionada no cabeçalho do relatório, sincroniza também as Estatísticas do Dia
+                if (!isTrefila && (matchesDate(r.data, selectedDate) || String(r.data || '').trim() === formattedDateNumbers)) {
+                    setStatsShiftA(prevStats => ({ ...prevStats, pecasProduzidas: Number(cleanValue) || 0 }));
+                }
             }
             return updated;
         }));
@@ -3099,10 +3137,12 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         const velocidadeMinutoA = secondsEfetivoA > 0 ? (metrosProduzidosA / (secondsEfetivoA / 60)) : 0;
         const velocidadeMinutoB = secondsEfetivoB > 0 ? (metrosProduzidosB / (secondsEfetivoB / 60)) : 0;
 
-        // Produtividade / Ritmo por hora
-        const totalWorkedHoursA = totalElapsedA > 0 ? (totalElapsedA / 3600) : (totalWorkedA / 3600);
-        const ratePerHourA = (totalWorkedHoursA >= 0.16 && statsShiftA.pecasProduzidas > 0)
-            ? Math.round(statsShiftA.pecasProduzidas / totalWorkedHoursA)
+        // Produtividade / Ritmo por hora (baseado no Tempo Efetivo de Máquina para recalcular ao adicionar/editar paradas manualmente)
+        const effectiveHoursA = secondsEfetivoA > 0
+            ? (secondsEfetivoA / 3600)
+            : (totalElapsedA > 0 ? (totalElapsedA / 3600) : (totalWorkedA / 3600));
+        const ratePerHourA = (effectiveHoursA >= 0.05 && statsShiftA.pecasProduzidas > 0)
+            ? Math.round(statsShiftA.pecasProduzidas / effectiveHoursA)
             : (initialDayStats?.ratePerHour && initialDayStats.ratePerHour > 0 ? initialDayStats.ratePerHour : 0);
         const rateUnitA = initialDayStats?.rateUnit || (isTrefila ? 'kg/h' : 'pçs/h');
         const ratePerHourStrA = ratePerHourA > 0 ? `${ratePerHourA.toLocaleString('pt-BR')} ${rateUnitA}` : `0 ${rateUnitA}`;
@@ -3132,9 +3172,11 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
             velocidadeStrA = `${mPerMin} metros/ minuto`;
         }
 
-        const totalWorkedHoursB = totalElapsedB > 0 ? (totalElapsedB / 3600) : (totalWorkedB > 0 ? (totalWorkedB / 3600) : 0);
-        const ratePerHourB = (totalWorkedHoursB >= 0.16 && statsShiftB.pecasProduzidas > 0)
-            ? Math.round(statsShiftB.pecasProduzidas / totalWorkedHoursB)
+        const effectiveHoursB = secondsEfetivoB > 0
+            ? (secondsEfetivoB / 3600)
+            : (totalElapsedB > 0 ? (totalElapsedB / 3600) : (totalWorkedB > 0 ? (totalWorkedB / 3600) : 0));
+        const ratePerHourB = (effectiveHoursB >= 0.05 && statsShiftB.pecasProduzidas > 0)
+            ? Math.round(statsShiftB.pecasProduzidas / effectiveHoursB)
             : 0;
         const rateUnitB = isTrefila ? 'kg/h' : 'pçs/h';
         const ratePerHourStrB = ratePerHourB > 0 ? `${ratePerHourB.toLocaleString('pt-BR')} ${rateUnitB}` : `0 ${rateUnitB}`;
@@ -4263,7 +4305,22 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                                 <input
                                                     type="number"
                                                     value={statsShiftA.pecasProduzidas || ''}
-                                                    onChange={e => setStatsShiftA({ ...statsShiftA, pecasProduzidas: parseInt(e.target.value, 10) || 0 })}
+                                                    onChange={e => {
+                                                        const newQty = parseInt(e.target.value, 10) || 0;
+                                                        setStatsShiftA({ ...statsShiftA, pecasProduzidas: newQty });
+                                                        const size = statsShiftA.tamanhoPeca || 12;
+                                                        const unitW = getTheoreticalWeightPerPiece(productDescription, size);
+                                                        setProductionUpdates(prev => prev.map(r => {
+                                                            if (matchesDate(r.data, selectedDate) || String(r.data || '').trim() === formattedDateNumbers) {
+                                                                return {
+                                                                    ...r,
+                                                                    qnt: newQty,
+                                                                    peso: Math.round(newQty * unitW)
+                                                                };
+                                                            }
+                                                            return r;
+                                                        }));
+                                                    }}
                                                     className="modern-editable-input text-center w-20 min-w-[76px] text-slate-950 border-b border-slate-200 font-black text-sm"
                                                     placeholder="0"
                                                 />
@@ -4534,7 +4591,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                                             onChange={e => setPiecesToProduce(parseInt(e.target.value, 10) || 0)}
                                             className="modern-editable-input text-center w-28 min-w-[100px] text-[#002060] font-black text-xs"
                                         />
-                                        <span className="text-slate-500 font-medium">{isTrefila ? 'kg' : 'treliças'}</span>
+                                        <span className="text-slate-500 font-medium">{isTrefila ? 'kg' : isMalha ? 'malhas' : 'treliças'}</span>
                                     </div>
 
                                     <div className="flex gap-2">

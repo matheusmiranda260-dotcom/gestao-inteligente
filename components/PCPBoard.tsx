@@ -1220,12 +1220,15 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             // Se for ajuste de turno e houver relatório de turno correspondente (fechado)
             if (details?.mode === 'shift' && details.dayStats?.dateStr && details.shiftQty !== undefined) {
                 const targetDateStr = details.dayStats.dateStr;
-                const matchingReps = (shiftReports || []).filter(r => {
-                    const isThisOp = r.productionOrderId === targetOrder.id || r.orderNumber === targetOrder.orderNumber;
-                    if (!isThisOp) return false;
-                    const repDate = getIsoDateStr(r.shiftStartTime || (r as any).shift_start_time || r.date || r.shiftEndTime || (r as any).shift_end_time);
-                    return repDate === targetDateStr;
-                });
+                const matchingReps = (shiftReports || [])
+                    .filter(r => {
+                        const isThisOp = r.productionOrderId === targetOrder.id || r.orderNumber === targetOrder.orderNumber;
+                        if (!isThisOp) return false;
+                        const repDate = getIsoDateStr(r.shiftStartTime || (r as any).shift_start_time || r.date || r.shiftEndTime || (r as any).shift_end_time);
+                        return repDate === targetDateStr;
+                    })
+                    .sort((a, b) => (Number(b.totalProducedQuantity || b.totalProducedWeight || 0)) - (Number(a.totalProducedQuantity || a.totalProducedWeight || 0)));
+
                 for (let rIdx = 0; rIdx < matchingReps.length; rIdx++) {
                     const matchingRep = matchingReps[rIdx];
                     const newRepVal = rIdx === 0 ? details.shiftQty : 0;
@@ -1241,10 +1244,14 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                     }
                 }
 
-                // Gravar na folha diária salva (localStorage e Supabase) para refletir instantaneamente
+                // Gravar na folha diária salva (localStorage) em todas as datas da máquina para refletir instantaneamente
                 const machName = targetOrder.scheduledMachine || (targetOrder.machine as string) || 'Treliça 1';
-                const localKey = `daily_report_${machName}_${targetDateStr}`;
+                const [yStr, mStr, dStr] = targetDateStr.split('-');
+                const brFullDate = `${dStr}/${mStr}/${yStr}`;
+                const brShortDate = `${dStr}/${mStr}`;
+                const unitW = getOpWeightPerUnit(targetOrder);
                 try {
+                    const localKey = `daily_report_${machName}_${targetDateStr}`;
                     const existingRaw = localStorage.getItem(localKey);
                     const existingData = existingRaw ? JSON.parse(existingRaw) : {};
                     const newPayload = {
@@ -1258,6 +1265,34 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                         }
                     };
                     localStorage.setItem(localKey, JSON.stringify(newPayload));
+
+                    // Também sincronizar production_updates em qualquer relatório diário em cache desta máquina
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k && k.startsWith(`daily_report_${machName}_`)) {
+                            const raw = localStorage.getItem(k);
+                            if (!raw) continue;
+                            const parsed = JSON.parse(raw);
+                            if (Array.isArray(parsed.production_updates)) {
+                                let updatedAny = false;
+                                parsed.production_updates = parsed.production_updates.map((u: any) => {
+                                    const uData = String(u.data || '').trim();
+                                    if (uData === brFullDate || uData === brShortDate || uData === targetDateStr) {
+                                        updatedAny = true;
+                                        return {
+                                            ...u,
+                                            qnt: details.shiftQty,
+                                            peso: isTrefila ? details.shiftQty : Math.round((Number(details.shiftQty) || 0) * unitW)
+                                        };
+                                    }
+                                    return u;
+                                });
+                                if (updatedAny) {
+                                    localStorage.setItem(k, JSON.stringify(parsed));
+                                }
+                            }
+                        }
+                    }
                 } catch { }
             }
 
@@ -2090,8 +2125,8 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
                 gauge: g.gauge,
                 meshSpacing: (g as any).meshSpacing,
                 panelDimensions: (g as any).panelDimensions || (g as any).tamanho,
-                peso_peca: (g as any).peso_peca || g.peso_final,
-                peso_final: g.peso_final,
+                peso_peca: (g as any).peso_peca || (g as any).pesoPeca || g.peso_final || (g as any).pesoFinal,
+                peso_final: g.peso_final || (g as any).pesoFinal,
                 longitudinal: (g as any).longitudinal,
                 transversal: (g as any).transversal
             });
@@ -4715,6 +4750,59 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             }
         }
 
+        // Sincronizar paradas editadas/adicionadas manualmente na Ficha Oficial de Produção Diária (localStorage)
+        try {
+            const savedDailyRaw = localStorage.getItem(`daily_report_${machName}_${dateStr}`);
+            if (savedDailyRaw) {
+                const savedDaily = JSON.parse(savedDailyRaw);
+                if (!savedDaily.production_order || savedDaily.production_order === op.orderNumber) {
+                    const manualStops = [
+                        ...(Array.isArray(savedDaily.stops_shift_a) ? savedDaily.stops_shift_a : []),
+                        ...(Array.isArray(savedDaily.stops_shift_b) ? savedDaily.stops_shift_b : [])
+                    ];
+                    if (manualStops.length > 0) {
+                        const parseSec = (tStr: string): number => {
+                            if (!tStr) return 0;
+                            const clean = String(tStr).trim().toLowerCase().replace(/[h.]/g, ':');
+                            if (/^\d{4}$/.test(clean)) return (parseInt(clean.slice(0, 2), 10) || 0) * 3600 + (parseInt(clean.slice(2, 4), 10) || 0) * 60;
+                            if (/^\d{6}$/.test(clean)) return (parseInt(clean.slice(0, 2), 10) || 0) * 3600 + (parseInt(clean.slice(2, 4), 10) || 0) * 60 + (parseInt(clean.slice(4, 6), 10) || 0);
+                            const p = clean.split(':');
+                            return (parseInt(p[0], 10) || 0) * 3600 + (parseInt(p[1], 10) || 0) * 60 + (parseInt(p[2], 10) || 0);
+                        };
+                        const intervals: [number, number][] = [];
+                        manualStops.forEach((s: any) => {
+                            if (!s || !s.inicio || !s.fim) return;
+                            const st = parseSec(s.inicio);
+                            let en = parseSec(s.fim);
+                            if (en < st) en += 24 * 3600;
+                            const dur = en - st;
+                            if (dur > 0 && dur <= 12 * 3600) intervals.push([st, en]);
+                        });
+                        if (intervals.length > 0) {
+                            intervals.sort((a, b) => a[0] - b[0]);
+                            let mergedSec = 0;
+                            let [cS, cE] = intervals[0];
+                            for (let i = 1; i < intervals.length; i++) {
+                                const [nS, nE] = intervals[i];
+                                if (nS <= cE) cE = Math.max(cE, nE);
+                                else {
+                                    mergedSec += (cE - cS);
+                                    cS = nS;
+                                    cE = nE;
+                                }
+                            }
+                            mergedSec += (cE - cS);
+                            const manualDowntimeMs = mergedSec * 1000;
+                            if (dayElapsedShiftMs === 0) {
+                                dayElapsedShiftMs = shiftPlannedDurationMs;
+                            }
+                            dayDowntimeMs = Math.min(manualDowntimeMs, dayElapsedShiftMs);
+                        }
+                    }
+                }
+            }
+        } catch { /* ignore */ }
+
         let effectiveMs = 0;
         if (todayProduced > 0 || isProducingNow) {
             effectiveMs = Math.max(0, dayElapsedShiftMs - dayDowntimeMs);
@@ -5075,7 +5163,7 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
             });
 
             if (found) {
-                const rawPeso = (found as any).peso_peca || (found as any).peso_final || (found as any).peso;
+                const rawPeso = (found as any).peso_peca || (found as any).pesoPeca || (found as any).peso_final || (found as any).pesoFinal || (found as any).peso;
                 if (rawPeso) {
                     const parsed = parseFloat(String(rawPeso).replace(',', '.'));
                     if (!isNaN(parsed) && parsed > 0) return parsed;
