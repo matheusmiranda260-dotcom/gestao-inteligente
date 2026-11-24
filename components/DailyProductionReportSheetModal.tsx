@@ -1120,8 +1120,8 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         });
 
         // 4. Se initialProduced estiver definido para a data inicial do card aberto no Dashboard, garante paridade exata
-        if (initialProduced !== undefined && initialProduced > 0 && dateStr && (!upToDateStr || upToDateStr >= dateStr)) {
-            dayMap.set(dateStr, initialProduced);
+        if (initialProduced !== undefined && initialProduced > 0 && initialDateStr && (!upToDateStr || upToDateStr >= initialDateStr)) {
+            dayMap.set(initialDateStr, initialProduced);
         }
 
         const sortedDates = [...dayMap.keys()].filter(d => !upToDateStr || d <= upToDateStr).sort();
@@ -1980,7 +1980,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
         }
 
         // 3. Sincronizar com initialProduced calculado pelo PCP quando na mesma data inicial do card aberto
-        if (initialProduced !== undefined && initialProduced > 0 && (!dateStr || matchesDate(selectedDate, dateStr))) {
+        if (initialProduced !== undefined && initialProduced > 0 && (!initialDateStr || matchesDate(selectedDate, initialDateStr))) {
             piecesA = initialProduced;
         }
 
@@ -2583,7 +2583,7 @@ export const DailyProductionReportSheetModal: React.FC<DailyProductionReportShee
                     : (rawStatsA.horasTrabalhadas || defaultShiftA);
 
                 // Sincronização inteligente com a produção real do Dashboard / chão de fábrica:
-                let piecesAFromDb = (initialProduced !== undefined && initialProduced > 0 && (!dateStr || matchesDate(targetDate, dateStr)))
+                let piecesAFromDb = (initialProduced !== undefined && initialProduced > 0 && (!initialDateStr || matchesDate(targetDate, initialDateStr)))
                     ? initialProduced
                     : (auto.statsShiftA.pecasProduzidas > 0 ? auto.statsShiftA.pecasProduzidas : Number(rawStatsA.pecasProduzidas || 0));
 

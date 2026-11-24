@@ -4733,13 +4733,33 @@ export const PCPBoard: React.FC<PCPBoardProps> = ({
         } else if (isPast) {
             const hasPastActivity = reportsDayQty > 0 || dayPackagesQty > 0 || dayLotsWeight > 0 || dayLogsPcs > 0 || closedDowntimeMs > 0;
             if (hasPastActivity) {
-                const repWithTimes = matchingReports.find(r => r.shiftStartTime && r.shiftEndTime);
-                if (repWithTimes) {
-                    const s = new Date(repWithTimes.shiftStartTime).getTime();
-                    const e = new Date(repWithTimes.shiftEndTime).getTime();
-                    if (!isNaN(s) && !isNaN(e) && e > s) {
-                        dayElapsedShiftMs = Math.min(e - s, shiftPlannedDurationMs);
+                // Mesclar todos os intervalos de turno do dia (evita pegar só um handover curto de 1 min)
+                const shiftIntervals: [number, number][] = [];
+                matchingReports.forEach(r => {
+                    if (r.shiftStartTime && r.shiftEndTime) {
+                        const s = new Date(r.shiftStartTime).getTime();
+                        const e = new Date(r.shiftEndTime).getTime();
+                        if (!isNaN(s) && !isNaN(e) && e > s) {
+                            shiftIntervals.push([s, e]);
+                        }
                     }
+                });
+                if (shiftIntervals.length > 0) {
+                    shiftIntervals.sort((a, b) => a[0] - b[0]);
+                    let mergedMs = 0;
+                    let [curS, curE] = shiftIntervals[0];
+                    for (let i = 1; i < shiftIntervals.length; i++) {
+                        const [nS, nE] = shiftIntervals[i];
+                        if (nS <= curE) {
+                            curE = Math.max(curE, nE);
+                        } else {
+                            mergedMs += (curE - curS);
+                            curS = nS;
+                            curE = nE;
+                        }
+                    }
+                    mergedMs += (curE - curS);
+                    dayElapsedShiftMs = Math.min(mergedMs, shiftPlannedDurationMs);
                 }
 
                 if (dayElapsedShiftMs === 0) {
