@@ -1569,6 +1569,7 @@ const QuantityPromptModal: React.FC<{
     const [totalQty, setTotalQty] = useState(totalOrderQty);
     
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [confirmZero, setConfirmZero] = useState<boolean>(false);
 
     const isTrelica = machineName?.startsWith('Treliça');
     const isMalha = machineName?.startsWith('Malha');
@@ -1607,6 +1608,7 @@ const QuantityPromptModal: React.FC<{
     const isSubmitBlocked = isBelowMinimum || (pieceDelta > 0 && hasMissingLots);
 
     const handleShiftChange = (valStr: string) => {
+        setConfirmZero(false);
         const val = parseInt(valStr, 10);
         if (isNaN(val)) {
             setShiftQty(0);
@@ -1622,6 +1624,7 @@ const QuantityPromptModal: React.FC<{
     };
 
     const handleTotalChange = (valStr: string) => {
+        setConfirmZero(false);
         const val = parseInt(valStr, 10);
         if (isNaN(val)) {
             setTotalQty(0);
@@ -1640,6 +1643,10 @@ const QuantityPromptModal: React.FC<{
         e.preventDefault();
         if (isBelowMinimum) {
             setErrorMsg(`Erro: Quantidade informada inferior ao mínimo registrado.`);
+            return;
+        }
+        if (effectiveShiftQty === 0 && !confirmZero) {
+            setConfirmZero(true);
             return;
         }
         if (mode === 'total') {
@@ -1862,6 +1869,19 @@ const QuantityPromptModal: React.FC<{
                     )}
                 </div>
 
+                {/* Alerta de confirmação dupla ao tentar enviar 0 peças no turno */}
+                {confirmZero && effectiveShiftQty === 0 && !isBelowMinimum && (
+                    <div className="bg-amber-950/70 border-2 border-amber-500 p-3 rounded-xl flex items-start gap-2.5 text-xs text-amber-100 animate-fade-in">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                            <span className="font-black text-amber-200">Você está informando 0 peças neste turno!</span>
+                            <p className="text-[11px] text-amber-200/90 mt-0.5 leading-snug">
+                                Se a máquina já produziu peças, digite a quantidade no campo acima. Se realmente não produziu nenhuma peça ainda, clique novamente em <strong>Confirmar 0 Peças</strong>.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Rodapé com Ações */}
                 <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
                     <button
@@ -1874,10 +1894,14 @@ const QuantityPromptModal: React.FC<{
                     <button
                         type="submit"
                         disabled={isSubmitBlocked}
-                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-6 rounded-xl text-xs transition shadow-lg shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer"
+                        className={`${confirmZero && effectiveShiftQty === 0 ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/40' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/40'} disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-2.5 px-6 rounded-xl text-xs transition shadow-lg flex items-center gap-1.5 cursor-pointer`}
                     >
-                        <span>✓</span>
-                        <span>{hasMissingLots && pieceDelta > 0 ? 'Abasteça os Lotes Primeiro' : 'Confirmar Produção'}</span>
+                        <span>{confirmZero && effectiveShiftQty === 0 ? '⚠️' : '✓'}</span>
+                        <span>
+                            {hasMissingLots && pieceDelta > 0
+                                ? 'Abasteça os Lotes Primeiro'
+                                : (confirmZero && effectiveShiftQty === 0 ? 'Confirmar 0 Peças' : 'Confirmar Produção')}
+                        </span>
                     </button>
                 </div>
             </form>

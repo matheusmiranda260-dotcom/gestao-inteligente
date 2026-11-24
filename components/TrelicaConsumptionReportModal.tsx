@@ -427,6 +427,7 @@ export const saveTrelicaPackagesData = async (op: ProductionOrderData, data: Tre
     }));
 
     const totalPackagedWeight = syncedWeighedPackages.reduce((acc, p) => acc + (Number(p.weight) || 0), 0);
+    const totalPackagedPieces = syncedWeighedPackages.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
 
     if (op.id) {
         try {
@@ -441,10 +442,16 @@ export const saveTrelicaPackagesData = async (op: ProductionOrderData, data: Tre
             if (totalPackagedWeight > 0) {
                 op.actualProducedWeight = totalPackagedWeight;
             }
+            const currentProducedQty = Number(op.actualProducedQuantity || (op as any).actual_produced_quantity || 0);
+            const shouldSyncQty = totalPackagedPieces > currentProducedQty;
+            if (shouldSyncQty) {
+                op.actualProducedQuantity = totalPackagedPieces;
+            }
             await updateItem('production_orders', op.id, {
                 summary: updatedSummary,
                 weighedPackages: syncedWeighedPackages,
-                ...(totalPackagedWeight > 0 ? { actualProducedWeight: totalPackagedWeight } : {})
+                ...(totalPackagedWeight > 0 ? { actualProducedWeight: totalPackagedWeight } : {}),
+                ...(shouldSyncQty ? { actualProducedQuantity: totalPackagedPieces, lastQuantityUpdate: new Date().toISOString() } : {})
             } as any);
         } catch (err) {
             console.warn('Erro ao salvar pacotes de treliça no Supabase:', err);
