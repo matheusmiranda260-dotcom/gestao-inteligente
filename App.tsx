@@ -173,61 +173,52 @@ const App: React.FC = () => {
     }, [currentUser, page]); // Refresh when page changes too
 
     useEffect(() => {
+        const hydrateOrderList = (orders: any[]) =>
+            (orders || []).map((o: any) => {
+                if (o.summary && typeof o.summary === 'object') {
+                    return {
+                        ...o.summary,
+                        ...o,
+                        targetSpeed: o.targetSpeed ?? o.summary.target_speed ?? o.summary.targetSpeed,
+                        rollChangeTimeMinutes: o.rollChangeTimeMinutes ?? o.summary.roll_change_time_minutes ?? o.summary.rollChangeTimeMinutes,
+                        setupTimeMinutes: o.setupTimeMinutes ?? o.summary.setup_time_minutes ?? o.summary.setupTimeMinutes,
+                        estimatedProductionHours: o.estimatedProductionHours ?? o.summary.estimated_production_hours ?? o.summary.estimatedProductionHours,
+                        dailyWorkHours: o.dailyWorkHours ?? o.summary.daily_work_hours ?? o.summary.dailyWorkHours,
+                        shiftConfig: o.shiftConfig ?? o.summary.shift_config ?? o.summary.shiftConfig,
+                    };
+                }
+                return o;
+            });
+
+        const safeFetch = <T,>(table: string, critical = false): Promise<T[]> =>
+            fetchTable<T>(table).catch((err) => {
+                console.warn(`[loadData] Falha ao carregar tabela ${table}:`, err);
+                if (critical) throw err;
+                return [];
+            });
+
         const loadData = async () => {
             try {
+                // Fase 1 (Prioritária): Carrega primeiro os dados essenciais do PCP e autenticação
                 const [
-                    fetchedUsers, fetchedEmployees, fetchedStock, fetchedConferences, fetchedTransfers,
-                    fetchedOrders, fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
-                    fetchedParts, fetchedReports, fetchedProductionRecords, fetchedGauges, fetchedNotes, fetchedMeetings, fetchedCategories, fetchedDowntimeConfigs,
-                    fetchedAccessLogs, fetchedSchedules
+                    fetchedOrders, fetchedReports, fetchedEmployees, fetchedUsers,
+                    fetchedGauges, fetchedDowntimeConfigs, dbShift, dbHolidays
                 ] = await Promise.all([
-                    fetchTable<User>('app_users'),
-                    fetchTable<Employee>('employees'),
-                    fetchTable<StockItem>('stock_items'),
-                    fetchTable<ConferenceData>('conferences'),
-                    fetchTable<TransferRecord>('transfers'),
-                    fetchTable<ProductionOrderData>('production_orders'),
-                    fetchTable<FinishedProductItem>('finished_goods'),
-                    fetchTable<PontaItem>('pontas_stock'),
-                    fetchTable<FinishedGoodsTransferRecord>('finished_goods_transfers'),
-                    fetchTable<PartsRequest>('parts_requests'),
-                    fetchTable<ShiftReport>('shift_reports'),
-                    fetchTable<ProductionRecord>('production_records'),
-
-                    fetchTable<StockGauge>('stock_gauges').catch(() => []),
-                    fetchTable<StickyNote>('sticky_notes').catch(() => []),
-                    fetchTable<Meeting>('meetings').catch(() => []),
-                    fetchTable<MeetingCategory>('meeting_categories').catch(() => []),
-                    fetchTable<DowntimeConfig>('downtime_configs').catch(() => []),
-                    fetchTable<UserAccessLog>('user_access_logs').catch(() => []),
-                    fetchTable<ProductionSchedule>('production_schedules').catch(() => [])
+                    safeFetch<ProductionOrderData>('production_orders', true),
+                    safeFetch<ShiftReport>('shift_reports'),
+                    safeFetch<Employee>('employees'),
+                    safeFetch<User>('app_users'),
+                    safeFetch<StockGauge>('stock_gauges'),
+                    safeFetch<DowntimeConfig>('downtime_configs'),
+                    fetchPcpShiftConfig().catch(() => null),
+                    fetchPcpHolidays().catch(() => [])
                 ]);
 
                 setUsers(fetchedUsers);
-                setAccessLogs(fetchedAccessLogs || []);
                 setEmployees(fetchedEmployees);
-                setStock(fetchedStock);
-                setConferences(fetchedConferences);
-                const hydratedOrders = (fetchedOrders || []).map((o: any) => {
-                    if (o.summary && typeof o.summary === 'object') {
-                        return {
-                            ...o.summary,
-                            ...o,
-                            targetSpeed: o.targetSpeed ?? o.summary.target_speed ?? o.summary.targetSpeed,
-                            rollChangeTimeMinutes: o.rollChangeTimeMinutes ?? o.summary.roll_change_time_minutes ?? o.summary.rollChangeTimeMinutes,
-                            setupTimeMinutes: o.setupTimeMinutes ?? o.summary.setup_time_minutes ?? o.summary.setupTimeMinutes,
-                            estimatedProductionHours: o.estimatedProductionHours ?? o.summary.estimated_production_hours ?? o.summary.estimatedProductionHours,
-                            dailyWorkHours: o.dailyWorkHours ?? o.summary.daily_work_hours ?? o.summary.dailyWorkHours,
-                            shiftConfig: o.shiftConfig ?? o.summary.shift_config ?? o.summary.shiftConfig,
-                        };
-                    }
-                    return o;
-                });
-                setProductionOrders(hydratedOrders);
-                setPontasStock(fetchedPontas);
-                setFinishedGoodsTransfers(fetchedFGTransfers);
-                setPartsRequests(fetchedParts);
+                setProductionOrders(hydrateOrderList(fetchedOrders));
                 setShiftReports(fetchedReports);
+                setDowntimeConfigs(fetchedDowntimeConfigs || []);
 
                 const baseGauges = fetchedGauges || [];
                 const hasElectrodeGauges = baseGauges.some(g => g.materialType === 'Eletrodos Treliças');
@@ -243,27 +234,51 @@ const App: React.FC = () => {
                 } else {
                     setGauges(baseGauges);
                 }
-                setStickyNotes(fetchedNotes || []);
-                setMeetings(fetchedMeetings || []);
-                setMeetingCategories(fetchedCategories || []);
-                setDowntimeConfigs(fetchedDowntimeConfigs || []);
-                setProductionSchedules(fetchedSchedules || []);
 
-                // Split production records
-                setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Trefila')));
-                setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Treliça')));
-                setMalhaProduction(fetchedProductionRecords.filter(r => r.machine.toLowerCase().startsWith('malha')));
-
-                const [dbShift, dbHolidays] = await Promise.all([
-                    fetchPcpShiftConfig(),
-                    fetchPcpHolidays()
-                ]);
                 if (dbShift) {
                     setPcpShiftConfig(dbShift);
                 }
                 if (dbHolidays && dbHolidays.length > 0) {
                     setPcpHolidays(dbHolidays);
                 }
+
+                // Fase 2 (Secundária): Estoque, conferências, reuniões e logs sem travar o Quadro PCP
+                const [
+                    fetchedStock, fetchedConferences, fetchedTransfers,
+                    fetchedFinishedGoods, fetchedPontas, fetchedFGTransfers,
+                    fetchedParts, fetchedProductionRecords, fetchedNotes,
+                    fetchedMeetings, fetchedCategories, fetchedAccessLogs
+                ] = await Promise.all([
+                    safeFetch<StockItem>('stock_items'),
+                    safeFetch<ConferenceData>('conferences'),
+                    safeFetch<TransferRecord>('transfers'),
+                    safeFetch<FinishedProductItem>('finished_goods'),
+                    safeFetch<PontaItem>('pontas_stock'),
+                    safeFetch<FinishedGoodsTransferRecord>('finished_goods_transfers'),
+                    safeFetch<PartsRequest>('parts_requests'),
+                    safeFetch<ProductionRecord>('production_records'),
+                    safeFetch<StickyNote>('sticky_notes'),
+                    safeFetch<Meeting>('meetings'),
+                    safeFetch<MeetingCategory>('meeting_categories'),
+                    safeFetch<UserAccessLog>('user_access_logs')
+                ]);
+
+                setStock(fetchedStock);
+                setConferences(fetchedConferences);
+                setTransfers(fetchedTransfers);
+                setFinishedGoods(fetchedFinishedGoods);
+                setPontasStock(fetchedPontas);
+                setFinishedGoodsTransfers(fetchedFGTransfers);
+                setPartsRequests(fetchedParts);
+                setStickyNotes(fetchedNotes || []);
+                setMeetings(fetchedMeetings || []);
+                setMeetingCategories(fetchedCategories || []);
+                setAccessLogs(fetchedAccessLogs || []);
+
+                // Split production records
+                setTrefilaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Trefila')));
+                setTrelicaProduction(fetchedProductionRecords.filter(r => r.machine.startsWith('Treliça')));
+                setMalhaProduction(fetchedProductionRecords.filter(r => r.machine.toLowerCase().startsWith('malha')));
 
             } catch (error) {
                 console.error("Failed to load data from Supabase", error);
@@ -274,6 +289,32 @@ const App: React.FC = () => {
         if (currentUser) {
             loadData();
         }
+
+        // Sincronização periódica leve (a cada 20s) para manter o PCP sempre atualizado mesmo sem WebSocket (via proxy Vercel)
+        let syncInterval: any = null;
+        if (currentUser) {
+            syncInterval = setInterval(async () => {
+                if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+                try {
+                    const [freshOrders, freshReports] = await Promise.all([
+                        fetchTable<ProductionOrderData>('production_orders'),
+                        fetchTable<ShiftReport>('shift_reports')
+                    ]);
+                    if (freshOrders && freshOrders.length > 0) {
+                        setProductionOrders(hydrateOrderList(freshOrders));
+                    }
+                    if (freshReports) {
+                        setShiftReports(freshReports);
+                    }
+                } catch {
+                    // silencioso no polling em segundo plano
+                }
+            }, 20000);
+        }
+
+        return () => {
+            if (syncInterval) clearInterval(syncInterval);
+        };
     }, [currentUser]);
 
     const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
